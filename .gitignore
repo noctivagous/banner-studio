@@ -30,3 +30,6 @@ pnpm-debug.log*
 # deploy caches
 .vercel
 .netlify
+
+# refs internal
+refs/internal/*

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AssembleGuide } from './components/AssembleGuide.jsx'
 import { CopyPanel } from './components/CopyPanel.jsx'
 import { DocumentMenu } from './components/DocumentMenu.jsx'
 import { PrintButton } from './components/PrintButton.jsx'
@@ -174,6 +175,7 @@ export default function App() {
               <span className="font-mono text-[10px] tracking-[0.14em] text-[#7A7A80] uppercase">
                 No edge-to-edge • Inside safe area
               </span>
+              <AssembleGuide asymmetric={printOverlap} overlap={overlap} />
             </div>
           </div>
           <div className="flex items-center gap-3">

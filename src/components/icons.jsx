@@ -122,6 +122,22 @@ export function OverlapIcon() {
   )
 }
 
+export function LandscapeIcon() {
+  return (
+    <Base>
+      <rect x="1.5" y="3" width="9" height="6" rx="1" />
+    </Base>
+  )
+}
+
+export function PortraitIcon() {
+  return (
+    <Base>
+      <rect x="3" y="1.5" width="6" height="9" rx="1" />
+    </Base>
+  )
+}
+
 export function OutputIcon() {
   return (
     <Base>

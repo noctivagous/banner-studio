@@ -1,7 +1,10 @@
 import { MARGIN_PRESETS, detectPreset } from '../lib/layout.js'
 import { PAPERS } from '../lib/paper.js'
 import { FieldLabel } from './FieldLabel.jsx'
-import { MarginIcon, OverlapIcon, PrinterIcon } from './icons.jsx'
+import { SegmentControl } from './SegmentControl.jsx'
+import { LandscapeIcon, MarginIcon, OverlapIcon, PortraitIcon, PrinterIcon } from './icons.jsx'
+
+const OVERLAP_STEPS = [0.15, 0.25, 0.35, 0.5]
 
 const PRESET_BUTTONS = [
   { id: 'laser', label: 'Laser', sub: '.25"' },
@@ -48,18 +51,22 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
           </div>
         </div>
         <div className="grid grid-cols-2 gap-1.5">
-          {['landscape', 'portrait'].map((dir) => (
+          {[
+            { id: 'landscape', label: 'Landscape', Icon: LandscapeIcon },
+            { id: 'portrait', label: 'Portrait', Icon: PortraitIcon },
+          ].map(({ id, label, Icon }) => (
             <button
-              key={dir}
+              key={id}
               type="button"
-              onClick={() => onChange({ orientation: dir })}
-              className={`h-8 rounded-[4px] border font-mono text-[11px] tracking-[0.08em] uppercase ${
-                orientation === dir
+              onClick={() => onChange({ orientation: id })}
+              className={`h-8 rounded-[4px] border font-mono text-[11px] tracking-[0.08em] uppercase flex items-center justify-center gap-1.5 ${
+                orientation === id
                   ? 'bg-[#E3FF33] border-[#E3FF33] text-black font-bold'
                   : 'bg-[#26262E] border-[#43434E] text-[#7A7A80] hover:text-[#F0F0F2]'
               }`}
             >
-              {dir}
+              <Icon />
+              {label}
             </button>
           ))}
         </div>
@@ -124,19 +131,16 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
         >
           Overlap for Tape
         </FieldLabel>
-        <input
-          type="range"
-          min={0}
-          max={0.5}
-          step={0.05}
-          value={overlap}
-          onChange={(e) => onChange({ overlap: parseFloat(e.target.value) })}
-          className="w-full"
+        <SegmentControl
+          fill
+          ariaLabel="Overlap for tape"
+          value={overlap.toFixed(2)}
+          onChange={(next) => onChange({ overlap: Number(next) })}
+          options={OVERLAP_STEPS.map((step) => ({
+            value: step.toFixed(2),
+            label: `${step.toFixed(2)}"`,
+          }))}
         />
-        <div className="flex justify-between mt-1 font-mono text-[8px] text-[#5A5A60]">
-          <span>0&quot; no overlap</span>
-          <span>0.5&quot; max</span>
-        </div>
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { overlapCutSlack } from '../lib/layout.js'
+import { CUT_LINE_BLEND, overlapCutSlack } from '../lib/layout.js'
 import { BannerType } from './Preview.jsx'
 
 export function PrintArea({
@@ -79,22 +79,22 @@ export function PrintArea({
           </div>
           {printTrim &&
             [
-              i > 0 ? margins.left : null,
-              i < sheetCount - 1
-                ? margins.left + contentW + overlapCutSlack(overlap, printOverlap)
+              i > 0
+                ? margins.left + (printOverlap ? overlapCutSlack(overlap, printOverlap) : 0)
                 : null,
+              !printOverlap && i < sheetCount - 1 ? margins.left + contentW : null,
             ]
               .filter((edge) => edge != null)
               .map((edge) => (
                 <div
                   key={edge}
                   style={{
+                    ...CUT_LINE_BLEND,
                     position: 'absolute',
                     left: `${edge}in`,
                     top: `${margins.top}in`,
                     height: `${trimH}in`,
-                    borderLeft: '1px dashed #000',
-                    zIndex: 2,
+                    zIndex: 4,
                   }}
                 />
               ))}

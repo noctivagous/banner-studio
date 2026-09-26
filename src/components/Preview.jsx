@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { PX_PER_INCH, overlapCutSlack } from '../lib/layout.js'
+import { SegmentControl } from './SegmentControl.jsx'
+import { CUT_LINE_BLEND, PX_PER_INCH, overlapCutSlack } from '../lib/layout.js'
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
 
@@ -239,6 +240,9 @@ export function Preview({
   })
   const rulerH = 28
   const zoomPresets = [0.25, 0.5, 0.75, 1]
+  const [arrangement, setArrangement] = useState('overlap')
+  const stacked = arrangement === 'overlap' && printOverlap && overlap > 0
+  const sheetGap = arrangement === 'separate' ? 24 : stacked ? 0 : 8
 
   const measureScroll = useCallback(() => {
     const el = canvasRef.current
@@ -277,18 +281,22 @@ export function Preview({
     const padStyle = pad ? getComputedStyle(pad) : null
     const padX = padStyle ? parseFloat(padStyle.paddingLeft) + parseFloat(padStyle.paddingRight) : 48
     const padY = padStyle ? parseFloat(padStyle.paddingTop) + parseFloat(padStyle.paddingBottom) : 48
-    const gap = 24
     const labelH = showNumbers ? 28 : 0
     const availW = el.clientWidth - padX
     const availH = el.clientHeight - padY
     if (availW < 40 || availH < 40) return
-    const zW = (availW - Math.max(0, sheetCount - 1) * gap) / (sheetCount * pageW * PX_PER_INCH)
+    const spanIn =
+      stacked && sheetCount > 0
+        ? pageW + (sheetCount - 1) * contentW
+        : sheetCount * pageW
+    const gapPx = stacked ? 0 : sheetGap
+    const zW = (availW - Math.max(0, sheetCount - 1) * gapPx) / (spanIn * PX_PER_INCH)
     const zH = (availH - rulerH - labelH) / (pageH * PX_PER_INCH)
     const next = Math.max(0.05, Math.min(zW, zH))
     if (!Number.isFinite(next)) return
     const rounded = Math.round(next * 1000) / 1000
     if (Math.abs(rounded - zoom) > 0.0005) onZoom(rounded)
-  }, [onZoom, pageH, pageW, sheetCount, showNumbers, zoom])
+  }, [onZoom, pageH, pageW, sheetCount, showNumbers, zoom, stacked, sheetGap, contentW])
 
   useEffect(() => {
     if (!scaleToFit || sheetCount === 0) return
@@ -308,7 +316,7 @@ export function Preview({
     ro.observe(el)
     if (rowRef.current) ro.observe(rowRef.current)
     return () => ro.disconnect()
-  }, [measureScroll, sheetCount, zoom, pageW, pageH, showNumbers])
+  }, [measureScroll, sheetCount, zoom, pageW, pageH, showNumbers, arrangement, printOverlap])
 
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-[#08080A] relative order-first xl:order-none overflow-hidden">
@@ -319,6 +327,15 @@ export function Preview({
             <span className="font-mono text-[11px] tracking-[0.12em] text-[#F0F0F2] uppercase">
               Preview Canvas
             </span>
+            <SegmentControl
+              ariaLabel="Sheet arrangement"
+              value={arrangement}
+              onChange={setArrangement}
+              options={[
+                { value: 'separate', label: 'Separate' },
+                { value: 'overlap', label: 'Overlap' },
+              ]}
+            />
           </div>
           <div className="hidden md:flex items-center gap-2 ml-3 pl-3 border-l border-[#43434E]">
             <span className="font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
@@ -405,12 +422,21 @@ export function Preview({
               </div>
             </div>
           ) : (
-            <div ref={rowRef} className="flex gap-6" style={{ width: 'max-content' }}>
+            <div
+              ref={rowRef}
+              className="relative flex"
+              style={{ width: 'max-content', gap: sheetGap }}
+            >
               {Array.from({ length: sheetCount }).map((_, i) => (
                 <div
                   key={i}
                   className="relative shrink-0"
-                  style={{ width: sheetW, height: rulerH + sheetH + (showNumbers ? 28 : 0) }}
+                  style={{
+                    width: sheetW,
+                    height: rulerH + sheetH + (showNumbers ? 28 : 0),
+                    marginLeft: stacked && i > 0 ? -(sheetW - contentPx) : 0,
+                    zIndex: stacked ? i + 1 : 1,
+                  }}
                 >
                   <div
                     className="absolute overflow-hidden"
@@ -429,8 +455,9 @@ export function Preview({
                       top: rulerH,
                       width: sheetW,
                       height: sheetH,
-                      boxShadow:
-                        '0 1px 0 0 rgba(255,255,255,0.12) inset, 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)',
+                      boxShadow: stacked && i > 0
+                        ? '-10px 0 18px rgba(0,0,0,0.55), 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)'
+                        : '0 1px 0 0 rgba(255,255,255,0.12) inset, 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)',
                     }}
                   >
                     <div
@@ -536,19 +563,24 @@ export function Preview({
                     )}
                     {showTrim &&
                       [
-                        i > 0 ? margins.left * px : null,
-                        i < sheetCount - 1 ? margins.left * px + contentPx + cutSlackPx : null,
+                        i > 0
+                          ? margins.left * px + (printOverlap ? cutSlackPx : 0)
+                          : null,
+                        !printOverlap && i < sheetCount - 1
+                          ? margins.left * px + contentPx
+                          : null,
                       ]
                         .filter((edge) => edge != null)
                         .map((edge) => (
                           <div
                             key={edge}
-                            className="absolute pointer-events-none z-[2]"
+                            className="absolute pointer-events-none"
                             style={{
+                              ...CUT_LINE_BLEND,
                               left: edge,
                               top: margins.top * px,
                               height: trimH * px,
-                              borderLeft: '1px dashed #E3FF33',
+                              zIndex: 4,
                             }}
                           />
                         ))}
@@ -585,24 +617,7 @@ export function Preview({
                       </Fragment>
                     )}
                   </div>
-                  {showTrim &&
-                    [
-                      i > 0 ? margins.left * px : null,
-                      i < sheetCount - 1 ? margins.left * px + contentPx : null,
-                    ]
-                      .filter((edge) => edge != null)
-                      .map((edge) => (
-                        <div
-                          key={edge}
-                          className="absolute z-[3] w-5 h-5 rounded-full bg-[#E3FF33] flex items-center justify-center text-[10px] text-black shadow pointer-events-none"
-                          style={{
-                            left: edge - 10,
-                            top: rulerH + margins.top * px + printableHpx / 2 - 10,
-                          }}
-                        >
-                          ✂
-                        </div>
-                      ))}
+
                   {showNumbers && (
                     <div
                       className="absolute left-0 font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase flex items-center gap-2"
@@ -619,6 +634,28 @@ export function Preview({
                   )}
                 </div>
               ))}
+              {showTrim &&
+                Array.from({ length: Math.max(0, sheetCount - 1) }).map((_, i) => {
+                  const pitch = stacked ? contentPx : sheetW + sheetGap
+                  const cutSheet = printOverlap ? i + 1 : i
+                  const cutOnSheet = printOverlap
+                    ? margins.left * px + cutSlackPx
+                    : margins.left * px + contentPx
+                  const cutX = cutSheet * pitch + cutOnSheet
+                  return (
+                    <div
+                      key={i}
+                      className="absolute z-30 w-5 h-5 rounded-full bg-[#E3FF33] flex items-center justify-center text-[10px] text-black shadow pointer-events-none"
+                      style={{
+                        left: cutX - 10,
+                        top: rulerH + margins.top * px + printableHpx / 2 - 10,
+                      }}
+                      title={printOverlap ? 'Cut the top sheet inside the overlap' : 'Cut this edge'}
+                    >
+                      ✂
+                    </div>
+                  )
+                })}
             </div>
           )}
         </div>

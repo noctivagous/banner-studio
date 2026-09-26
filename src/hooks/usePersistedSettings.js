@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS = {
   rows: 1,
   contentKind: 'text',
   margins: { top: 0.25, bottom: 0.25, left: 0.25, right: 0.25 },
-  overlap: 0.15,
+  overlap: 0.5,
   showTrim: true,
   showSafe: true,
   showTape: true,

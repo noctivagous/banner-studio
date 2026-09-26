@@ -1,8 +1,22 @@
 export const PX_PER_INCH = 90
 
-// The next sheet's left cut is rarely exact. Shift the previous sheet's
-// scissor line this far into the duplicated tape so the join still matches.
+// Inset the top sheet's left cut this far into the duplicated tape.
+// The sheet underneath keeps the full strip and its guide is not drawn.
 export const OVERLAP_CUT_SLACK = 0.05
+
+// White dashes blended with difference stay visible on white paper and on black type.
+export const CUT_LINE_BLEND = {
+  width: '1px',
+  backgroundImage: 'repeating-linear-gradient(to bottom, #fff 0 4px, transparent 4px 8px)',
+  mixBlendMode: 'difference',
+  pointerEvents: 'none',
+}
+
+// printOverlap on is asymmetric trim: cut the following sheet's left edge
+// and lay it over the previous sheet's uncut right flap.
+// printOverlap off is an edge-to-edge butt joint: cut both sides of the seam.
+export const ASSEMBLY_ASYMMETRIC_TRIM = 'asymmetric-trim'
+export const ASSEMBLY_EDGE_TO_EDGE = 'edge-to-edge'
 
 export function overlapCutSlack(overlap, duplicate) {
   if (!duplicate || overlap <= 0) return 0
