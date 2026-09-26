@@ -13,7 +13,7 @@ export const DEFAULT_SETTINGS = {
   strokeOn: false,
   strokeWidth: 0.02,
   strokeColor: '#000000',
-  align: 'left',
+  align: 'center',
   paperId: 'letter',
   orientation: 'landscape',
   rows: 1,
