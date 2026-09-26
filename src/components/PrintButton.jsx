@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 const MARKS = [
+  { key: 'printOverlap', label: 'Tape overlap' },
   { key: 'printTrim', label: 'Scissor edge guide' },
   { key: 'printNumbers', label: 'Sheet numbers' },
   { key: 'printCutMarks', label: 'Cut marks' },

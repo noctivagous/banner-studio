@@ -1,4 +1,13 @@
 export const PX_PER_INCH = 90
+
+// The next sheet's left cut is rarely exact. Shift the previous sheet's
+// scissor line this far into the duplicated tape so the join still matches.
+export const OVERLAP_CUT_SLACK = 0.05
+
+export function overlapCutSlack(overlap, duplicate) {
+  if (!duplicate || overlap <= 0) return 0
+  return Math.min(OVERLAP_CUT_SLACK, overlap / 2)
+}
 export const PAGE_W = 11
 export const PAGE_H = 8.5
 

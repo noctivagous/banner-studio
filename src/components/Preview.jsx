@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { PX_PER_INCH } from '../lib/layout.js'
+import { PX_PER_INCH, overlapCutSlack } from '../lib/layout.js'
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
 
@@ -209,6 +209,7 @@ export function Preview({
   strokeOn,
   strokeWidth,
   strokeColor,
+  printOverlap,
   showTrim,
   showSafe,
   showTape,
@@ -219,6 +220,9 @@ export function Preview({
   const sheetW = pageW * px
   const sheetH = pageH * px
   const contentPx = contentW * px
+  const sliceW = printOverlap && overlap > 0 ? trimW : contentW
+  const slicePx = sliceW * px
+  const cutSlackPx = overlapCutSlack(overlap, printOverlap) * px
   const printableHpx = trimH * px
   const typePx = fontPx * zoom
   const canvasRef = useRef(null)
@@ -413,11 +417,11 @@ export function Preview({
                     style={{
                       left: margins.left * px,
                       top: 0,
-                      width: contentPx,
+                      width: slicePx,
                       height: rulerH,
                     }}
                   >
-                    <ContentRuler startIn={i * contentW} widthIn={contentW} px={px} />
+                    <ContentRuler startIn={i * contentW} widthIn={sliceW} px={px} />
                   </div>
                   <div
                     className="absolute left-0 bg-white rounded-[2px] overflow-hidden"
@@ -477,7 +481,7 @@ export function Preview({
                       style={{
                         left: margins.left * px,
                         top: margins.top * px,
-                        width: contentPx,
+                        width: slicePx,
                         height: printableHpx,
                       }}
                     >
@@ -485,7 +489,7 @@ export function Preview({
                         className="h-full flex flex-col justify-center"
                         style={{
                           transform: `translateX(-${i * contentPx}px)`,
-                          width: Math.max(sheetCount * contentPx, contentPx),
+                          width: Math.max(sheetCount * contentPx, contentPx) + (printOverlap ? overlap * px : 0),
                         }}
                       >
                         <BannerType
@@ -501,7 +505,7 @@ export function Preview({
                         />
                       </div>
                     </div>
-                    {showTape && overlap > 0 && i < sheetCount - 1 && (
+                    {showTape && overlap > 0 && !printOverlap && i < sheetCount - 1 && (
                       <div
                         className="absolute pointer-events-none flex items-center justify-center"
                         style={{
@@ -533,7 +537,7 @@ export function Preview({
                     {showTrim &&
                       [
                         i > 0 ? margins.left * px : null,
-                        i < sheetCount - 1 ? margins.left * px + contentPx : null,
+                        i < sheetCount - 1 ? margins.left * px + contentPx + cutSlackPx : null,
                       ]
                         .filter((edge) => edge != null)
                         .map((edge) => (

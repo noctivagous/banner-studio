@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { overlapCutSlack } from '../lib/layout.js'
 import { BannerType } from './Preview.jsx'
 
 export function PrintArea({
@@ -19,6 +20,8 @@ export function PrintArea({
   strokeOn,
   strokeWidth,
   strokeColor,
+  printOverlap,
+  overlap,
   printTrim,
   printNumbers,
   printCutMarks,
@@ -45,7 +48,7 @@ export function PrintArea({
               position: 'absolute',
               left: `${margins.left}in`,
               top: `${margins.top}in`,
-              width: `${contentW}in`,
+              width: `${printOverlap && overlap > 0 ? trimW : contentW}in`,
               height: `${trimH}in`,
               overflow: 'hidden',
               background: 'white',
@@ -54,7 +57,7 @@ export function PrintArea({
             <div
               style={{
                 transform: `translateX(-${i * contentW}in)`,
-                width: `${Math.max(sheetCount * contentW, contentW)}in`,
+                width: `${Math.max(sheetCount * contentW, contentW) + (printOverlap ? overlap : 0)}in`,
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
@@ -77,7 +80,9 @@ export function PrintArea({
           {printTrim &&
             [
               i > 0 ? margins.left : null,
-              i < sheetCount - 1 ? margins.left + contentW : null,
+              i < sheetCount - 1
+                ? margins.left + contentW + overlapCutSlack(overlap, printOverlap)
+                : null,
             ]
               .filter((edge) => edge != null)
               .map((edge) => (

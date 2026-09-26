@@ -26,10 +26,11 @@ export const DEFAULT_SETTINGS = {
   showNumbers: true,
   showCutMarks: false,
   printTrim: true,
+  printOverlap: true,
   printNumbers: false,
   printCutMarks: false,
   zoom: 1,
-  scaleToFit: false,
+  scaleToFit: true,
   extensions: {},
 }
 

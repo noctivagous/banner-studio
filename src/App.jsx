@@ -41,6 +41,7 @@ export default function App() {
     showNumbers,
     showCutMarks,
     printTrim,
+    printOverlap,
     printNumbers,
     printCutMarks,
     zoom,
@@ -87,7 +88,14 @@ export default function App() {
   }, [lines, font, fontPx, letterSpacing, copy])
 
   const textWidthIn = textWidthPx / PX_PER_INCH
-  const sheetCount = textWidthIn > 0 ? Math.ceil(textWidthIn / contentW) : 0
+  const sheetCount =
+    textWidthIn <= 0
+      ? 0
+      : printOverlap && overlap > 0
+        ? textWidthIn <= trimW
+          ? 1
+          : Math.ceil((textWidthIn - overlap) / contentW)
+        : Math.ceil(textWidthIn / contentW)
   const assembledInches =
     sheetCount > 0 ? sheetCount * trimW - (sheetCount - 1) * overlap : 0
 
@@ -188,7 +196,7 @@ export default function App() {
               <PrintButton
                 disabled={sheetCount === 0}
                 onPrint={print}
-                marks={{ printTrim, printNumbers, printCutMarks }}
+                marks={{ printOverlap, printTrim, printNumbers, printCutMarks }}
                 onChange={patch}
               />
               <DocumentMenu settings={settings} onImport={patch} />
@@ -239,6 +247,7 @@ export default function App() {
             strokeOn={strokeOn}
             strokeWidth={strokeWidth}
             strokeColor={strokeColor}
+            printOverlap={printOverlap}
             showTrim={showTrim}
             showSafe={showSafe}
             showTape={showTape}
@@ -268,7 +277,7 @@ export default function App() {
                 showCutMarks={showCutMarks}
                 onChange={patch}
                 onPrint={print}
-                printMarks={{ printTrim, printNumbers, printCutMarks }}
+                printMarks={{ printOverlap, printTrim, printNumbers, printCutMarks }}
                 pageLabel={pageLabel}
               />
             </div>
@@ -295,6 +304,8 @@ export default function App() {
         strokeOn={strokeOn}
         strokeWidth={strokeWidth}
         strokeColor={strokeColor}
+        printOverlap={printOverlap}
+        overlap={overlap}
         printTrim={printTrim}
         printNumbers={printNumbers}
         printCutMarks={printCutMarks}
