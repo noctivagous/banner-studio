@@ -47,7 +47,7 @@ npx vercel --prod dist
 - With Tape overlap on, each sheet clips `trimWidth` of type and advances by `contentWidth`, so the overlap strip is duplicated; with it off, the window is `contentWidth` and the tape strip is blank
 - Canvas `measureText` of the banner strip → sheet count (`ceil((textWidth − overlap) / contentWidth)` when overlap copy is on)
 - Assembled length = `sheets × trimWidth − (sheets − 1) × overlap`
-- Glyph height is clamped so type stays inside printable height (0.8"–7")
+- Glyph height runs from 0.8" up to the current sheet’s printable height (page size and orientation, minus the top and bottom margins)
 
 ## GUI
 

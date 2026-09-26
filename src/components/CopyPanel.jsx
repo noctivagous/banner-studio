@@ -233,7 +233,7 @@ export function CopyPanel({
               <div className="flex justify-between mt-1">
                 <span className="font-mono text-[8px] text-[#7A7A80]">0.8"</span>
                 <span className="font-mono text-[8px] text-[#7A7A80]">
-                  {Math.min(7, printableHeight).toFixed(1)}" max
+                  {glyphMax.toFixed(1)}" max
                 </span>
               </div>
             </div>

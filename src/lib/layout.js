@@ -117,7 +117,8 @@ export function measureTextWidthPx(lines, font, fontPx, letterSpacingEm) {
 }
 
 export function glyphMaxInches(printableHeight) {
-  return Math.min(7, Math.max(0.8, printableHeight - 0.05))
+  const room = Math.max(0.8, printableHeight - 0.05)
+  return Math.max(0.8, Math.floor(room * 10) / 10)
 }
 
 export function clampGlyphHeight(height, printableHeight) {

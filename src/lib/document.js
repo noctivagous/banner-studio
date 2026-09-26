@@ -1,5 +1,5 @@
-import { FONTS } from './layout.js'
-import { PAPERS } from './paper.js'
+import { FONTS, glyphMaxInches } from './layout.js'
+import { PAPERS, sheetSize } from './paper.js'
 
 export const SCHEMA = 'tile-banner-studio'
 export const DOCUMENT_VERSION = 1
@@ -202,7 +202,12 @@ export function importDocument(raw, defaults) {
     contentKind: 'text',
     copy: typeof textSplit.known.copy === 'string' ? textSplit.known.copy : defaults.copy,
     fontId,
-    glyphHeight: clamp(textSplit.known.glyphHeight, 0.8, 7, defaults.glyphHeight),
+    glyphHeight: clamp(
+      textSplit.known.glyphHeight,
+      0.8,
+      glyphMaxInches(sheetSize(paperId, orientation).pageH - margins.top - margins.bottom),
+      defaults.glyphHeight,
+    ),
     lineHeight: clamp(textSplit.known.lineHeight, 0.6, 1.8, defaults.lineHeight),
     letterSpacing: clamp(textSplit.known.letterSpacing, -0.05, 0.3, defaults.letterSpacing),
     transform: asEnum(textSplit.known.transform, ['asIs', 'uppercase', 'lowercase'], defaults.transform),
