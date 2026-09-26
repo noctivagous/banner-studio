@@ -20,7 +20,7 @@ export function Output({
   pageLabel,
 }) {
   const toggles = [
-    { label: 'Show Trim Lines', key: 'showTrim', value: showTrim },
+    { label: 'Scissor edge guide', key: 'showTrim', value: showTrim },
     { label: 'Show Safe Area', key: 'showSafe', value: showSafe },
     { label: 'Show Tape Zones', key: 'showTape', value: showTape },
     { label: 'Show Sheet Numbers', key: 'showNumbers', value: showNumbers },

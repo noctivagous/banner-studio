@@ -74,20 +74,25 @@ export function PrintArea({
               />
             </div>
           </div>
-          {printTrim && (
-            <div
-              style={{
-                position: 'absolute',
-                left: `${margins.left}in`,
-                top: `${margins.top}in`,
-                width: `${trimW}in`,
-                height: `${trimH}in`,
-                border: '1px dashed #000',
-                boxSizing: 'border-box',
-                opacity: 0.9,
-              }}
-            />
-          )}
+          {printTrim &&
+            [
+              i > 0 ? margins.left : null,
+              i < sheetCount - 1 ? margins.left + contentW : null,
+            ]
+              .filter((edge) => edge != null)
+              .map((edge) => (
+                <div
+                  key={edge}
+                  style={{
+                    position: 'absolute',
+                    left: `${edge}in`,
+                    top: `${margins.top}in`,
+                    height: `${trimH}in`,
+                    borderLeft: '1px dashed #000',
+                    zIndex: 2,
+                  }}
+                />
+              ))}
           {printCutMarks && (
             <Fragment>
               <div

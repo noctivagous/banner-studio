@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 const MARKS = [
-  { key: 'printTrim', label: 'Trim lines' },
+  { key: 'printTrim', label: 'Scissor edge guide' },
   { key: 'printNumbers', label: 'Sheet numbers' },
   { key: 'printCutMarks', label: 'Cut marks' },
 ]

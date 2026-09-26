@@ -60,7 +60,7 @@ export function CopyPanel({
   const glyphMax = glyphMaxInches(printableHeight)
 
   return (
-    <div className="w-full xl:w-[340px] bg-[#121214] xl:border-r border-b xl:border-b-0 border-[#43434E] overflow-y-auto shrink-0 flex flex-col">
+    <div className="w-full xl:w-[340px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#121214] xl:border-r border-b xl:border-b-0 border-[#43434E] overflow-y-auto flex flex-col">
       <div className="p-5 space-y-7">
         <div>
           <div className="flex items-center justify-between mb-3">

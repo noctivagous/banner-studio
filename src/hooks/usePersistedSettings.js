@@ -25,10 +25,11 @@ export const DEFAULT_SETTINGS = {
   showTape: true,
   showNumbers: true,
   showCutMarks: false,
-  printTrim: false,
+  printTrim: true,
   printNumbers: false,
   printCutMarks: false,
   zoom: 1,
+  scaleToFit: false,
   extensions: {},
 }
 

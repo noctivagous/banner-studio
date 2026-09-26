@@ -74,7 +74,7 @@ export function DocumentMenu({ settings, onImport }) {
         aria-label="Document menu"
         aria-expanded={open}
         aria-haspopup="menu"
-        className="h-8 w-8 rounded-[4px] border border-[#43434E] bg-[#26262E] text-[#F0F0F2] font-mono text-[14px] tracking-[0.14em] hover:border-[#5E5E69]"
+        className="h-8 w-8 rounded-[4px] bg-[#E3FF33] text-black font-mono text-[14px] font-bold tracking-[0.12em] hover:brightness-110"
       >
         …
       </button>

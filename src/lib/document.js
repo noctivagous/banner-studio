@@ -31,6 +31,7 @@ const VIEW_KEYS = [
   'printNumbers',
   'printCutMarks',
   'zoom',
+  'scaleToFit',
 ]
 
 const LAYOUT_KEYS = ['paperId', 'orientation', 'rows']
@@ -116,6 +117,7 @@ export function exportDocument(settings) {
       printNumbers: settings.printNumbers,
       printCutMarks: settings.printCutMarks,
       zoom: settings.zoom,
+      scaleToFit: settings.scaleToFit,
     },
     extensions: isPlainObject(settings.extensions) ? settings.extensions : {},
   }
@@ -177,9 +179,7 @@ export function importDocument(raw, defaults) {
     right: clamp(marginsIn.right, 0, 1, defaults.margins.right),
   }
 
-  const zoom = [0.25, 0.5, 0.75, 1].includes(viewSplit.known.zoom)
-    ? viewSplit.known.zoom
-    : defaults.zoom
+  const zoom = clamp(viewSplit.known.zoom, 0.05, 4, defaults.zoom)
 
   const extensions = isPlainObject(parsed.extensions) ? { ...parsed.extensions } : {}
   const unknown = {
@@ -220,6 +220,7 @@ export function importDocument(raw, defaults) {
     printNumbers: asBool(viewSplit.known.printNumbers, defaults.printNumbers),
     printCutMarks: asBool(viewSplit.known.printCutMarks, defaults.printCutMarks),
     zoom,
+    scaleToFit: asBool(viewSplit.known.scaleToFit, defaults.scaleToFit),
     extensions,
   }
 }

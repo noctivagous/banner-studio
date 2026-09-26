@@ -15,7 +15,7 @@ import {
   measureTextWidthPx,
   transformLines,
 } from './lib/layout.js'
-import { sheetSize } from './lib/paper.js'
+import { PAPERS, sheetSize } from './lib/paper.js'
 
 export default function App() {
   const [settings, patch] = usePersistedSettings()
@@ -44,6 +44,7 @@ export default function App() {
     printNumbers,
     printCutMarks,
     zoom,
+    scaleToFit,
   } = settings
 
   const font = useMemo(() => FONTS.find((f) => f.id === fontId) || FONTS[0], [fontId])
@@ -107,7 +108,7 @@ export default function App() {
     <>
       <div
         id="app-root"
-        className="min-h-screen max-w-[100vw] overflow-x-hidden bg-[#08080A] text-[#F0F0F2] flex flex-col selection:bg-[#E3FF33] selection:text-black"
+        className="h-full max-h-full overflow-hidden bg-[#08080A] text-[#F0F0F2] flex flex-col selection:bg-[#E3FF33] selection:text-black"
       >
         <header
           className="h-14 bg-[#121214] border-b border-[#43434E] flex items-center justify-between px-4 shrink-0 sticky top-0 z-30"
@@ -121,9 +122,44 @@ export default function App() {
               >
                 TILE<span className="text-[#7A7A80] mx-[5px]">/</span>BANNER STUDIO
               </span>
-              <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-[4px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase">
-                {sheet.label} {orientation} {pageW.toFixed(2)}×{pageH.toFixed(2)} — Trim & Tape
-              </span>
+              <div className="hidden md:inline-flex items-center gap-1.5">
+                <label className="relative">
+                  <span className="sr-only">Page size</span>
+                  <select
+                    aria-label="Page size"
+                    value={paperId}
+                    onChange={(e) => patch({ paperId: e.target.value })}
+                    className="h-6 pl-2 pr-5 rounded-[4px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
+                  >
+                    {PAPERS.map((paper) => (
+                      <option key={paper.id} value={paper.id}>
+                        {paper.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-[8px] text-[#7A7A80]">
+                    ▼
+                  </span>
+                </label>
+                <label className="relative">
+                  <span className="sr-only">Orientation</span>
+                  <select
+                    aria-label="Orientation"
+                    value={orientation}
+                    onChange={(e) => patch({ orientation: e.target.value })}
+                    className="h-6 pl-2 pr-5 rounded-[4px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
+                  >
+                    <option value="landscape">Landscape</option>
+                    <option value="portrait">Portrait</option>
+                  </select>
+                  <span className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-[8px] text-[#7A7A80]">
+                    ▼
+                  </span>
+                </label>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-[4px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase">
+                  {pageW.toFixed(2)}×{pageH.toFixed(2)} — Trim & Tape
+                </span>
+              </div>
             </div>
             <div className="hidden lg:flex items-center gap-2 ml-2">
               <div className="w-px h-4 bg-[#43434E]" />
@@ -179,7 +215,9 @@ export default function App() {
           />
           <Preview
             zoom={zoom}
+            scaleToFit={scaleToFit}
             onZoom={(next) => patch({ zoom: next })}
+            onScaleToFit={(next) => patch({ scaleToFit: next })}
             sheetCount={sheetCount}
             assembledInches={assembledInches}
             margins={margins}
@@ -207,7 +245,7 @@ export default function App() {
             showNumbers={showNumbers}
             showCutMarks={showCutMarks}
           />
-          <div className="w-full xl:w-[320px] bg-[#121214] xl:border-l border-t xl:border-t-0 border-[#43434E] overflow-y-auto shrink-0">
+          <div className="w-full xl:w-[320px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#121214] xl:border-l border-t xl:border-t-0 border-[#43434E] overflow-y-auto">
             <div className="p-5">
               <PrinterSafe
                 margins={margins}
@@ -236,6 +274,7 @@ export default function App() {
             </div>
           </div>
         </div>
+        <footer className="h-[10px] shrink-0 bg-[#121214] border-t border-[#43434E]" />
       </div>
       <PrintArea
         sheetCount={sheetCount}

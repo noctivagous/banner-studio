@@ -88,53 +88,47 @@ function Hatch({ style }) {
   )
 }
 
-function BannerHScroll({
-  left,
-  max,
-  view,
-  onChange,
-  className = 'w-full h-3 flex items-center shrink-0 bg-[#121214]',
-  ariaLabel = 'Scroll banner preview',
-}) {
+function OverlayScroll({ axis, value, max, view, onChange, ariaLabel }) {
   const trackRef = useRef(null)
   const dragging = useRef(false)
-  const [trackW, setTrackW] = useState(0)
-  const overflowing = max > 1
+  const [trackSize, setTrackSize] = useState(0)
+  const vertical = axis === 'y'
 
   useEffect(() => {
     const track = trackRef.current
     if (!track) return
-    const update = () => setTrackW(track.clientWidth)
+    const update = () => setTrackSize(vertical ? track.clientHeight : track.clientWidth)
     update()
     const ro = new ResizeObserver(update)
     ro.observe(track)
     return () => ro.disconnect()
-  }, [overflowing])
+  }, [vertical, max])
 
   const ratio = view > 0 ? view / (view + max) : 1
-  const thumb = Math.max(28, ratio * trackW)
-  const travel = Math.max(0, trackW - thumb)
-  const thumbX = max > 0 ? (left / max) * travel : 0
+  const thumb = Math.max(28, ratio * trackSize)
+  const travel = Math.max(0, trackSize - thumb)
+  const offset = max > 0 ? (value / max) * travel : 0
 
-  const setFromClientX = useCallback(
-    (clientX) => {
+  const setFromPointer = useCallback(
+    (client) => {
       const track = trackRef.current
       if (!track || max <= 0) return
       const rect = track.getBoundingClientRect()
-      const ratio = view > 0 ? view / (view + max) : 1
-      const thumb = Math.max(28, ratio * rect.width)
-      const travel = Math.max(1, rect.width - thumb)
-      const next = ((clientX - rect.left - thumb / 2) / travel) * max
+      const size = vertical ? rect.height : rect.width
+      const origin = vertical ? rect.top : rect.left
+      const thumbSize = Math.max(28, (view > 0 ? view / (view + max) : 1) * size)
+      const span = Math.max(1, size - thumbSize)
+      const next = ((client - origin - thumbSize / 2) / span) * max
       onChange(Math.max(0, Math.min(max, next)))
     },
-    [max, view, onChange],
+    [max, view, onChange, vertical],
   )
 
   useEffect(() => {
-    const onMove = (e) => {
+    const onMove = (event) => {
       if (!dragging.current) return
-      e.preventDefault()
-      setFromClientX(e.clientX)
+      event.preventDefault()
+      setFromPointer(vertical ? event.clientY : event.clientX)
     }
     const onUp = () => {
       dragging.current = false
@@ -145,53 +139,57 @@ function BannerHScroll({
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
     }
-  }, [setFromClientX])
-
-  if (!overflowing) return null
+  }, [setFromPointer, vertical])
 
   return (
-    <div className={className}>
+    <div
+      ref={trackRef}
+      role="scrollbar"
+      aria-label={ariaLabel}
+      aria-orientation={vertical ? 'vertical' : 'horizontal'}
+      aria-valuemin={0}
+      aria-valuemax={Math.round(max)}
+      aria-valuenow={Math.round(value)}
+      tabIndex={0}
+      className={`relative bg-[#08080A]/90 border border-[#43434E] cursor-pointer ${
+        vertical ? 'h-full w-[7px]' : 'w-full h-[7px]'
+      }`}
+      onPointerDown={(event) => {
+        dragging.current = true
+        event.currentTarget.setPointerCapture?.(event.pointerId)
+        setFromPointer(vertical ? event.clientY : event.clientX)
+      }}
+      onKeyDown={(event) => {
+        const step = Math.max(40, view * 0.25)
+        const prev = vertical ? 'ArrowUp' : 'ArrowLeft'
+        const nextKey = vertical ? 'ArrowDown' : 'ArrowRight'
+        if (event.key === nextKey) {
+          event.preventDefault()
+          onChange(Math.min(max, value + step))
+        }
+        if (event.key === prev) {
+          event.preventDefault()
+          onChange(Math.max(0, value - step))
+        }
+      }}
+    >
       <div
-        ref={trackRef}
-        role="scrollbar"
-        aria-label={ariaLabel}
-        aria-orientation="horizontal"
-        aria-valuemin={0}
-        aria-valuemax={Math.round(max)}
-        aria-valuenow={Math.round(left)}
-        tabIndex={0}
-        className="relative w-full h-[5px] bg-[#08080A] border-y border-[#43434E] cursor-pointer"
-        onPointerDown={(e) => {
-          if (!overflowing) return
-          dragging.current = true
-          e.currentTarget.setPointerCapture?.(e.pointerId)
-          setFromClientX(e.clientX)
-        }}
-        onKeyDown={(e) => {
-          if (!overflowing) return
-          const step = Math.max(40, view * 0.25)
-          if (e.key === 'ArrowRight') {
-            e.preventDefault()
-            onChange(Math.min(max, left + step))
-          }
-          if (e.key === 'ArrowLeft') {
-            e.preventDefault()
-            onChange(Math.max(0, left - step))
-          }
-        }}
-      >
-        <div
-          className="absolute top-0 bottom-0 bg-[#5E5E69] hover:bg-[#E3FF33] transition-colors"
-          style={{ width: `${thumb}px`, transform: `translateX(${thumbX}px)` }}
-        />
-      </div>
+        className="absolute bg-[#5E5E69] hover:bg-[#E3FF33]"
+        style={
+          vertical
+            ? { left: 0, right: 0, height: thumb, transform: `translateY(${offset}px)` }
+            : { top: 0, bottom: 0, width: thumb, transform: `translateX(${offset}px)` }
+        }
+      />
     </div>
   )
 }
 
 export function Preview({
   zoom,
+  scaleToFit,
   onZoom,
+  onScaleToFit,
   sheetCount,
   assembledInches,
   margins,
@@ -224,27 +222,79 @@ export function Preview({
   const printableHpx = trimH * px
   const typePx = fontPx * zoom
   const canvasRef = useRef(null)
-  const [hScroll, setHScroll] = useState({ left: 0, max: 0, view: 0 })
+  const padRef = useRef(null)
+  const rowRef = useRef(null)
+  const [scroll, setScroll] = useState({
+    left: 0,
+    hMax: 0,
+    hView: 0,
+    top: 0,
+    vMax: 0,
+    vView: 0,
+    hTop: 0,
+  })
   const rulerH = 28
+  const zoomPresets = [0.25, 0.5, 0.75, 1]
 
   const measureScroll = useCallback(() => {
     const el = canvasRef.current
     if (!el) return
-    const view = el.clientWidth
-    const max = Math.max(0, el.scrollWidth - view)
-    const left = Math.max(0, Math.min(max, el.scrollLeft))
+    const hView = el.clientWidth
+    const vView = el.clientHeight
+    const hMax = Math.max(0, el.scrollWidth - hView)
+    const vMax = Math.max(0, el.scrollHeight - vView)
+    const left = Math.max(0, Math.min(hMax, el.scrollLeft))
+    const top = Math.max(0, Math.min(vMax, el.scrollTop))
     if (el.scrollLeft !== left) el.scrollLeft = left
-    setHScroll({ left, max, view })
+    if (el.scrollTop !== top) el.scrollTop = top
+    let hTop = vView - 14
+    const row = rowRef.current
+    if (row) {
+      const rowBottom = row.getBoundingClientRect().bottom
+      const canvasTop = el.getBoundingClientRect().top
+      const underLabels = rowBottom - canvasTop + 6
+      if (underLabels + 8 < vView) hTop = Math.max(4, underLabels)
+    }
+    setScroll({ left, hMax, hView, top, vMax, vView, hTop })
   }, [])
 
-  const applyScroll = useCallback((left) => {
+  const applyScroll = useCallback((axis, next) => {
     const el = canvasRef.current
     if (!el) return
-    const max = Math.max(0, el.scrollWidth - el.clientWidth)
-    const clamped = Math.max(0, Math.min(max, left))
-    el.scrollLeft = clamped
-    setHScroll({ left: clamped, max, view: el.clientWidth })
-  }, [])
+    if (axis === 'x') el.scrollLeft = next
+    else el.scrollTop = next
+    measureScroll()
+  }, [measureScroll])
+
+  const fitSequence = useCallback(() => {
+    const el = canvasRef.current
+    const pad = padRef.current
+    if (!el || sheetCount === 0) return
+    const padStyle = pad ? getComputedStyle(pad) : null
+    const padX = padStyle ? parseFloat(padStyle.paddingLeft) + parseFloat(padStyle.paddingRight) : 48
+    const padY = padStyle ? parseFloat(padStyle.paddingTop) + parseFloat(padStyle.paddingBottom) : 48
+    const gap = 24
+    const labelH = showNumbers ? 28 : 0
+    const availW = el.clientWidth - padX
+    const availH = el.clientHeight - padY
+    if (availW < 40 || availH < 40) return
+    const zW = (availW - Math.max(0, sheetCount - 1) * gap) / (sheetCount * pageW * PX_PER_INCH)
+    const zH = (availH - rulerH - labelH) / (pageH * PX_PER_INCH)
+    const next = Math.max(0.05, Math.min(zW, zH))
+    if (!Number.isFinite(next)) return
+    const rounded = Math.round(next * 1000) / 1000
+    if (Math.abs(rounded - zoom) > 0.0005) onZoom(rounded)
+  }, [onZoom, pageH, pageW, sheetCount, showNumbers, zoom])
+
+  useEffect(() => {
+    if (!scaleToFit || sheetCount === 0) return
+    const el = canvasRef.current
+    if (!el) return
+    fitSequence()
+    const ro = new ResizeObserver(() => fitSequence())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [scaleToFit, sheetCount, fitSequence])
 
   useEffect(() => {
     const el = canvasRef.current
@@ -252,11 +302,12 @@ export function Preview({
     measureScroll()
     const ro = new ResizeObserver(measureScroll)
     ro.observe(el)
+    if (rowRef.current) ro.observe(rowRef.current)
     return () => ro.disconnect()
-  }, [measureScroll, sheetCount, zoom, assembledInches])
+  }, [measureScroll, sheetCount, zoom, pageW, pageH, showNumbers])
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#08080A] relative order-first xl:order-none overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-[#08080A] relative order-first xl:order-none overflow-hidden">
       <div className="h-[46px] bg-[#121214] border-b border-[#43434E] flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-2">
@@ -275,13 +326,16 @@ export function Preview({
           <span className="hidden md:block font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase mr-2">
             Zoom
           </span>
-          {[0.25, 0.5, 0.75, 1].map((level) => (
+          {zoomPresets.map((level) => (
             <button
               key={level}
               type="button"
-              onClick={() => onZoom(level)}
+              onClick={() => {
+                onScaleToFit(false)
+                onZoom(level)
+              }}
               className={`h-7 px-2.5 rounded-[4px] border font-mono text-[11px] tracking-[0.08em] transition-colors ${
-                zoom === level
+                !scaleToFit && Math.abs(zoom - level) < 0.001
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                   : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-[#F0F0F2] hover:border-[#5E5E69]'
               }`}
@@ -289,30 +343,26 @@ export function Preview({
               {level * 100}%
             </button>
           ))}
+          <div className="w-px h-4 bg-[#43434E] mx-1" />
+          <button
+            type="button"
+            onClick={() => onScaleToFit(true)}
+            className={`h-7 px-2.5 rounded-[4px] border font-mono text-[11px] tracking-[0.08em] uppercase transition-colors ${
+              scaleToFit
+                ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
+                : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-[#F0F0F2] hover:border-[#5E5E69]'
+            }`}
+          >
+            Scale
+          </button>
         </div>
       </div>
 
-      <BannerHScroll
-        left={hScroll.left}
-        max={hScroll.max}
-        view={hScroll.view}
-        onChange={applyScroll}
-        ariaLabel="Scroll banner preview, top"
-        className="w-full h-3 flex items-center shrink-0 bg-[#121214] border-b border-[#43434E]"
-      />
-
+      <div className="flex-1 relative min-h-0 min-w-0">
       <div
         ref={canvasRef}
-        className="flex-1 overflow-auto relative bg-[#08080A] preview-canvas"
-        onScroll={() => {
-          const el = canvasRef.current
-          if (!el) return
-          setHScroll({
-            left: el.scrollLeft,
-            max: Math.max(0, el.scrollWidth - el.clientWidth),
-            view: el.clientWidth,
-          })
-        }}
+        className="absolute inset-0 overflow-auto bg-[#08080A] preview-canvas"
+        onScroll={measureScroll}
       >
         <div
           className="absolute inset-0 opacity-[0.06]"
@@ -322,7 +372,7 @@ export function Preview({
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-[#08080A] via-transparent to-[#08080A]/60 pointer-events-none" />
-        <div className="relative p-6 md:p-10">
+        <div ref={padRef} className="relative p-6 md:p-10">
           {sheetCount === 0 ? (
             <div className="min-h-[420px] flex items-center justify-center">
               <div className="w-full max-w-[520px] border border-dashed border-[#43434E] rounded-[4px] bg-[#121214]/60 backdrop-blur p-8 text-center">
@@ -351,7 +401,7 @@ export function Preview({
               </div>
             </div>
           ) : (
-            <div className="flex gap-6" style={{ width: 'max-content' }}>
+            <div ref={rowRef} className="flex gap-6" style={{ width: 'max-content' }}>
               {Array.from({ length: sheetCount }).map((_, i) => (
                 <div
                   key={i}
@@ -480,19 +530,24 @@ export function Preview({
                         }}
                       />
                     )}
-                    {showTrim && (
-                      <div
-                        className="absolute border border-dashed pointer-events-none z-[2]"
-                        style={{
-                          left: margins.left * px,
-                          top: margins.top * px,
-                          width: trimW * px,
-                          height: trimH * px,
-                          borderColor: '#E3FF33',
-                          borderWidth: '1px',
-                        }}
-                      />
-                    )}
+                    {showTrim &&
+                      [
+                        i > 0 ? margins.left * px : null,
+                        i < sheetCount - 1 ? margins.left * px + contentPx : null,
+                      ]
+                        .filter((edge) => edge != null)
+                        .map((edge) => (
+                          <div
+                            key={edge}
+                            className="absolute pointer-events-none z-[2]"
+                            style={{
+                              left: edge,
+                              top: margins.top * px,
+                              height: trimH * px,
+                              borderLeft: '1px dashed #E3FF33',
+                            }}
+                          />
+                        ))}
                     {showCutMarks && (
                       <Fragment>
                         <div
@@ -526,26 +581,24 @@ export function Preview({
                       </Fragment>
                     )}
                   </div>
-                  {showTrim && (
-                    <Fragment>
-                      <div
-                        className="absolute flex items-center gap-1"
-                        style={{ left: -2, top: rulerH + margins.top * px + 2 }}
-                      >
-                        <div className="w-5 h-5 rounded-full bg-[#E3FF33] flex items-center justify-center text-[10px] text-black shadow">
+                  {showTrim &&
+                    [
+                      i > 0 ? margins.left * px : null,
+                      i < sheetCount - 1 ? margins.left * px + contentPx : null,
+                    ]
+                      .filter((edge) => edge != null)
+                      .map((edge) => (
+                        <div
+                          key={edge}
+                          className="absolute z-[3] w-5 h-5 rounded-full bg-[#E3FF33] flex items-center justify-center text-[10px] text-black shadow pointer-events-none"
+                          style={{
+                            left: edge - 10,
+                            top: rulerH + margins.top * px + printableHpx / 2 - 10,
+                          }}
+                        >
                           ✂
                         </div>
-                      </div>
-                      <div
-                        className="absolute flex items-center gap-1"
-                        style={{ left: -2, top: rulerH + margins.top * px + printableHpx - 18 }}
-                      >
-                        <div className="w-5 h-5 rounded-full bg-[#E3FF33] flex items-center justify-center text-[10px] text-black shadow">
-                          ✂
-                        </div>
-                      </div>
-                    </Fragment>
-                  )}
+                      ))}
                   {showNumbers && (
                     <div
                       className="absolute left-0 font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase flex items-center gap-2"
@@ -566,14 +619,42 @@ export function Preview({
           )}
         </div>
       </div>
-      <BannerHScroll
-        left={hScroll.left}
-        max={hScroll.max}
-        view={hScroll.view}
-        onChange={applyScroll}
-        ariaLabel="Scroll banner preview, bottom"
-        className="w-full h-3 flex items-center shrink-0 bg-[#121214] border-t border-[#43434E]"
-      />
+      {scroll.hMax > 1 && (
+        <div
+          className="absolute z-20 pointer-events-auto"
+          style={{
+            left: 8,
+            right: scroll.vMax > 1 ? 18 : 8,
+            top: scroll.hTop,
+            height: 7,
+          }}
+        >
+          <OverlayScroll
+            axis="x"
+            value={scroll.left}
+            max={scroll.hMax}
+            view={scroll.hView}
+            onChange={(next) => applyScroll('x', next)}
+            ariaLabel="Scroll banner horizontally"
+          />
+        </div>
+      )}
+      {scroll.vMax > 1 && (
+        <div
+          className="absolute z-20 right-1 w-[7px]"
+          style={{ top: 6, bottom: scroll.hMax > 1 ? 16 : 6 }}
+        >
+          <OverlayScroll
+            axis="y"
+            value={scroll.top}
+            max={scroll.vMax}
+            view={scroll.vView}
+            onChange={(next) => applyScroll('y', next)}
+            ariaLabel="Scroll banner vertically"
+          />
+        </div>
+      )}
+      </div>
     </div>
   )
 }
