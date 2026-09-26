@@ -99,7 +99,7 @@ export function Output({
             }}
           />
           <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-4 h-4 bg-[#E3FF33] rounded-full flex items-center justify-center text-[9px]">
-            ✂
+            <span className="inline-block rotate-[270deg] scale-[1.2]">✂</span>
           </div>
         </div>
         <div>

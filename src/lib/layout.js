@@ -12,6 +12,15 @@ export const CUT_LINE_BLEND = {
   pointerEvents: 'none',
 }
 
+// Lime dashes for the preview canvas only, matching the scissors badge.
+// Print keeps CUT_LINE_BLEND so it stays legible on paper.
+export const PREVIEW_CUT_LINE = {
+  width: '1px',
+  backgroundImage: 'repeating-linear-gradient(to bottom, #E3FF33 0 4px, transparent 4px 8px)',
+  mixBlendMode: 'difference',
+  pointerEvents: 'none',
+}
+
 // printOverlap on is asymmetric trim: cut the following sheet's left edge
 // and lay it over the previous sheet's uncut right flap.
 // printOverlap off is an edge-to-edge butt joint: cut both sides of the seam.
