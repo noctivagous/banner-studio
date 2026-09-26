@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { PAGE_H, PAGE_W, PX_PER_INCH } from '../lib/layout.js'
+import { PX_PER_INCH } from '../lib/layout.js'
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
 
@@ -43,7 +43,7 @@ function ContentRuler({ startIn, widthIn, px }) {
   for (let inch = first; inch <= last; inch += 1) ticks.push(inch)
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden bg-[#26262E] rounded-t-[2px]">
       <div className="absolute left-0 right-0 bottom-0 h-px bg-[#43434E]" />
       <div className="absolute bottom-0 left-0 w-px h-3 bg-[#5E5E69]" />
       <div className="absolute bottom-0 right-0 w-px h-3 bg-[#5E5E69]" />
@@ -57,7 +57,7 @@ function ContentRuler({ startIn, widthIn, px }) {
               className={`absolute bottom-0 left-0 w-px ${foot ? 'h-4 bg-[#F0F0F2]' : 'h-2.5 bg-[#5E5E69]'}`}
             />
             {mid && (
-              <span className="absolute top-0 left-1 font-mono text-[9px] text-[#5A5A60] whitespace-nowrap">
+              <span className="absolute top-0 left-1 font-mono text-[9px] text-[#7A7A80] whitespace-nowrap">
                 {inch}&quot;
               </span>
             )}
@@ -70,6 +70,21 @@ function ContentRuler({ startIn, widthIn, px }) {
         )
       })}
     </div>
+  )
+}
+
+function Hatch({ style }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute pointer-events-none"
+      style={{
+        backgroundImage:
+          'repeating-linear-gradient(45deg, rgba(255,255,255,0.85) 0 2px, transparent 2px 7px)',
+        mixBlendMode: 'difference',
+        ...style,
+      }}
+    />
   )
 }
 
@@ -181,6 +196,8 @@ export function Preview({
   assembledInches,
   margins,
   overlap,
+  pageW,
+  pageH,
   trimW,
   trimH,
   contentW,
@@ -201,8 +218,8 @@ export function Preview({
   showCutMarks,
 }) {
   const px = PX_PER_INCH * zoom
-  const sheetW = PAGE_W * px
-  const sheetH = PAGE_H * px
+  const sheetW = pageW * px
+  const sheetH = pageH * px
   const contentPx = contentW * px
   const printableHpx = trimH * px
   const typePx = fontPx * zoom
@@ -321,14 +338,14 @@ export function Preview({
                   BIG
                 </h3>
                 <p className="font-mono text-[11px] leading-[1.6] text-[#7A7A80] max-w-[36ch] mx-auto">
-                  Your banner text will be sliced into landscape 8.5×11 sheets. We keep type
+                  Your banner text will be sliced into {pageW.toFixed(2)}&quot; × {pageH.toFixed(2)}&quot; sheets. We keep type
                   inside your printer&apos;s safe area so nothing gets cropped. Trim on the{' '}
-                  <span className="text-[#E3FF33]">lime dashed line</span>, overlap the yellow
-                  tape zone.
+                  <span className="text-[#E3FF33]">lime dashed line</span>, overlap the
+                  hatched tape zone.
                 </p>
                 <div className="mt-6 flex justify-center gap-2">
                   <div className="h-8 px-3 rounded-[4px] bg-[#26262E] border border-[#43434E] flex items-center font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
-                    11&quot; × 8.5&quot; landscape • {PX_PER_INCH}px/in @100%
+                    {pageW.toFixed(2)}&quot; × {pageH.toFixed(2)}&quot; • {PX_PER_INCH}px/in @100%
                   </div>
                 </div>
               </div>
@@ -366,6 +383,45 @@ export function Preview({
                       className="absolute inset-0 opacity-[0.025] mix-blend-multiply pointer-events-none"
                       style={{ backgroundImage: PAPER_NOISE }}
                     />
+                    {showSafe && (
+                      <Fragment>
+                        {margins.top > 0 && (
+                          <Hatch
+                            style={{ left: 0, top: 0, width: sheetW, height: margins.top * px }}
+                          />
+                        )}
+                        {margins.bottom > 0 && (
+                          <Hatch
+                            style={{
+                              left: 0,
+                              top: (margins.top + trimH) * px,
+                              width: sheetW,
+                              height: margins.bottom * px,
+                            }}
+                          />
+                        )}
+                        {margins.left > 0 && (
+                          <Hatch
+                            style={{
+                              left: 0,
+                              top: margins.top * px,
+                              width: margins.left * px,
+                              height: trimH * px,
+                            }}
+                          />
+                        )}
+                        {margins.right > 0 && (
+                          <Hatch
+                            style={{
+                              left: (margins.left + trimW) * px,
+                              top: margins.top * px,
+                              width: margins.right * px,
+                              height: trimH * px,
+                            }}
+                          />
+                        )}
+                      </Fragment>
+                    )}
                     <div
                       className="absolute bg-white overflow-hidden"
                       style={{
@@ -403,11 +459,10 @@ export function Preview({
                           top: margins.top * px,
                           width: overlap * px,
                           height: printableHpx,
-                          background:
-                            'repeating-linear-gradient(45deg, rgba(227,255,51,0.22) 0 8px, rgba(227,255,51,0.08) 8px 16px)',
                           borderLeft: '1px dashed rgba(120,120,0,0.5)',
                         }}
                       >
+                        <Hatch style={{ inset: 0 }} />
                         <span className="font-mono text-[8px] font-black tracking-[0.24em] text-black/70 rotate-90">
                           TAPE ↕
                         </span>

@@ -3,6 +3,8 @@ import { BannerType } from './Preview.jsx'
 
 export function PrintArea({
   sheetCount,
+  pageW,
+  pageH,
   margins,
   contentW,
   trimW,
@@ -17,9 +19,9 @@ export function PrintArea({
   strokeOn,
   strokeWidth,
   strokeColor,
-  showTrim,
-  showNumbers,
-  showCutMarks,
+  printTrim,
+  printNumbers,
+  printCutMarks,
 }) {
   return (
     <div id="print-area">
@@ -28,8 +30,8 @@ export function PrintArea({
           key={i}
           className="print-sheet"
           style={{
-            width: '11in',
-            height: '8.5in',
+            width: `${pageW}in`,
+            height: `${pageH}in`,
             position: 'relative',
             background: 'white',
             overflow: 'hidden',
@@ -72,7 +74,7 @@ export function PrintArea({
               />
             </div>
           </div>
-          {showTrim && (
+          {printTrim && (
             <div
               style={{
                 position: 'absolute',
@@ -86,7 +88,7 @@ export function PrintArea({
               }}
             />
           )}
-          {showCutMarks && (
+          {printCutMarks && (
             <Fragment>
               <div
                 style={{
@@ -138,7 +140,7 @@ export function PrintArea({
               />
             </Fragment>
           )}
-          {showNumbers && (
+          {printNumbers && (
             <div
               style={{
                 position: 'absolute',

@@ -311,7 +311,7 @@ export function CopyPanel({
       </div>
       <div className="mt-auto p-5 pt-4 border-t border-[#43434E] bg-[#08080A]/50">
         <p className="font-mono text-[10px] leading-[1.5] tracking-[0.02em] text-[#5A5A60]">
-          Built for real printers. No edge-to-edge assumptions. Trim on lime, tape on yellow.
+          Built for real printers. No edge-to-edge assumptions. Trim on lime, tape the hatch.
         </p>
       </div>
     </div>

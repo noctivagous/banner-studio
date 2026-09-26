@@ -1,4 +1,5 @@
 import { MARGIN_PRESETS, detectPreset } from '../lib/layout.js'
+import { PAPERS } from '../lib/paper.js'
 import { FieldLabel } from './FieldLabel.jsx'
 import { MarginIcon, OverlapIcon, PrinterIcon } from './icons.jsx'
 
@@ -9,7 +10,7 @@ const PRESET_BUTTONS = [
   { id: 'custom', label: 'Custom', sub: 'Edit' },
 ]
 
-export function PrinterSafe({ margins, overlap, onChange }) {
+export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }) {
   const active = detectPreset(margins)
 
   return (
@@ -27,6 +28,41 @@ export function PrinterSafe({ margins, overlap, onChange }) {
           <span className="text-[#F0F0F2]">INSIDE</span> your printable area, not to the paper
           edge. You trim on the dashed line and tape sheets edge-to-edge.
         </p>
+      </div>
+      <div className="mb-4 space-y-2">
+        <FieldLabel icon={<PrinterIcon />}>Paper</FieldLabel>
+        <div className="relative">
+          <select
+            value={paperId}
+            onChange={(e) => onChange({ paperId: e.target.value })}
+            className="w-full bg-[#08080A] border border-[#43434E] rounded-[4px] h-9 px-2.5 font-mono text-[12px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 appearance-none"
+          >
+            {PAPERS.map((paper) => (
+              <option key={paper.id} value={paper.id}>
+                {paper.label}
+              </option>
+            ))}
+          </select>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#7A7A80] text-[10px]">
+            ▼
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {['landscape', 'portrait'].map((dir) => (
+            <button
+              key={dir}
+              type="button"
+              onClick={() => onChange({ orientation: dir })}
+              className={`h-8 rounded-[4px] border font-mono text-[11px] tracking-[0.08em] uppercase ${
+                orientation === dir
+                  ? 'bg-[#E3FF33] border-[#E3FF33] text-black font-bold'
+                  : 'bg-[#26262E] border-[#43434E] text-[#7A7A80] hover:text-[#F0F0F2]'
+              }`}
+            >
+              {dir}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-1.5 mb-4">
         {PRESET_BUTTONS.map((preset) => (

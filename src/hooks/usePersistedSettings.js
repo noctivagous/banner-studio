@@ -14,6 +14,10 @@ export const DEFAULT_SETTINGS = {
   strokeWidth: 0.02,
   strokeColor: '#000000',
   align: 'left',
+  paperId: 'letter',
+  orientation: 'landscape',
+  rows: 1,
+  contentKind: 'text',
   margins: { top: 0.25, bottom: 0.25, left: 0.25, right: 0.25 },
   overlap: 0.15,
   showTrim: true,
@@ -21,7 +25,11 @@ export const DEFAULT_SETTINGS = {
   showTape: true,
   showNumbers: true,
   showCutMarks: false,
+  printTrim: false,
+  printNumbers: false,
+  printCutMarks: false,
   zoom: 1,
+  extensions: {},
 }
 
 function load() {
@@ -33,6 +41,10 @@ function load() {
       ...DEFAULT_SETTINGS,
       ...parsed,
       margins: { ...DEFAULT_SETTINGS.margins, ...(parsed.margins || {}) },
+      extensions:
+        parsed.extensions && typeof parsed.extensions === 'object' && !Array.isArray(parsed.extensions)
+          ? parsed.extensions
+          : {},
     }
   } catch {
     return DEFAULT_SETTINGS

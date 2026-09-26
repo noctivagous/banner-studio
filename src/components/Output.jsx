@@ -1,4 +1,5 @@
 import { formatLength } from '../lib/layout.js'
+import { PrintButton } from './PrintButton.jsx'
 import { Toggle } from './Toggle.jsx'
 import { OutputIcon } from './icons.jsx'
 
@@ -15,6 +16,8 @@ export function Output({
   showCutMarks,
   onChange,
   onPrint,
+  printMarks,
+  pageLabel,
 }) {
   const toggles = [
     { label: 'Show Trim Lines', key: 'showTrim', value: showTrim },
@@ -88,7 +91,13 @@ export function Output({
       <div className="mt-5 bg-[#08080A] border border-[#43434E] rounded-[4px] p-3 flex gap-3 items-center">
         <div className="shrink-0 w-[72px] h-[48px] bg-white rounded-[2px] relative overflow-hidden border border-black/10">
           <div className="absolute inset-[6px] border border-dashed border-[#E3FF33]" />
-          <div className="absolute right-[10px] top-[6px] bottom-[6px] w-[10px] bg-[#E3FF33]/30 border-l border-dashed border-[#E3FF33]/60" />
+          <div
+            className="absolute right-[10px] top-[6px] bottom-[6px] w-[10px] border-l border-dashed border-black/40"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(45deg, rgba(0,0,0,0.3) 0 2px, transparent 2px 5px)',
+            }}
+          />
           <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-4 h-4 bg-[#E3FF33] rounded-full flex items-center justify-center text-[9px]">
             ✂
           </div>
@@ -100,7 +109,7 @@ export function Output({
           <div className="font-mono text-[10px] leading-[1.4] text-[#7A7A80] mt-1">
             Trim on lime dashes.
             <br />
-            Overlap yellow, tape back.
+            Overlap the hatch, tape back.
           </div>
         </div>
       </div>
@@ -115,16 +124,15 @@ export function Output({
           </span>
         </div>
         <div className="mt-2 h-px bg-[#43434E]" />
-        <button
-          type="button"
-          onClick={onPrint}
+        <PrintButton
+          fullWidth
           disabled={sheetCount === 0}
-          className="mt-3 w-full h-9 rounded-[4px] bg-[#E3FF33] text-black font-mono text-[11px] font-bold tracking-[0.14em] uppercase disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
-        >
-          Print
-        </button>
+          onPrint={onPrint}
+          marks={printMarks}
+          onChange={onChange}
+        />
         <div className="mt-2 font-mono text-[9px] leading-[1.4] tracking-[0.06em] text-[#5A5A60] uppercase">
-          Landscape 11×8.5 • @page margins 0 • Trim on lime, tape on yellow
+          Default is type only • {pageLabel} • @page margins 0
         </div>
       </div>
     </div>

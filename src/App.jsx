@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CopyPanel } from './components/CopyPanel.jsx'
+import { DocumentMenu } from './components/DocumentMenu.jsx'
+import { PrintButton } from './components/PrintButton.jsx'
 import { Output } from './components/Output.jsx'
 import { Preview } from './components/Preview.jsx'
 import { PrintArea } from './components/PrintArea.jsx'
@@ -7,14 +9,13 @@ import { PrinterSafe } from './components/PrinterSafe.jsx'
 import { usePersistedSettings } from './hooks/usePersistedSettings.js'
 import {
   FONTS,
-  PAGE_H,
-  PAGE_W,
   PX_PER_INCH,
   clampGlyphHeight,
   formatLength,
   measureTextWidthPx,
   transformLines,
 } from './lib/layout.js'
+import { sheetSize } from './lib/paper.js'
 
 export default function App() {
   const [settings, patch] = usePersistedSettings()
@@ -30,6 +31,8 @@ export default function App() {
     strokeWidth,
     strokeColor,
     align,
+    paperId,
+    orientation,
     margins,
     overlap,
     showTrim,
@@ -37,12 +40,17 @@ export default function App() {
     showTape,
     showNumbers,
     showCutMarks,
+    printTrim,
+    printNumbers,
+    printCutMarks,
     zoom,
   } = settings
 
   const font = useMemo(() => FONTS.find((f) => f.id === fontId) || FONTS[0], [fontId])
-  const trimW = PAGE_W - margins.left - margins.right
-  const trimH = PAGE_H - margins.top - margins.bottom
+  const sheet = sheetSize(paperId, orientation)
+  const { pageW, pageH } = sheet
+  const trimW = pageW - margins.left - margins.right
+  const trimH = pageH - margins.top - margins.bottom
   const contentW = Math.max(0.1, trimW - overlap)
   const lines = useMemo(() => transformLines(copy, transform), [copy, transform])
   const fontPx = glyphHeight * PX_PER_INCH * 0.9
@@ -83,6 +91,17 @@ export default function App() {
     sheetCount > 0 ? sheetCount * trimW - (sheetCount - 1) * overlap : 0
 
   const print = () => window.print()
+  const pageLabel = `${sheet.label} ${orientation} ${pageW.toFixed(2)}"×${pageH.toFixed(2)}"`
+
+  useEffect(() => {
+    let style = document.getElementById('banner-page-size')
+    if (!style) {
+      style = document.createElement('style')
+      style.id = 'banner-page-size'
+      document.head.appendChild(style)
+    }
+    style.textContent = `@media print { @page { size: ${pageW}in ${pageH}in; margin: 0; } }`
+  }, [pageW, pageH])
 
   return (
     <>
@@ -103,7 +122,7 @@ export default function App() {
                 TILE<span className="text-[#7A7A80] mx-[5px]">/</span>BANNER STUDIO
               </span>
               <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-[4px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase">
-                Landscape 8.5×11 — Trim & Tape
+                {sheet.label} {orientation} {pageW.toFixed(2)}×{pageH.toFixed(2)} — Trim & Tape
               </span>
             </div>
             <div className="hidden lg:flex items-center gap-2 ml-2">
@@ -130,14 +149,13 @@ export default function App() {
                   {trimW.toFixed(2)}&quot; × {trimH.toFixed(2)}&quot; TRIM
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={print}
+              <PrintButton
                 disabled={sheetCount === 0}
-                className="h-8 px-3 rounded-[4px] bg-[#E3FF33] text-black font-mono text-[11px] font-bold tracking-[0.12em] uppercase disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
-              >
-                Print
-              </button>
+                onPrint={print}
+                marks={{ printTrim, printNumbers, printCutMarks }}
+                onChange={patch}
+              />
+              <DocumentMenu settings={settings} onImport={patch} />
             </div>
           </div>
         </header>
@@ -166,6 +184,8 @@ export default function App() {
             assembledInches={assembledInches}
             margins={margins}
             overlap={overlap}
+            pageW={pageW}
+            pageH={pageH}
             trimW={trimW}
             trimH={trimH}
             contentW={contentW}
@@ -189,7 +209,13 @@ export default function App() {
           />
           <div className="w-full xl:w-[320px] bg-[#121214] xl:border-l border-t xl:border-t-0 border-[#43434E] overflow-y-auto shrink-0">
             <div className="p-5">
-              <PrinterSafe margins={margins} overlap={overlap} onChange={patch} />
+              <PrinterSafe
+                margins={margins}
+                overlap={overlap}
+                paperId={paperId}
+                orientation={orientation}
+                onChange={patch}
+              />
               <div aria-hidden="true" className="h-px -mx-5 my-7 bg-[#43434E]/60" />
               <Output
                 sheetCount={sheetCount}
@@ -204,6 +230,8 @@ export default function App() {
                 showCutMarks={showCutMarks}
                 onChange={patch}
                 onPrint={print}
+                printMarks={{ printTrim, printNumbers, printCutMarks }}
+                pageLabel={pageLabel}
               />
             </div>
           </div>
@@ -211,6 +239,8 @@ export default function App() {
       </div>
       <PrintArea
         sheetCount={sheetCount}
+        pageW={pageW}
+        pageH={pageH}
         margins={margins}
         contentW={contentW}
         trimW={trimW}
@@ -226,9 +256,9 @@ export default function App() {
         strokeOn={strokeOn}
         strokeWidth={strokeWidth}
         strokeColor={strokeColor}
-        showTrim={showTrim}
-        showNumbers={showNumbers}
-        showCutMarks={showCutMarks}
+        printTrim={printTrim}
+        printNumbers={printNumbers}
+        printCutMarks={printCutMarks}
       />
     </>
   )

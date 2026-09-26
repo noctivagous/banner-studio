@@ -62,11 +62,6 @@ input[type='range'] {
 }
 
 @media print {
-  @page {
-    size: 11in 8.5in landscape;
-    margin: 0;
-  }
-
   html,
   body,
   #root {
