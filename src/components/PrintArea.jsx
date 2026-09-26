@@ -7,7 +7,6 @@ export function PrintArea({
   contentW,
   trimW,
   trimH,
-  textWidthIn,
   lines,
   font,
   glyphHeight,
@@ -53,7 +52,7 @@ export function PrintArea({
             <div
               style={{
                 transform: `translateX(-${i * contentW}in)`,
-                width: `${textWidthIn}in`,
+                width: `${Math.max(sheetCount * contentW, contentW)}in`,
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',

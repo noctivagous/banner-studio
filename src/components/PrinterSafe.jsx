@@ -1,5 +1,6 @@
 import { MARGIN_PRESETS, detectPreset } from '../lib/layout.js'
 import { FieldLabel } from './FieldLabel.jsx'
+import { MarginIcon, OverlapIcon, PrinterIcon } from './icons.jsx'
 
 const PRESET_BUTTONS = [
   { id: 'laser', label: 'Laser', sub: '.25"' },
@@ -14,7 +15,8 @@ export function PrinterSafe({ margins, overlap, onChange }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <span className="font-mono text-[11px] tracking-[0.14em] text-[#E3FF33] uppercase">
+        <span className="font-mono text-[11px] tracking-[0.14em] text-[#E3FF33] uppercase flex items-center gap-1.5">
+          <PrinterIcon />
           02 / Printer Safe
         </span>
         <span className="w-6 h-px bg-[#E3FF33]/50" />
@@ -54,7 +56,7 @@ export function PrinterSafe({ margins, overlap, onChange }) {
       <div className="grid grid-cols-2 gap-2.5">
         {['top', 'bottom', 'left', 'right'].map((side) => (
           <div key={side} className="space-y-1.5">
-            <FieldLabel>{side}</FieldLabel>
+            <FieldLabel icon={<MarginIcon direction={side} />}>{side}</FieldLabel>
             <div className="relative">
               <input
                 type="number"
@@ -77,6 +79,7 @@ export function PrinterSafe({ margins, overlap, onChange }) {
       </div>
       <div className="mt-5">
         <FieldLabel
+          icon={<OverlapIcon />}
           value={
             <span className="font-mono text-[11px] px-1.5 py-0.5 bg-[#E3FF33] text-black rounded-[3px] font-bold">
               {overlap.toFixed(2)}"

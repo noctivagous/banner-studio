@@ -1,5 +1,6 @@
 import { formatLength } from '../lib/layout.js'
 import { Toggle } from './Toggle.jsx'
+import { OutputIcon } from './icons.jsx'
 
 export function Output({
   sheetCount,
@@ -26,7 +27,8 @@ export function Output({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <span className="font-mono text-[11px] tracking-[0.14em] text-[#E3FF33] uppercase">
+        <span className="font-mono text-[11px] tracking-[0.14em] text-[#E3FF33] uppercase flex items-center gap-1.5">
+          <OutputIcon />
           03 / Output
         </span>
       </div>

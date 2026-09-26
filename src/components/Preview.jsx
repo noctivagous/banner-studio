@@ -25,6 +25,7 @@ function BannerType({
         color: fill,
         lineHeight,
         textAlign: align,
+        width: '100%',
         whiteSpace: 'nowrap',
         ...(strokeOn ? { WebkitTextStroke: strokeCss, paintOrder: 'stroke fill' } : {}),
       }}
@@ -34,7 +35,52 @@ function BannerType({
   ))
 }
 
-function BannerHScroll({ left, max, view, onChange }) {
+function ContentRuler({ startIn, widthIn, px }) {
+  const endIn = startIn + widthIn
+  const first = Math.ceil(startIn - 1e-6)
+  const last = Math.floor(endIn + 1e-6)
+  const ticks = []
+  for (let inch = first; inch <= last; inch += 1) ticks.push(inch)
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      <div className="absolute left-0 right-0 bottom-0 h-px bg-[#43434E]" />
+      <div className="absolute bottom-0 left-0 w-px h-3 bg-[#5E5E69]" />
+      <div className="absolute bottom-0 right-0 w-px h-3 bg-[#5E5E69]" />
+      {ticks.map((inch) => {
+        const x = (inch - startIn) * px
+        const foot = inch % 12 === 0
+        const mid = inch % 6 === 0
+        return (
+          <div key={inch} className="absolute top-0 bottom-0" style={{ left: x }}>
+            <div
+              className={`absolute bottom-0 left-0 w-px ${foot ? 'h-4 bg-[#F0F0F2]' : 'h-2.5 bg-[#5E5E69]'}`}
+            />
+            {mid && (
+              <span className="absolute top-0 left-1 font-mono text-[9px] text-[#5A5A60] whitespace-nowrap">
+                {inch}&quot;
+              </span>
+            )}
+            {foot && (
+              <span className="absolute bottom-1 left-1.5 font-mono text-[10px] font-bold text-[#F0F0F2] whitespace-nowrap">
+                {Math.floor(inch / 12)}&apos;
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function BannerHScroll({
+  left,
+  max,
+  view,
+  onChange,
+  className = 'w-full h-3 flex items-center shrink-0 bg-[#121214]',
+  ariaLabel = 'Scroll banner preview',
+}) {
   const trackRef = useRef(null)
   const dragging = useRef(false)
   const [trackW, setTrackW] = useState(0)
@@ -89,11 +135,11 @@ function BannerHScroll({ left, max, view, onChange }) {
   if (!overflowing) return null
 
   return (
-    <div className="w-full h-3 flex items-center border-t border-[#43434E]">
+    <div className={className}>
       <div
         ref={trackRef}
         role="scrollbar"
-        aria-label="Scroll banner preview"
+        aria-label={ariaLabel}
         aria-orientation="horizontal"
         aria-valuemin={0}
         aria-valuemax={Math.round(max)}
@@ -138,8 +184,6 @@ export function Preview({
   trimW,
   trimH,
   contentW,
-  textWidthIn,
-  textWidthPx,
   fontPx,
   lines,
   font,
@@ -162,10 +206,9 @@ export function Preview({
   const contentPx = contentW * px
   const printableHpx = trimH * px
   const typePx = fontPx * zoom
-  const stripPx = textWidthPx * zoom
   const canvasRef = useRef(null)
-  const rulerRef = useRef(null)
   const [hScroll, setHScroll] = useState({ left: 0, max: 0, view: 0 })
+  const rulerH = 28
 
   const measureScroll = useCallback(() => {
     const el = canvasRef.current
@@ -174,7 +217,6 @@ export function Preview({
     const max = Math.max(0, el.scrollWidth - view)
     const left = Math.max(0, Math.min(max, el.scrollLeft))
     if (el.scrollLeft !== left) el.scrollLeft = left
-    if (rulerRef.current) rulerRef.current.scrollLeft = left
     setHScroll({ left, max, view })
   }, [])
 
@@ -184,7 +226,6 @@ export function Preview({
     const max = Math.max(0, el.scrollWidth - el.clientWidth)
     const clamped = Math.max(0, Math.min(max, left))
     el.scrollLeft = clamped
-    if (rulerRef.current) rulerRef.current.scrollLeft = clamped
     setHScroll({ left: clamped, max, view: el.clientWidth })
   }, [])
 
@@ -234,60 +275,14 @@ export function Preview({
         </div>
       </div>
 
-      <div className="shrink-0 bg-[#121214] border-b border-[#43434E]">
-        <div className="h-8 overflow-hidden relative flex items-center">
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
-          }}
-        />
-        <div
-          ref={rulerRef}
-          className="relative w-full h-full overflow-x-auto scrollbar-none flex items-center"
-        >
-          <div
-            className="flex items-end h-full"
-            style={{
-              width: `${Math.max(800, sheetCount * (sheetW + 24))}px`,
-              minWidth: '100%',
-            }}
-          >
-            {sheetCount > 0 ? (
-              Array.from({ length: Math.ceil(assembledInches) + 1 }).map((_, inch) => (
-                <div key={inch} className="relative shrink-0" style={{ width: `${px}px` }}>
-                  <div className="absolute bottom-0 left-0 w-px h-2.5 bg-[#2A2A2E]" />
-                  {inch % 12 === 0 && (
-                    <div className="absolute bottom-0 left-0 w-px h-4 bg-[#5E5E69]" />
-                  )}
-                  {inch % 6 === 0 && (
-                    <span className="absolute -top-0 left-1 font-mono text-[9px] text-[#5A5A60]">
-                      {inch}&quot;
-                    </span>
-                  )}
-                  {inch % 12 === 0 && (
-                    <span className="absolute bottom-1 left-1.5 font-mono text-[10px] font-bold text-[#F0F0F2]">
-                      {Math.floor(inch / 12)}'
-                    </span>
-                  )}
-                </div>
-              ))
-            ) : (
-              <span className="font-mono text-[10px] tracking-[0.1em] text-[#5A5A60] uppercase px-4">
-                Type to see ruler
-              </span>
-            )}
-          </div>
-        </div>
-        </div>
-        <BannerHScroll
-          left={hScroll.left}
-          max={hScroll.max}
-          view={hScroll.view}
-          onChange={applyScroll}
-        />
-      </div>
+      <BannerHScroll
+        left={hScroll.left}
+        max={hScroll.max}
+        view={hScroll.view}
+        onChange={applyScroll}
+        ariaLabel="Scroll banner preview, top"
+        className="w-full h-3 flex items-center shrink-0 bg-[#121214] border-b border-[#43434E]"
+      />
 
       <div
         ref={canvasRef}
@@ -295,7 +290,6 @@ export function Preview({
         onScroll={() => {
           const el = canvasRef.current
           if (!el) return
-          if (rulerRef.current) rulerRef.current.scrollLeft = el.scrollLeft
           setHScroll({
             left: el.scrollLeft,
             max: Math.max(0, el.scrollWidth - el.clientWidth),
@@ -345,11 +339,23 @@ export function Preview({
                 <div
                   key={i}
                   className="relative shrink-0"
-                  style={{ width: sheetW, height: sheetH + (showNumbers ? 28 : 0) }}
+                  style={{ width: sheetW, height: rulerH + sheetH + (showNumbers ? 28 : 0) }}
                 >
                   <div
-                    className="absolute top-0 left-0 bg-white rounded-[2px] overflow-hidden"
+                    className="absolute overflow-hidden"
                     style={{
+                      left: margins.left * px,
+                      top: 0,
+                      width: contentPx,
+                      height: rulerH,
+                    }}
+                  >
+                    <ContentRuler startIn={i * contentW} widthIn={contentW} px={px} />
+                  </div>
+                  <div
+                    className="absolute left-0 bg-white rounded-[2px] overflow-hidden"
+                    style={{
+                      top: rulerH,
                       width: sheetW,
                       height: sheetH,
                       boxShadow:
@@ -360,31 +366,6 @@ export function Preview({
                       className="absolute inset-0 opacity-[0.025] mix-blend-multiply pointer-events-none"
                       style={{ backgroundImage: PAPER_NOISE }}
                     />
-                    {showSafe && (
-                      <div
-                        className="absolute border border-dotted pointer-events-none"
-                        style={{
-                          left: margins.left * px,
-                          top: margins.top * px,
-                          width: trimW * px,
-                          height: trimH * px,
-                          borderColor: 'rgba(0,0,0,0.18)',
-                        }}
-                      />
-                    )}
-                    {showTrim && (
-                      <div
-                        className="absolute border border-dashed pointer-events-none"
-                        style={{
-                          left: margins.left * px,
-                          top: margins.top * px,
-                          width: trimW * px,
-                          height: trimH * px,
-                          borderColor: '#E3FF33',
-                          borderWidth: '1px',
-                        }}
-                      />
-                    )}
                     <div
                       className="absolute bg-white overflow-hidden"
                       style={{
@@ -398,7 +379,7 @@ export function Preview({
                         className="h-full flex flex-col justify-center"
                         style={{
                           transform: `translateX(-${i * contentPx}px)`,
-                          width: stripPx,
+                          width: Math.max(sheetCount * contentPx, contentPx),
                         }}
                       >
                         <BannerType
@@ -431,6 +412,31 @@ export function Preview({
                           TAPE ↕
                         </span>
                       </div>
+                    )}
+                    {showSafe && (
+                      <div
+                        className="absolute border border-dotted pointer-events-none z-[1]"
+                        style={{
+                          left: margins.left * px,
+                          top: margins.top * px,
+                          width: trimW * px,
+                          height: trimH * px,
+                          borderColor: 'rgba(0,0,0,0.18)',
+                        }}
+                      />
+                    )}
+                    {showTrim && (
+                      <div
+                        className="absolute border border-dashed pointer-events-none z-[2]"
+                        style={{
+                          left: margins.left * px,
+                          top: margins.top * px,
+                          width: trimW * px,
+                          height: trimH * px,
+                          borderColor: '#E3FF33',
+                          borderWidth: '1px',
+                        }}
+                      />
                     )}
                     {showCutMarks && (
                       <Fragment>
@@ -469,7 +475,7 @@ export function Preview({
                     <Fragment>
                       <div
                         className="absolute flex items-center gap-1"
-                        style={{ left: -2, top: margins.top * px + 2 }}
+                        style={{ left: -2, top: rulerH + margins.top * px + 2 }}
                       >
                         <div className="w-5 h-5 rounded-full bg-[#E3FF33] flex items-center justify-center text-[10px] text-black shadow">
                           ✂
@@ -477,7 +483,7 @@ export function Preview({
                       </div>
                       <div
                         className="absolute flex items-center gap-1"
-                        style={{ left: -2, top: margins.top * px + printableHpx - 18 }}
+                        style={{ left: -2, top: rulerH + margins.top * px + printableHpx - 18 }}
                       >
                         <div className="w-5 h-5 rounded-full bg-[#E3FF33] flex items-center justify-center text-[10px] text-black shadow">
                           ✂
@@ -488,7 +494,7 @@ export function Preview({
                   {showNumbers && (
                     <div
                       className="absolute left-0 font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase flex items-center gap-2"
-                      style={{ top: sheetH + 6 }}
+                      style={{ top: rulerH + sheetH + 6 }}
                     >
                       <span className="px-1.5 py-0.5 bg-[#26262E] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
                         SHEET {String(i + 1).padStart(2, '0')} /{' '}
@@ -505,6 +511,14 @@ export function Preview({
           )}
         </div>
       </div>
+      <BannerHScroll
+        left={hScroll.left}
+        max={hScroll.max}
+        view={hScroll.view}
+        onChange={applyScroll}
+        ariaLabel="Scroll banner preview, bottom"
+        className="w-full h-3 flex items-center shrink-0 bg-[#121214] border-t border-[#43434E]"
+      />
     </div>
   )
 }
