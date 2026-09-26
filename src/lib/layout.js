@@ -2,15 +2,28 @@ export const PX_PER_INCH = 90
 export const PAGE_W = 11
 export const PAGE_H = 8.5
 
+export const FONT_GROUPS = ['Sans Serif', 'Slab Serif', 'Display', 'Stencil']
+
 export const FONTS = [
-  { id: 'anton', label: 'Anton', family: 'Anton', weight: '400' },
-  { id: 'bebas', label: 'Bebas Neue', family: 'Bebas Neue', weight: '400' },
-  { id: 'oswald', label: 'Oswald 700', family: 'Oswald', weight: '700' },
-  { id: 'impact', label: 'Impact', family: 'Impact', weight: '900' },
-  { id: 'archivo', label: 'Archivo Black', family: 'Archivo Black', weight: '400' },
-  { id: 'blackops', label: 'Black Ops One', family: 'Black Ops One', weight: '400' },
-  { id: 'monoton', label: 'Monoton', family: 'Monoton', weight: '400' },
-  { id: 'space', label: 'Space Grotesk Bold', family: 'Space Grotesk', weight: '700' },
+  { id: 'anton', label: 'Anton', family: 'Anton', weight: '400', group: 'Sans Serif' },
+  { id: 'bebas', label: 'Bebas Neue', family: 'Bebas Neue', weight: '400', group: 'Sans Serif' },
+  { id: 'oswald', label: 'Oswald 700', family: 'Oswald', weight: '700', group: 'Sans Serif' },
+  { id: 'impact', label: 'Impact', family: 'Impact', weight: '900', group: 'Sans Serif' },
+  { id: 'archivo', label: 'Archivo Black', family: 'Archivo Black', weight: '400', group: 'Sans Serif' },
+  { id: 'space', label: 'Space Grotesk Bold', family: 'Space Grotesk', weight: '700', group: 'Sans Serif' },
+  { id: 'staatliches', label: 'Staatliches', family: 'Staatliches', weight: '400', group: 'Sans Serif' },
+  { id: 'alfaslab', label: 'Alfa Slab One', family: 'Alfa Slab One', weight: '400', group: 'Slab Serif' },
+  { id: 'ultra', label: 'Ultra Slab', family: 'Ultra', weight: '400', group: 'Slab Serif' },
+  { id: 'arvo', label: 'Arvo Bold', family: 'Arvo', weight: '700', group: 'Slab Serif' },
+  { id: 'graduate', label: 'Graduate', family: 'Graduate', weight: '400', group: 'Slab Serif' },
+  { id: 'zillaslab', label: 'Zilla Slab Bold', family: 'Zilla Slab', weight: '700', group: 'Slab Serif' },
+  { id: 'luckiest', label: 'Luckiest Guy', family: 'Luckiest Guy', weight: '400', group: 'Display' },
+  { id: 'titan', label: 'Titan One', family: 'Titan One', weight: '400', group: 'Display' },
+  { id: 'bungee', label: 'Bungee', family: 'Bungee', weight: '400', group: 'Display' },
+  { id: 'passion', label: 'Passion One 900', family: 'Passion One', weight: '900', group: 'Display' },
+  { id: 'monoton', label: 'Monoton', family: 'Monoton', weight: '400', group: 'Display' },
+  { id: 'blackops', label: 'Black Ops One', family: 'Black Ops One', weight: '400', group: 'Stencil' },
+  { id: 'saira', label: 'Saira Stencil One', family: 'Saira Stencil One', weight: '400', group: 'Stencil' },
 ]
 
 export const MARGIN_PRESETS = {

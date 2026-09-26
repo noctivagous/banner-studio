@@ -1,5 +1,6 @@
-import { FONTS, glyphMaxInches } from '../lib/layout.js'
+import { glyphMaxInches } from '../lib/layout.js'
 import { FieldLabel } from './FieldLabel.jsx'
+import { FontSelect } from './FontSelect.jsx'
 import { Toggle } from './Toggle.jsx'
 import {
   AlignIcon,
@@ -12,6 +13,33 @@ import {
   StrokeIcon,
   TransformIcon,
 } from './icons.jsx'
+
+function CustomColorWell({ value, label, onChange }) {
+  return (
+    <div title={label} className="relative w-8 h-8 shrink-0">
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 translate-x-[3px] translate-y-[3px] rounded-full"
+        style={{
+          background:
+            'conic-gradient(from 45deg, #f44336, #ff9800, #ffeb3b, #4caf50, #2196f3, #9c27b0, #f44336)',
+        }}
+      />
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 rounded-full border border-[#43434E]"
+        style={{ background: value }}
+      />
+      <input
+        type="color"
+        value={value}
+        aria-label={label}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute -inset-1 opacity-0 cursor-pointer"
+      />
+    </div>
+  )
+}
 
 export function CopyPanel({
   copy,
@@ -46,23 +74,7 @@ export function CopyPanel({
           </div>
           <div className="mb-4">
             <FieldLabel icon={<FontIcon />}>Font Family</FieldLabel>
-            <div className="relative">
-              <select
-                value={fontId}
-                onChange={(e) => onChange({ fontId: e.target.value })}
-                className="w-full bg-[#08080A] border border-[#43434E] rounded-[4px] px-3 py-2.5 text-[13px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 appearance-none"
-                style={{ fontFamily: `"${font.family}", Impact, sans-serif` }}
-              >
-                {FONTS.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#7A7A80] text-[10px]">
-                ▼
-              </div>
-            </div>
+            <FontSelect fontId={fontId} onChange={onChange} />
           </div>
           <div className="relative group">
             <textarea
@@ -87,21 +99,20 @@ export function CopyPanel({
               <div>
                 <FieldLabel icon={<FillIcon />}>Fill</FieldLabel>
                 <div className="flex items-center gap-2">
-                  <div className="relative w-8 h-8 rounded-[4px] overflow-hidden border border-[#43434E] shrink-0">
-                    <input
-                      type="color"
-                      value={fill}
-                      onChange={(e) => onChange({ fill: e.target.value })}
-                      className="absolute inset-0 w-[200%] h-[200%] -translate-x-1/4 -translate-y-1/4 cursor-pointer"
-                    />
-                  </div>
+                  <CustomColorWell
+                    value={fill}
+                    label="Custom fill color"
+                    onChange={(next) => onChange({ fill: next })}
+                  />
                   <div className="flex gap-1">
                     {['#000000', '#FFFFFF'].map((swatch) => (
                       <button
                         key={swatch}
                         type="button"
+                        title={swatch === '#000000' ? 'Black fill' : 'White fill'}
+                        aria-label={swatch === '#000000' ? 'Black fill' : 'White fill'}
                         onClick={() => onChange({ fill: swatch })}
-                        className={`w-8 h-8 rounded-[4px] border text-[10px] font-mono ${
+                        className={`w-8 h-11 rounded-[4px] border font-mono transition-colors flex flex-col items-center justify-center gap-0.5 ${
                           fill === swatch ? 'border-[#E3FF33]' : 'border-[#43434E]'
                         }`}
                         style={{
@@ -109,10 +120,21 @@ export function CopyPanel({
                           color: swatch === '#000000' ? '#fff' : '#000',
                         }}
                       >
-                        {swatch === '#000000' ? 'K' : 'W'}
+                        <span className="text-[10px] leading-none">
+                          {swatch === '#000000' ? 'K' : 'W'}
+                        </span>
+                        <span className="text-[8px] leading-none uppercase tracking-[0.06em]">
+                          {swatch === '#000000' ? 'Black' : 'White'}
+                        </span>
                       </button>
                     ))}
                   </div>
+                </div>
+                <div
+                  className="mt-1.5 font-mono text-[10px] tracking-[0.06em] text-[#7A7A80] uppercase"
+                  title="Current fill color"
+                >
+                  {fill}
                 </div>
               </div>
               <div>
@@ -123,13 +145,21 @@ export function CopyPanel({
                       key={dir}
                       type="button"
                       onClick={() => onChange({ align: dir })}
-                      className={`h-8 rounded-[4px] border text-[12px] transition-colors ${
+                      title={`Align ${dir}`}
+                      aria-label={`Align ${dir}`}
+                      aria-pressed={align === dir}
+                      className={`h-11 rounded-[4px] border transition-colors flex flex-col items-center justify-center gap-0.5 ${
                         align === dir
-                          ? 'bg-[#F0F0F2] text-black border-[#F0F0F2]'
+                          ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                           : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-white'
                       }`}
                     >
-                      {dir === 'left' ? '◧' : dir === 'center' ? '⬌' : '◨'}
+                      <span className="text-[12px] leading-none">
+                        {dir === 'left' ? '◧' : dir === 'center' ? '⬌' : '◨'}
+                      </span>
+                      <span className="font-mono text-[8px] leading-none uppercase tracking-[0.08em]">
+                        {dir}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -170,14 +200,11 @@ export function CopyPanel({
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Color</span>
-                    <div className="relative w-6 h-6 rounded-[3px] overflow-hidden border border-[#43434E]">
-                      <input
-                        type="color"
-                        value={strokeColor}
-                        onChange={(e) => onChange({ strokeColor: e.target.value })}
-                        className="absolute inset-0 w-[200%] h-[200%] -translate-x-1/4 -translate-y-1/4 cursor-pointer"
-                      />
-                    </div>
+                    <CustomColorWell
+                      value={strokeColor}
+                      label="Custom stroke color"
+                      onChange={(next) => onChange({ strokeColor: next })}
+                    />
                   </div>
                 </div>
               )}
