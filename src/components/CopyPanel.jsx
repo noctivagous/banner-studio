@@ -234,7 +234,7 @@ export function CopyPanel({
                   : {}),
                 ...(shadow.on
                   ? {
-                      textShadow: `${textareaShadowDx}px ${textareaShadowDy}px 0 #000000`,
+                      textShadow: `${textareaShadowDx}px ${textareaShadowDy}px 0 ${shadow.color}`,
                     }
                   : {}),
                 ...(overlay.on
@@ -244,7 +244,7 @@ export function CopyPanel({
                         angleDeg: overlay.angle,
                         spacing: px.spacing,
                         lineWidth: px.lineWidth,
-                        color: '#000000',
+                        color: overlay.color,
                         unit: 'px',
                       })
                     })()
@@ -346,6 +346,14 @@ export function CopyPanel({
                   <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
                     Hatch lines over the base fill, clipped to the glyph.
                   </p>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Color</span>
+                    <CustomColorWell
+                      value={overlay.color}
+                      label="Custom overlay color"
+                      onChange={(next) => setOverlay({ color: next })}
+                    />
+                  </div>
                   <HatchFields
                     values={overlay}
                     resolved={overlayResolved}
@@ -539,6 +547,14 @@ export function CopyPanel({
                         </button>
                       ))}
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Color</span>
+                    <CustomColorWell
+                      value={shadow.color}
+                      label="Custom shadow color"
+                      onChange={(next) => setShadow({ color: next })}
+                    />
                   </div>
                   {shadow.fillType === SHADOW_FILL_HATCH && (
                     <HatchFields

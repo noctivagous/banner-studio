@@ -145,6 +145,7 @@ export const DEFAULT_TEXT_SHADOW = {
   shadowDistance: null,
   shadowAngle: 45,
   fillType: SHADOW_FILL_SOLID,
+  color: '#000000',
   hatchAngle: 45,
   hatchSpacingPct: 10,
   hatchLineWidthPct: 2,
@@ -153,6 +154,7 @@ export const DEFAULT_TEXT_SHADOW = {
 export const DEFAULT_FILL_OVERLAY = {
   on: false,
   type: OVERLAY_TYPE_HATCH,
+  color: '#000000',
   angle: 90,
   spacingPct: 10,
   lineWidthPct: 2,
@@ -206,6 +208,13 @@ function clampPct(value, fallback, min, max) {
   return Number.isFinite(pct) ? Math.min(max, Math.max(min, pct)) : fallback
 }
 
+function asHexColor(value, fallback) {
+  if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value.trim())) {
+    return value.trim().toUpperCase()
+  }
+  return fallback
+}
+
 export function normalizeTextShadow(value, fallback) {
   const base = { ...DEFAULT_TEXT_SHADOW, ...(fallback || {}) }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return base
@@ -222,6 +231,7 @@ export function normalizeTextShadow(value, fallback) {
     shadowDistance,
     shadowAngle: clampAngle(value.shadowAngle, base.shadowAngle),
     fillType: value.fillType === SHADOW_FILL_HATCH ? SHADOW_FILL_HATCH : SHADOW_FILL_SOLID,
+    color: asHexColor(value.color, base.color),
     hatchAngle: clampAngle(value.hatchAngle, base.hatchAngle),
     hatchSpacingPct: clampPct(value.hatchSpacingPct, base.hatchSpacingPct, 2, 50),
     hatchLineWidthPct: clampPct(value.hatchLineWidthPct, base.hatchLineWidthPct, 0.5, 25),
@@ -234,6 +244,7 @@ export function normalizeFillOverlay(value, fallback) {
   return {
     on: typeof value.on === 'boolean' ? value.on : base.on,
     type: OVERLAY_TYPE_HATCH,
+    color: asHexColor(value.color, base.color),
     angle: clampAngle(value.angle, base.angle),
     spacingPct: clampPct(value.spacingPct, base.spacingPct, 2, 50),
     lineWidthPct: clampPct(value.lineWidthPct, base.lineWidthPct, 0.5, 25),
@@ -305,15 +316,24 @@ export function matchGlyphPreset({ fill, strokeOn, strokeColor, textShadow, fill
     strokeOn &&
     isBlack(strokeColor) &&
     shadowOn &&
+    isBlack(shadow.color) &&
     shadowSolid &&
     overlayOn &&
+    isBlack(overlay.color) &&
     overlay.angle === HATCH_SHADOW_OVERLAY.angle &&
     overlay.spacingPct === HATCH_SHADOW_OVERLAY.spacingPct &&
     overlay.lineWidthPct === HATCH_SHADOW_OVERLAY.lineWidthPct
   ) {
     return TEXT_EFFECT_HATCH_SHADOW
   }
-  if (isWhite(fill) && strokeOn && shadowOn && shadowSolid && !overlayOn) {
+  if (
+    isWhite(fill) &&
+    strokeOn &&
+    shadowOn &&
+    isBlack(shadow.color) &&
+    shadowSolid &&
+    !overlayOn
+  ) {
     return TEXT_EFFECT_OUTLINE_COPY_SHADOW
   }
   if (
@@ -322,6 +342,7 @@ export function matchGlyphPreset({ fill, strokeOn, strokeColor, textShadow, fill
     !overlayOn &&
     shadowOn &&
     shadow.fillType === SHADOW_FILL_HATCH &&
+    isBlack(shadow.color) &&
     shadow.hatchSpacingPct === FILL_HATCH_SHADOW.hatchSpacingPct &&
     shadow.hatchLineWidthPct === FILL_HATCH_SHADOW.hatchLineWidthPct &&
     (shadow.hatchAngle === 90 || shadow.hatchAngle === 0)
@@ -346,13 +367,14 @@ export function applyGlyphPreset(presetId, settings) {
       fill: '#FFFFFF',
       strokeOn: true,
       strokeColor: '#000000',
-      fillOverlay: { ...overlay, ...HATCH_SHADOW_OVERLAY, on: true },
+      fillOverlay: { ...overlay, ...HATCH_SHADOW_OVERLAY, on: true, color: '#000000' },
       textShadow: {
         ...shadow,
         on: true,
         shadowDistance: null,
         shadowAngle: 45,
         fillType: SHADOW_FILL_SOLID,
+        color: '#000000',
       },
     }
   }
@@ -370,6 +392,7 @@ export function applyGlyphPreset(presetId, settings) {
         shadowDistance: null,
         shadowAngle: 45,
         fillType: SHADOW_FILL_HATCH,
+        color: '#000000',
         ...FILL_HATCH_SHADOW,
         hatchAngle: presetId === TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG ? 0 : 90,
       },
@@ -386,6 +409,7 @@ export function applyGlyphPreset(presetId, settings) {
         shadowDistance: null,
         shadowAngle: 45,
         fillType: SHADOW_FILL_SOLID,
+        color: '#000000',
       },
     }
   }

@@ -23,6 +23,7 @@ function BannerType({
   shadowOn,
   shadowDx,
   shadowDy,
+  shadowColor,
   shadowHatch,
   overlayHatch,
   hatchUnit,
@@ -54,8 +55,8 @@ function BannerType({
               inset: 0,
               transform: `translate(${shadowDx}, ${shadowDy})`,
               ...(shadowHatch
-                ? hatchStyle({ ...shadowHatch, color: '#000000', unit: hatchUnit })
-                : { color: '#000000', WebkitTextStroke: '0px transparent' }),
+                ? hatchStyle({ ...shadowHatch, unit: hatchUnit })
+                : { color: shadowColor, WebkitTextStroke: '0px transparent' }),
             }}
           >
             {text}
@@ -80,7 +81,6 @@ function BannerType({
               inset: 0,
               ...hatchStyle({
                 ...overlayHatch,
-                color: '#000000',
                 unit: hatchUnit,
                 ...(strokeOn ? { strokeCss } : {}),
               }),
@@ -271,6 +271,7 @@ export function Preview({
   shadowOn,
   shadowDxIn,
   shadowDyIn,
+  shadowColor,
   shadowFillType,
   shadowHatchAngle,
   shadowHatchSpacingIn,
@@ -279,6 +280,7 @@ export function Preview({
   overlayAngle,
   overlaySpacingIn,
   overlayLineWidthIn,
+  overlayColor,
   printOverlap,
   showTrim,
   showSafe,
@@ -601,12 +603,14 @@ export function Preview({
                           shadowOn={shadowOn}
                           shadowDx={`${shadowDxIn * px}px`}
                           shadowDy={`${shadowDyIn * px}px`}
+                          shadowColor={shadowColor}
                           shadowHatch={
                             shadowFillType === SHADOW_FILL_HATCH
                               ? {
                                   angleDeg: shadowHatchAngle,
                                   spacing: shadowHatchSpacingIn * px,
                                   lineWidth: shadowHatchLineWidthIn * px,
+                                  color: shadowColor,
                                 }
                               : null
                           }
@@ -616,6 +620,7 @@ export function Preview({
                                   angleDeg: overlayAngle,
                                   spacing: overlaySpacingIn * px,
                                   lineWidth: overlayLineWidthIn * px,
+                                  color: overlayColor,
                                 }
                               : null
                           }

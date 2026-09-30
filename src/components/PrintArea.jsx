@@ -23,6 +23,7 @@ export function PrintArea({
   shadowOn,
   shadowDxIn,
   shadowDyIn,
+  shadowColor,
   shadowFillType,
   shadowHatchAngle,
   shadowHatchSpacingIn,
@@ -31,6 +32,7 @@ export function PrintArea({
   overlayAngle,
   overlaySpacingIn,
   overlayLineWidthIn,
+  overlayColor,
   printOverlap,
   overlap,
   printTrim,
@@ -88,12 +90,14 @@ export function PrintArea({
                 shadowOn={shadowOn}
                 shadowDx={`${shadowDxIn}in`}
                 shadowDy={`${shadowDyIn}in`}
+                shadowColor={shadowColor}
                 shadowHatch={
                   shadowFillType === SHADOW_FILL_HATCH
                     ? {
                         angleDeg: shadowHatchAngle,
                         spacing: shadowHatchSpacingIn,
                         lineWidth: shadowHatchLineWidthIn,
+                        color: shadowColor,
                       }
                     : null
                 }
@@ -103,6 +107,7 @@ export function PrintArea({
                         angleDeg: overlayAngle,
                         spacing: overlaySpacingIn,
                         lineWidth: overlayLineWidthIn,
+                        color: overlayColor,
                       }
                     : null
                 }

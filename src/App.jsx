@@ -288,6 +288,7 @@ export default function App() {
             shadowOn={textShadow.on}
             shadowDxIn={shadowOffset.dx}
             shadowDyIn={shadowOffset.dy}
+            shadowColor={textShadow.color}
             shadowFillType={textShadow.fillType}
             shadowHatchAngle={shadowHatch.angle}
             shadowHatchSpacingIn={shadowHatch.spacingIn}
@@ -296,6 +297,7 @@ export default function App() {
             overlayAngle={overlayHatch.angle}
             overlaySpacingIn={overlayHatch.spacingIn}
             overlayLineWidthIn={overlayHatch.lineWidthIn}
+            overlayColor={fillOverlay.color}
             printOverlap={printOverlap}
             showTrim={showTrim}
             showSafe={showSafe}
@@ -356,6 +358,7 @@ export default function App() {
         shadowOn={textShadow.on}
         shadowDxIn={shadowOffset.dx}
         shadowDyIn={shadowOffset.dy}
+        shadowColor={textShadow.color}
         shadowFillType={textShadow.fillType}
         shadowHatchAngle={shadowHatch.angle}
         shadowHatchSpacingIn={shadowHatch.spacingIn}
@@ -364,6 +367,7 @@ export default function App() {
         overlayAngle={overlayHatch.angle}
         overlaySpacingIn={overlayHatch.spacingIn}
         overlayLineWidthIn={overlayHatch.lineWidthIn}
+        overlayColor={fillOverlay.color}
         printOverlap={printOverlap}
         overlap={overlap}
         printTrim={printTrim}
