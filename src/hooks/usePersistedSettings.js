@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { DEFAULT_TEXT_EFFECT, normalizeTextEffect } from '../lib/layout.js'
+import {
+  DEFAULT_FILL_OVERLAY,
+  DEFAULT_TEXT_SHADOW,
+  normalizeFillOverlay,
+  normalizeTextShadow,
+} from '../lib/layout.js'
 
 export const STORAGE_KEY = 'tile-banner-studio'
 
@@ -14,7 +19,8 @@ export const DEFAULT_SETTINGS = {
   strokeOn: false,
   strokeWidth: 0.02,
   strokeColor: '#000000',
-  textEffect: { ...DEFAULT_TEXT_EFFECT },
+  textShadow: { ...DEFAULT_TEXT_SHADOW },
+  fillOverlay: { ...DEFAULT_FILL_OVERLAY },
   align: 'center',
   paperId: 'letter',
   orientation: 'landscape',
@@ -45,7 +51,8 @@ function load() {
       ...DEFAULT_SETTINGS,
       ...parsed,
       margins: { ...DEFAULT_SETTINGS.margins, ...(parsed.margins || {}) },
-      textEffect: normalizeTextEffect(parsed.textEffect, DEFAULT_SETTINGS.textEffect),
+      textShadow: normalizeTextShadow(parsed.textShadow, DEFAULT_SETTINGS.textShadow),
+      fillOverlay: normalizeFillOverlay(parsed.fillOverlay, DEFAULT_SETTINGS.fillOverlay),
       extensions:
         parsed.extensions && typeof parsed.extensions === 'object' && !Array.isArray(parsed.extensions)
           ? parsed.extensions

@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { CUT_LINE_BLEND, overlapCutSlack } from '../lib/layout.js'
+import { CUT_LINE_BLEND, SHADOW_FILL_HATCH, overlapCutSlack } from '../lib/layout.js'
 import { BannerType } from './Preview.jsx'
 
 export function PrintArea({
@@ -20,11 +20,17 @@ export function PrintArea({
   strokeOn,
   strokeWidth,
   strokeColor,
-  effectId,
+  shadowOn,
   shadowDxIn,
   shadowDyIn,
-  effectStrokeWidthIn,
-  effectStrokeColor,
+  shadowFillType,
+  shadowHatchAngle,
+  shadowHatchSpacingIn,
+  shadowHatchLineWidthIn,
+  overlayOn,
+  overlayAngle,
+  overlaySpacingIn,
+  overlayLineWidthIn,
   printOverlap,
   overlap,
   printTrim,
@@ -79,10 +85,28 @@ export function PrintArea({
                 align={align}
                 strokeOn={strokeOn}
                 strokeCss={`${strokeWidth}in ${strokeColor}`}
-                effectId={effectId}
-                effectDx={`${shadowDxIn}in`}
-                effectDy={`${shadowDyIn}in`}
-                effectStrokeCss={`${effectStrokeWidthIn}in ${effectStrokeColor}`}
+                shadowOn={shadowOn}
+                shadowDx={`${shadowDxIn}in`}
+                shadowDy={`${shadowDyIn}in`}
+                shadowHatch={
+                  shadowFillType === SHADOW_FILL_HATCH
+                    ? {
+                        angleDeg: shadowHatchAngle,
+                        spacing: shadowHatchSpacingIn,
+                        lineWidth: shadowHatchLineWidthIn,
+                      }
+                    : null
+                }
+                overlayHatch={
+                  overlayOn
+                    ? {
+                        angleDeg: overlayAngle,
+                        spacing: overlaySpacingIn,
+                        lineWidth: overlayLineWidthIn,
+                      }
+                    : null
+                }
+                hatchUnit="in"
               />
             </div>
           </div>

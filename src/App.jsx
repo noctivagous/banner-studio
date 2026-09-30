@@ -12,9 +12,9 @@ import {
   FONTS,
   PX_PER_INCH,
   clampGlyphHeight,
-  effectStrokeIn,
   formatLength,
   measureTextWidthPx,
+  resolveHatchIn,
   resolveShadowOffsetIn,
   transformLines,
 } from './lib/layout.js'
@@ -33,7 +33,8 @@ export default function App() {
     strokeOn,
     strokeWidth,
     strokeColor,
-    textEffect,
+    textShadow,
+    fillOverlay,
     align,
     paperId,
     orientation,
@@ -61,13 +62,35 @@ export default function App() {
   const lines = useMemo(() => transformLines(copy, transform), [copy, transform])
   const fontPx = glyphHeight * PX_PER_INCH * 0.9
   const shadowOffset = useMemo(
-    () => resolveShadowOffsetIn(textEffect, glyphHeight, font.id),
-    [textEffect, glyphHeight, font.id],
+    () => resolveShadowOffsetIn(textShadow, glyphHeight, font.id),
+    [textShadow, glyphHeight, font.id],
   )
-  const outline = effectStrokeIn(textEffect, strokeOn, strokeWidth, strokeColor) || {
-    widthIn: 0,
-    color: strokeColor,
-  }
+  const overlayHatch = useMemo(
+    () =>
+      resolveHatchIn(
+        {
+          angle: fillOverlay.angle,
+          spacingPct: fillOverlay.spacingPct,
+          lineWidthPct: fillOverlay.lineWidthPct,
+        },
+        glyphHeight,
+        font.id,
+      ),
+    [fillOverlay, glyphHeight, font.id],
+  )
+  const shadowHatch = useMemo(
+    () =>
+      resolveHatchIn(
+        {
+          angle: textShadow.hatchAngle,
+          spacingPct: textShadow.hatchSpacingPct,
+          lineWidthPct: textShadow.hatchLineWidthPct,
+        },
+        glyphHeight,
+        font.id,
+      ),
+    [textShadow, glyphHeight, font.id],
+  )
 
   const [textWidthPx, setTextWidthPx] = useState(0)
 
@@ -230,7 +253,8 @@ export default function App() {
             strokeOn={strokeOn}
             strokeWidth={strokeWidth}
             strokeColor={strokeColor}
-            textEffect={textEffect}
+            textShadow={textShadow}
+            fillOverlay={fillOverlay}
             align={align}
             printableHeight={trimH}
             onChange={patch}
@@ -261,11 +285,17 @@ export default function App() {
             strokeOn={strokeOn}
             strokeWidth={strokeWidth}
             strokeColor={strokeColor}
-            effectId={textEffect.id}
+            shadowOn={textShadow.on}
             shadowDxIn={shadowOffset.dx}
             shadowDyIn={shadowOffset.dy}
-            effectStrokeWidthIn={outline.widthIn}
-            effectStrokeColor={outline.color}
+            shadowFillType={textShadow.fillType}
+            shadowHatchAngle={shadowHatch.angle}
+            shadowHatchSpacingIn={shadowHatch.spacingIn}
+            shadowHatchLineWidthIn={shadowHatch.lineWidthIn}
+            overlayOn={fillOverlay.on}
+            overlayAngle={overlayHatch.angle}
+            overlaySpacingIn={overlayHatch.spacingIn}
+            overlayLineWidthIn={overlayHatch.lineWidthIn}
             printOverlap={printOverlap}
             showTrim={showTrim}
             showSafe={showSafe}
@@ -323,11 +353,17 @@ export default function App() {
         strokeOn={strokeOn}
         strokeWidth={strokeWidth}
         strokeColor={strokeColor}
-        effectId={textEffect.id}
+        shadowOn={textShadow.on}
         shadowDxIn={shadowOffset.dx}
         shadowDyIn={shadowOffset.dy}
-        effectStrokeWidthIn={outline.widthIn}
-        effectStrokeColor={outline.color}
+        shadowFillType={textShadow.fillType}
+        shadowHatchAngle={shadowHatch.angle}
+        shadowHatchSpacingIn={shadowHatch.spacingIn}
+        shadowHatchLineWidthIn={shadowHatch.lineWidthIn}
+        overlayOn={fillOverlay.on}
+        overlayAngle={overlayHatch.angle}
+        overlaySpacingIn={overlayHatch.spacingIn}
+        overlayLineWidthIn={overlayHatch.lineWidthIn}
         printOverlap={printOverlap}
         overlap={overlap}
         printTrim={printTrim}

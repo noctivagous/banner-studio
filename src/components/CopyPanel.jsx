@@ -1,7 +1,20 @@
 import {
-  TEXT_EFFECTS,
+  DEFAULT_FILL_OVERLAY,
+  DEFAULT_TEXT_SHADOW,
+  PX_PER_INCH,
+  SHADOW_FILL_HATCH,
+  SHADOW_FILL_SOLID,
+  TEXT_EFFECT_CUSTOM,
+  TEXT_EFFECT_FILL_HATCH_SHADOW,
+  TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG,
+  TEXT_EFFECT_HATCH_SHADOW,
+  TEXT_EFFECT_NONE,
   TEXT_EFFECT_OUTLINE_COPY_SHADOW,
+  applyGlyphPreset,
   glyphMaxInches,
+  hatchStyle,
+  matchGlyphPreset,
+  resolveHatchIn,
   resolveShadowOffsetIn,
 } from '../lib/layout.js'
 import { FieldLabel } from './FieldLabel.jsx'
@@ -21,6 +34,75 @@ import {
 } from './icons.jsx'
 
 const ANGLE_ARROWS = ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗']
+
+function HatchFields({ values, resolved, onPatch, keys }) {
+  const k = keys || { angle: 'angle', spacingPct: 'spacingPct', lineWidthPct: 'lineWidthPct' }
+  return (
+    <>
+      <div>
+        <div className="flex justify-between mb-1">
+          <span className="font-mono text-[10px] text-[#7A7A80] uppercase">
+            Hatch angle
+          </span>
+          <span className="font-mono text-[10px] text-[#F0F0F2]">{values.angle}°</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={360}
+          step={5}
+          value={values.angle}
+          onChange={(e) => onPatch({ [k.angle]: parseFloat(e.target.value) })}
+          className="w-full"
+        />
+      </div>
+      <div>
+        <div className="flex justify-between mb-1">
+          <span className="font-mono text-[10px] text-[#7A7A80] uppercase">
+            Line spacing
+          </span>
+          <span className="font-mono text-[10px] text-[#F0F0F2]">
+            {values.spacingPct}% · {resolved.spacingIn.toFixed(2)}"
+          </span>
+        </div>
+        <input
+          type="range"
+          min={2}
+          max={50}
+          step={1}
+          value={values.spacingPct}
+          onChange={(e) => onPatch({ [k.spacingPct]: parseFloat(e.target.value) })}
+          className="w-full"
+        />
+        <div className="flex justify-between mt-1">
+          <span className="font-mono text-[8px] text-[#7A7A80]">% of x-height</span>
+        </div>
+      </div>
+      <div>
+        <div className="flex justify-between mb-1">
+          <span className="font-mono text-[10px] text-[#7A7A80] uppercase">
+            Line width
+          </span>
+          <span className="font-mono text-[10px] text-[#F0F0F2]">
+            {values.lineWidthPct}% · {resolved.lineWidthIn.toFixed(2)}"
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0.5}
+          max={25}
+          step={0.5}
+          value={values.lineWidthPct}
+          onChange={(e) => onPatch({ [k.lineWidthPct]: parseFloat(e.target.value) })}
+          className="w-full"
+        />
+        <div className="flex justify-between mt-1">
+          <span className="font-mono text-[8px] text-[#7A7A80]">% of x-height</span>
+        </div>
+      </div>
+    </>
+  )
+}
 
 function CustomColorWell({ value, label, onChange }) {
   return (
@@ -61,24 +143,58 @@ export function CopyPanel({
   strokeOn,
   strokeWidth,
   strokeColor,
-  textEffect,
+  textShadow,
+  fillOverlay,
   align,
   printableHeight,
   onChange,
 }) {
   const glyphMax = glyphMaxInches(printableHeight)
-  const effect = textEffect || { id: 'none', shadowDistance: null, shadowAngle: 45 }
-  const effectActive = effect.id === TEXT_EFFECT_OUTLINE_COPY_SHADOW
-  const setEffect = (patch) => onChange({ textEffect: { ...effect, ...patch } })
+  const shadow = textShadow || { ...DEFAULT_TEXT_SHADOW }
+  const setShadow = (patch) => onChange({ textShadow: { ...shadow, ...patch } })
+  const overlay = fillOverlay || { ...DEFAULT_FILL_OVERLAY }
+  const setOverlay = (patch) => onChange({ fillOverlay: { ...overlay, ...patch } })
+  const matchedPreset = matchGlyphPreset({
+    fill,
+    strokeOn,
+    strokeColor,
+    textShadow: shadow,
+    fillOverlay: overlay,
+  })
+  const applyPreset = (presetId) =>
+    onChange(applyGlyphPreset(presetId, { textShadow: shadow, fillOverlay: overlay }))
+  const overlayResolved = resolveHatchIn(
+    {
+      angle: overlay.angle,
+      spacingPct: overlay.spacingPct,
+      lineWidthPct: overlay.lineWidthPct,
+    },
+    glyphHeight,
+    fontId,
+  )
+  const shadowHatchResolved = resolveHatchIn(
+    {
+      angle: shadow.hatchAngle,
+      spacingPct: shadow.hatchSpacingPct,
+      lineWidthPct: shadow.hatchLineWidthPct,
+    },
+    glyphHeight,
+    fontId,
+  )
+  const previewScale = 28 / Math.max(1, glyphHeight * PX_PER_INCH * 0.9)
+  const previewHatchPx = (resolved) => ({
+    spacing: Math.max(2, resolved.spacingIn * PX_PER_INCH * previewScale),
+    lineWidth: Math.max(1, resolved.lineWidthIn * PX_PER_INCH * previewScale),
+  })
   const autoDistance = resolveShadowOffsetIn(
-    { ...effect, shadowDistance: null },
+    { ...shadow, shadowDistance: null },
     glyphHeight,
     fontId,
   ).distance
   const distanceMax = Math.max(0.3, Math.ceil(autoDistance * 1.5 * 100) / 100)
   const angleArrow =
-    ANGLE_ARROWS[((Math.round(effect.shadowAngle / 45) % 8) + 8) % 8]
-  const shadowRadians = (effect.shadowAngle * Math.PI) / 180
+    ANGLE_ARROWS[((Math.round(shadow.shadowAngle / 45) % 8) + 8) % 8]
+  const shadowRadians = (shadow.shadowAngle * Math.PI) / 180
   const textareaShadowDx = Math.round(2 * Math.cos(shadowRadians))
   const textareaShadowDy = Math.round(2 * Math.sin(shadowRadians))
 
@@ -110,13 +226,28 @@ export function CopyPanel({
                 fontFamily: `"${font.family}", Impact, sans-serif`,
                 fontWeight: font.weight,
                 textAlign: align,
-                ...(effectActive
+                ...(strokeOn
                   ? {
-                      color: '#FFFFFF',
                       WebkitTextStroke: '1px #000000',
                       paintOrder: 'stroke fill',
+                    }
+                  : {}),
+                ...(shadow.on
+                  ? {
                       textShadow: `${textareaShadowDx}px ${textareaShadowDy}px 0 #000000`,
                     }
+                  : {}),
+                ...(overlay.on
+                  ? (() => {
+                      const px = previewHatchPx(overlayResolved)
+                      return hatchStyle({
+                        angleDeg: overlay.angle,
+                        spacing: px.spacing,
+                        lineWidth: px.lineWidth,
+                        color: '#000000',
+                        unit: 'px',
+                      })
+                    })()
                   : {}),
               }}
             />
@@ -127,8 +258,8 @@ export function CopyPanel({
 
           <div className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className={effectActive ? 'opacity-40 pointer-events-none' : undefined}>
-                <FieldLabel icon={<FillIcon />}>Fill</FieldLabel>
+              <div>
+                <FieldLabel icon={<FillIcon />}>Fill (Base)</FieldLabel>
                 <div className="flex items-center gap-2">
                   <CustomColorWell
                     value={fill}
@@ -165,7 +296,7 @@ export function CopyPanel({
                   className="mt-1.5 font-mono text-[10px] tracking-[0.06em] text-[#7A7A80] uppercase"
                   title="Current fill color"
                 >
-                  {effectActive ? 'White — set by effect' : fill}
+                  {fill}
                 </div>
               </div>
               <div>
@@ -199,6 +330,33 @@ export function CopyPanel({
 
             <div className="pt-1">
               <FieldLabel
+                icon={<FillIcon />}
+                value={
+                  <Toggle
+                    on={overlay.on}
+                    onToggle={() => setOverlay({ on: !overlay.on })}
+                    offKnob="bg-[#7A7A80]"
+                  />
+                }
+              >
+                Fill (Overlay)
+              </FieldLabel>
+              {overlay.on && (
+                <div className="space-y-3 p-3 bg-[#08080A] border border-[#43434E] rounded-[4px]">
+                  <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
+                    Hatch lines over the base fill, clipped to the glyph.
+                  </p>
+                  <HatchFields
+                    values={overlay}
+                    resolved={overlayResolved}
+                    onPatch={setOverlay}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="pt-1">
+              <FieldLabel
                 icon={<StrokeIcon />}
                 value={
                   <Toggle
@@ -210,11 +368,6 @@ export function CopyPanel({
               >
                 Stroke
               </FieldLabel>
-              {effectActive && (
-                <p className="mb-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
-                  Drives the effect outline{strokeOn ? '' : ' (off — effect uses a thin black outline)'}.
-                </p>
-              )}
               {strokeOn && (
                 <div className="space-y-3 p-3 bg-[#08080A] border border-[#43434E] rounded-[4px]">
                   <div>
@@ -241,103 +394,6 @@ export function CopyPanel({
                       label="Custom stroke color"
                       onChange={(next) => onChange({ strokeColor: next })}
                     />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <FieldLabel icon={<EffectIcon />}>Text Effects</FieldLabel>
-              <div className="mb-2 font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
-                Glyph Effects
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {TEXT_EFFECTS.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setEffect({ id: option.id })}
-                    aria-pressed={effect.id === option.id}
-                    className={`min-h-8 px-2 py-1.5 rounded-[4px] border text-[11px] font-mono uppercase tracking-[0.06em] transition-all ${
-                      effect.id === option.id
-                        ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                        : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              {effectActive && (
-                <div className="mt-3 space-y-3 p-3 bg-[#08080A] border border-[#43434E] rounded-[4px]">
-                  <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
-                    White-filled outline over a black copy. Overrides fill;
-                    stroke settings drive the outline.
-                  </p>
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-mono text-[10px] text-[#7A7A80] uppercase">
-                        Shadow distance
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span className="font-mono text-[10px] text-[#F0F0F2]">
-                          {effect.shadowDistance == null
-                            ? `Auto ${autoDistance.toFixed(2)}"`
-                            : `${effect.shadowDistance.toFixed(2)}"`}
-                        </span>
-                        {effect.shadowDistance != null && (
-                          <button
-                            type="button"
-                            onClick={() => setEffect({ shadowDistance: null })}
-                            className="font-mono text-[9px] tracking-[0.08em] uppercase text-[#E3FF33] hover:underline"
-                          >
-                            Auto
-                          </button>
-                        )}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={distanceMax}
-                      step={0.01}
-                      value={Math.min(effect.shadowDistance ?? autoDistance, distanceMax)}
-                      onChange={(e) =>
-                        setEffect({ shadowDistance: parseFloat(e.target.value) })
-                      }
-                      className="w-full"
-                    />
-                    <div className="flex justify-between mt-1">
-                      <span className="font-mono text-[8px] text-[#7A7A80]">0.00"</span>
-                      <span className="font-mono text-[8px] text-[#7A7A80]">
-                        Auto = 0.9 × bar width
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="font-mono text-[10px] text-[#7A7A80] uppercase">
-                        Shadow angle
-                      </span>
-                      <span className="font-mono text-[10px] text-[#F0F0F2]">
-                        {effect.shadowAngle}° {angleArrow}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={360}
-                      step={5}
-                      value={effect.shadowAngle}
-                      onChange={(e) =>
-                        setEffect({ shadowAngle: parseFloat(e.target.value) })
-                      }
-                      className="w-full"
-                    />
-                    <div className="flex justify-between mt-1">
-                      <span className="font-mono text-[8px] text-[#7A7A80]">0° →</span>
-                      <span className="font-mono text-[8px] text-[#7A7A80]">45° ↘ default</span>
-                    </div>
                   </div>
                 </div>
               )}
@@ -421,7 +477,7 @@ export function CopyPanel({
             </div>
 
             <div>
-              <FieldLabel icon={<TransformIcon />}>Transform</FieldLabel>
+              <FieldLabel icon={<TransformIcon />}>Text Transform</FieldLabel>
               <div className="grid grid-cols-3 gap-1.5">
                 {['uppercase', 'lowercase', 'asIs'].map((mode) => (
                   <button
@@ -438,6 +494,178 @@ export function CopyPanel({
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <FieldLabel icon={<EffectIcon />}>Text Effects</FieldLabel>
+              <div className="mb-2 font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
+                Text Shadow
+              </div>
+              <div className="flex items-center justify-between mb-2 px-3 py-2 bg-[#08080A] border border-[#43434E] rounded-[4px]">
+                <span className="font-mono text-[10px] text-[#7A7A80] uppercase">
+                  Black copy behind
+                </span>
+                <Toggle
+                  on={shadow.on}
+                  onToggle={() => setShadow({ on: !shadow.on })}
+                  offKnob="bg-[#7A7A80]"
+                />
+              </div>
+              {shadow.on && (
+                <div className="mb-4 space-y-3 p-3 bg-[#08080A] border border-[#43434E] rounded-[4px]">
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="font-mono text-[10px] text-[#7A7A80] uppercase">
+                        Shadow fill
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { id: SHADOW_FILL_SOLID, label: 'Solid' },
+                        { id: SHADOW_FILL_HATCH, label: 'Hatch' },
+                      ].map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setShadow({ fillType: option.id })}
+                          aria-pressed={shadow.fillType === option.id}
+                          className={`h-8 rounded-[4px] border text-[11px] font-mono uppercase tracking-[0.08em] transition-all ${
+                            shadow.fillType === option.id
+                              ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
+                              : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {shadow.fillType === SHADOW_FILL_HATCH && (
+                    <HatchFields
+                      values={{
+                        angle: shadow.hatchAngle,
+                        spacingPct: shadow.hatchSpacingPct,
+                        lineWidthPct: shadow.hatchLineWidthPct,
+                      }}
+                      resolved={shadowHatchResolved}
+                      onPatch={setShadow}
+                      keys={{
+                        angle: 'hatchAngle',
+                        spacingPct: 'hatchSpacingPct',
+                        lineWidthPct: 'hatchLineWidthPct',
+                      }}
+                    />
+                  )}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-mono text-[10px] text-[#7A7A80] uppercase">
+                        Shadow distance
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-mono text-[10px] text-[#F0F0F2]">
+                          {shadow.shadowDistance == null
+                            ? `Auto ${autoDistance.toFixed(2)}"`
+                            : `${shadow.shadowDistance.toFixed(2)}"`}
+                        </span>
+                        {shadow.shadowDistance != null && (
+                          <button
+                            type="button"
+                            onClick={() => setShadow({ shadowDistance: null })}
+                            className="font-mono text-[9px] tracking-[0.08em] uppercase text-[#E3FF33] hover:underline"
+                          >
+                            Auto
+                          </button>
+                        )}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={distanceMax}
+                      step={0.01}
+                      value={Math.min(shadow.shadowDistance ?? autoDistance, distanceMax)}
+                      onChange={(e) =>
+                        setShadow({ shadowDistance: parseFloat(e.target.value) })
+                      }
+                      className="w-full"
+                    />
+                    <div className="flex justify-between mt-1">
+                      <span className="font-mono text-[8px] text-[#7A7A80]">0.00"</span>
+                      <span className="font-mono text-[8px] text-[#7A7A80]">
+                        Auto = 0.9 × bar width
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="font-mono text-[10px] text-[#7A7A80] uppercase">
+                        Shadow angle
+                      </span>
+                      <span className="font-mono text-[10px] text-[#F0F0F2]">
+                        {shadow.shadowAngle}° {angleArrow}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={360}
+                      step={5}
+                      value={shadow.shadowAngle}
+                      onChange={(e) =>
+                        setShadow({ shadowAngle: parseFloat(e.target.value) })
+                      }
+                      className="w-full"
+                    />
+                    <div className="flex justify-between mt-1">
+                      <span className="font-mono text-[8px] text-[#7A7A80]">0° →</span>
+                      <span className="font-mono text-[8px] text-[#7A7A80]">45° ↘ default</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="mb-2 font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
+                Glyph Effects
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { id: TEXT_EFFECT_NONE, label: 'None' },
+                  { id: TEXT_EFFECT_OUTLINE_COPY_SHADOW, label: 'Outline + Shadow' },
+                  { id: TEXT_EFFECT_HATCH_SHADOW, label: 'Hatch + Shadow' },
+                  { id: TEXT_EFFECT_FILL_HATCH_SHADOW, label: 'Fill + Hatch-Shadow 90deg' },
+                  { id: TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG, label: 'Fill + Hatch-Shadow 0deg' },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => applyPreset(option.id)}
+                    aria-pressed={matchedPreset === option.id}
+                    className={`min-h-8 px-2 py-1.5 rounded-[4px] border text-[11px] font-mono uppercase tracking-[0.06em] transition-all ${
+                      matchedPreset === option.id
+                        ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
+                        : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <div
+                aria-live="polite"
+                className={`mt-1.5 px-2 py-1.5 rounded-[4px] border border-dashed text-center text-[11px] font-mono uppercase tracking-[0.06em] ${
+                  matchedPreset === TEXT_EFFECT_CUSTOM
+                    ? 'border-[#E3FF33] text-[#E3FF33]'
+                    : 'border-[#43434E] text-[#5A5A60]'
+                }`}
+              >
+                Custom
+                {matchedPreset === TEXT_EFFECT_CUSTOM ? ' — your mix' : ' — off preset'}
+              </div>
+              <p className="mt-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
+                Presets set fill, stroke, overlay and shadow together.
+                Hatch + Shadow uses white fill, black hatch at 90°, black
+                stroke, and a solid black shadow. Fill + Hatch-Shadow uses
+                black fill with a hatch shadow at 90° or 0°.
+              </p>
             </div>
           </div>
         </div>

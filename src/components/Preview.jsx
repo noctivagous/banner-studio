@@ -3,7 +3,8 @@ import { SegmentControl } from './SegmentControl.jsx'
 import {
   PREVIEW_CUT_LINE,
   PX_PER_INCH,
-  TEXT_EFFECT_OUTLINE_COPY_SHADOW,
+  SHADOW_FILL_HATCH,
+  hatchStyle,
   overlapCutSlack,
 } from '../lib/layout.js'
 
@@ -19,61 +20,75 @@ function BannerType({
   align,
   strokeOn,
   strokeCss,
-  effectId,
-  effectDx,
-  effectDy,
-  effectStrokeCss,
+  shadowOn,
+  shadowDx,
+  shadowDy,
+  shadowHatch,
+  overlayHatch,
+  hatchUnit,
 }) {
   return lines.map((line, i) => {
     const text = line || '\u00a0'
-    const baseType = {
-      fontFamily: `"${font.family}", Impact, sans-serif`,
-      fontWeight: font.weight,
-      fontSize,
-      letterSpacing: `${letterSpacing}em`,
-      lineHeight,
-      textAlign: align,
-      width: '100%',
-      whiteSpace: 'nowrap',
-    }
-    if (effectId === TEXT_EFFECT_OUTLINE_COPY_SHADOW) {
-      return (
-        <div
-          key={i}
-          style={{
-            ...baseType,
-            position: 'relative',
-            color: '#FFFFFF',
-            WebkitTextStroke: effectStrokeCss,
-            paintOrder: 'stroke fill',
-          }}
-        >
+    // Layer order: shadow copy, base face, hatch overlay. The stroke lives on
+    // the topmost face layer so the outline sits above the hatch lines.
+    return (
+      <div
+        key={i}
+        style={{
+          fontFamily: `"${font.family}", Impact, sans-serif`,
+          fontWeight: font.weight,
+          fontSize,
+          letterSpacing: `${letterSpacing}em`,
+          lineHeight,
+          textAlign: align,
+          width: '100%',
+          whiteSpace: 'nowrap',
+          position: 'relative',
+        }}
+      >
+        {shadowOn && (
           <div
             aria-hidden="true"
             style={{
               position: 'absolute',
               inset: 0,
-              transform: `translate(${effectDx}, ${effectDy})`,
-              color: '#000000',
-              WebkitTextStroke: '0px transparent',
+              transform: `translate(${shadowDx}, ${shadowDy})`,
+              ...(shadowHatch
+                ? hatchStyle({ ...shadowHatch, color: '#000000', unit: hatchUnit })
+                : { color: '#000000', WebkitTextStroke: '0px transparent' }),
             }}
           >
             {text}
           </div>
-          <span style={{ position: 'relative' }}>{text}</span>
-        </div>
-      )
-    }
-    return (
-      <div
-        key={i}
-        style={{
-          ...baseType,
-          color: fill,
-          ...(strokeOn ? { WebkitTextStroke: strokeCss, paintOrder: 'stroke fill' } : {}),
-        }}
-      >
-        {text}
+        )}
+        <span
+          style={{
+            position: 'relative',
+            color: fill,
+            ...(strokeOn && !overlayHatch
+              ? { WebkitTextStroke: strokeCss, paintOrder: 'stroke fill' }
+              : {}),
+          }}
+        >
+          {text}
+        </span>
+        {overlayHatch && (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              ...hatchStyle({
+                ...overlayHatch,
+                color: '#000000',
+                unit: hatchUnit,
+                ...(strokeOn ? { strokeCss } : {}),
+              }),
+            }}
+          >
+            {text}
+          </div>
+        )}
       </div>
     )
   })
@@ -253,11 +268,17 @@ export function Preview({
   strokeOn,
   strokeWidth,
   strokeColor,
-  effectId,
+  shadowOn,
   shadowDxIn,
   shadowDyIn,
-  effectStrokeWidthIn,
-  effectStrokeColor,
+  shadowFillType,
+  shadowHatchAngle,
+  shadowHatchSpacingIn,
+  shadowHatchLineWidthIn,
+  overlayOn,
+  overlayAngle,
+  overlaySpacingIn,
+  overlayLineWidthIn,
   printOverlap,
   showTrim,
   showSafe,
@@ -577,10 +598,28 @@ export function Preview({
                           align={align}
                           strokeOn={strokeOn}
                           strokeCss={`${strokeWidth * px}px ${strokeColor}`}
-                          effectId={effectId}
-                          effectDx={`${shadowDxIn * px}px`}
-                          effectDy={`${shadowDyIn * px}px`}
-                          effectStrokeCss={`${effectStrokeWidthIn * px}px ${effectStrokeColor}`}
+                          shadowOn={shadowOn}
+                          shadowDx={`${shadowDxIn * px}px`}
+                          shadowDy={`${shadowDyIn * px}px`}
+                          shadowHatch={
+                            shadowFillType === SHADOW_FILL_HATCH
+                              ? {
+                                  angleDeg: shadowHatchAngle,
+                                  spacing: shadowHatchSpacingIn * px,
+                                  lineWidth: shadowHatchLineWidthIn * px,
+                                }
+                              : null
+                          }
+                          overlayHatch={
+                            overlayOn
+                              ? {
+                                  angleDeg: overlayAngle,
+                                  spacing: overlaySpacingIn * px,
+                                  lineWidth: overlayLineWidthIn * px,
+                                }
+                              : null
+                          }
+                          hatchUnit="px"
                         />
                       </div>
                     </div>
