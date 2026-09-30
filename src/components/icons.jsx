@@ -88,6 +88,15 @@ export function StrokeIcon() {
   )
 }
 
+export function EffectIcon() {
+  return (
+    <Base>
+      <rect x="1.6" y="1.6" width="6" height="6" rx="1" />
+      <rect x="4.4" y="4.4" width="6" height="6" rx="1" />
+    </Base>
+  )
+}
+
 export function PrinterIcon() {
   return (
     <Base>

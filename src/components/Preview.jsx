@@ -1,6 +1,11 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { SegmentControl } from './SegmentControl.jsx'
-import { PREVIEW_CUT_LINE, PX_PER_INCH, overlapCutSlack } from '../lib/layout.js'
+import {
+  PREVIEW_CUT_LINE,
+  PX_PER_INCH,
+  TEXT_EFFECT_OUTLINE_COPY_SHADOW,
+  overlapCutSlack,
+} from '../lib/layout.js'
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
 
@@ -14,26 +19,64 @@ function BannerType({
   align,
   strokeOn,
   strokeCss,
+  effectId,
+  effectDx,
+  effectDy,
+  effectStrokeCss,
 }) {
-  return lines.map((line, i) => (
-    <div
-      key={i}
-      style={{
-        fontFamily: `"${font.family}", Impact, sans-serif`,
-        fontWeight: font.weight,
-        fontSize,
-        letterSpacing: `${letterSpacing}em`,
-        color: fill,
-        lineHeight,
-        textAlign: align,
-        width: '100%',
-        whiteSpace: 'nowrap',
-        ...(strokeOn ? { WebkitTextStroke: strokeCss, paintOrder: 'stroke fill' } : {}),
-      }}
-    >
-      {line || '\u00a0'}
-    </div>
-  ))
+  return lines.map((line, i) => {
+    const text = line || '\u00a0'
+    const baseType = {
+      fontFamily: `"${font.family}", Impact, sans-serif`,
+      fontWeight: font.weight,
+      fontSize,
+      letterSpacing: `${letterSpacing}em`,
+      lineHeight,
+      textAlign: align,
+      width: '100%',
+      whiteSpace: 'nowrap',
+    }
+    if (effectId === TEXT_EFFECT_OUTLINE_COPY_SHADOW) {
+      return (
+        <div
+          key={i}
+          style={{
+            ...baseType,
+            position: 'relative',
+            color: '#FFFFFF',
+            WebkitTextStroke: effectStrokeCss,
+            paintOrder: 'stroke fill',
+          }}
+        >
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              transform: `translate(${effectDx}, ${effectDy})`,
+              color: '#000000',
+              WebkitTextStroke: '0px transparent',
+            }}
+          >
+            {text}
+          </div>
+          <span style={{ position: 'relative' }}>{text}</span>
+        </div>
+      )
+    }
+    return (
+      <div
+        key={i}
+        style={{
+          ...baseType,
+          color: fill,
+          ...(strokeOn ? { WebkitTextStroke: strokeCss, paintOrder: 'stroke fill' } : {}),
+        }}
+      >
+        {text}
+      </div>
+    )
+  })
 }
 
 function ContentRuler({ startIn, widthIn, px }) {
@@ -210,6 +253,11 @@ export function Preview({
   strokeOn,
   strokeWidth,
   strokeColor,
+  effectId,
+  shadowDxIn,
+  shadowDyIn,
+  effectStrokeWidthIn,
+  effectStrokeColor,
   printOverlap,
   showTrim,
   showSafe,
@@ -529,6 +577,10 @@ export function Preview({
                           align={align}
                           strokeOn={strokeOn}
                           strokeCss={`${strokeWidth * px}px ${strokeColor}`}
+                          effectId={effectId}
+                          effectDx={`${shadowDxIn * px}px`}
+                          effectDy={`${shadowDyIn * px}px`}
+                          effectStrokeCss={`${effectStrokeWidthIn * px}px ${effectStrokeColor}`}
                         />
                       </div>
                     </div>

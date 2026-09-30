@@ -127,3 +127,92 @@ export function clampGlyphHeight(height, printableHeight) {
   if (height < 0.8) return 0.8
   return height
 }
+
+export const TEXT_EFFECT_NONE = 'none'
+export const TEXT_EFFECT_OUTLINE_COPY_SHADOW = 'outline-copy-shadow'
+
+export const TEXT_EFFECTS = [
+  { id: TEXT_EFFECT_NONE, label: 'None' },
+  { id: TEXT_EFFECT_OUTLINE_COPY_SHADOW, label: 'Outline + Copy-Shadow' },
+]
+
+export const DEFAULT_TEXT_EFFECT = {
+  id: TEXT_EFFECT_NONE,
+  shadowDistance: null,
+  shadowAngle: 45,
+}
+
+// Heuristic stem-width fraction of glyph height, keyed by font id.
+// Heavy display faces have thick bars; thin/line faces much less.
+const BAR_FRACTION_BY_FONT = {
+  monoton: 0.08,
+  space: 0.11,
+  staatliches: 0.12,
+  bebas: 0.12,
+  oswald: 0.14,
+  zillaslab: 0.14,
+  arvo: 0.15,
+  graduate: 0.15,
+  saira: 0.15,
+  blackops: 0.16,
+  passion: 0.17,
+}
+const DEFAULT_BAR_FRACTION = 0.16
+
+// Fallback stroke for the effect outline when the user has stroke off.
+export const EFFECT_DEFAULT_STROKE_WIDTH_IN = 0.02
+export const EFFECT_DEFAULT_STROKE_COLOR = '#000000'
+
+export function estimateBarWidthInches(glyphHeightIn, fontId) {
+  if (!Number.isFinite(glyphHeightIn) || glyphHeightIn <= 0) return 0
+  const fraction = BAR_FRACTION_BY_FONT[fontId] ?? DEFAULT_BAR_FRACTION
+  return glyphHeightIn * fraction
+}
+
+export function normalizeTextEffect(value, fallback) {
+  const base = { ...DEFAULT_TEXT_EFFECT, ...(fallback || {}) }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return base
+  const ids = TEXT_EFFECTS.map((effect) => effect.id)
+  const id = ids.includes(value.id) ? value.id : base.id
+  let shadowDistance = base.shadowDistance
+  if (value.shadowDistance === null || value.shadowDistance === undefined) {
+    shadowDistance = null
+  } else {
+    const distance = Number(value.shadowDistance)
+    shadowDistance = Number.isFinite(distance) ? Math.min(2, Math.max(0, distance)) : null
+  }
+  const angle = Number(value.shadowAngle)
+  const shadowAngle = Number.isFinite(angle)
+    ? Math.min(360, Math.max(0, angle))
+    : base.shadowAngle
+  return { id, shadowDistance, shadowAngle }
+}
+
+// Angle convention: 0deg points east (+x), 90deg points south (+y, down-screen),
+// so the default 45deg drops the copy down and to the right.
+export function resolveShadowOffsetIn(textEffect, glyphHeightIn, fontId) {
+  const manual = textEffect?.shadowDistance
+  const distance =
+    typeof manual === 'number' && Number.isFinite(manual)
+      ? Math.max(0, manual)
+      : 0.9 * estimateBarWidthInches(glyphHeightIn, fontId)
+  const rawAngle = Number(textEffect?.shadowAngle)
+  const angle = Number.isFinite(rawAngle) ? rawAngle : DEFAULT_TEXT_EFFECT.shadowAngle
+  const radians = (angle * Math.PI) / 180
+  return {
+    distance,
+    angle,
+    dx: distance * Math.cos(radians),
+    dy: distance * Math.sin(radians),
+  }
+}
+
+// The effect owns the outline: user stroke settings feed it when present,
+// otherwise the effect falls back to a thin black outline.
+export function effectStrokeIn(textEffect, strokeOn, strokeWidth, strokeColor) {
+  if (textEffect?.id !== TEXT_EFFECT_OUTLINE_COPY_SHADOW) return null
+  return {
+    widthIn: strokeOn ? strokeWidth : EFFECT_DEFAULT_STROKE_WIDTH_IN,
+    color: strokeOn ? strokeColor : EFFECT_DEFAULT_STROKE_COLOR,
+  }
+}

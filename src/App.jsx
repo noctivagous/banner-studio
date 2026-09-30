@@ -12,8 +12,10 @@ import {
   FONTS,
   PX_PER_INCH,
   clampGlyphHeight,
+  effectStrokeIn,
   formatLength,
   measureTextWidthPx,
+  resolveShadowOffsetIn,
   transformLines,
 } from './lib/layout.js'
 import { PAPERS, sheetSize } from './lib/paper.js'
@@ -31,6 +33,7 @@ export default function App() {
     strokeOn,
     strokeWidth,
     strokeColor,
+    textEffect,
     align,
     paperId,
     orientation,
@@ -57,6 +60,14 @@ export default function App() {
   const contentW = Math.max(0.1, trimW - overlap)
   const lines = useMemo(() => transformLines(copy, transform), [copy, transform])
   const fontPx = glyphHeight * PX_PER_INCH * 0.9
+  const shadowOffset = useMemo(
+    () => resolveShadowOffsetIn(textEffect, glyphHeight, font.id),
+    [textEffect, glyphHeight, font.id],
+  )
+  const outline = effectStrokeIn(textEffect, strokeOn, strokeWidth, strokeColor) || {
+    widthIn: 0,
+    color: strokeColor,
+  }
 
   const [textWidthPx, setTextWidthPx] = useState(0)
 
@@ -219,6 +230,7 @@ export default function App() {
             strokeOn={strokeOn}
             strokeWidth={strokeWidth}
             strokeColor={strokeColor}
+            textEffect={textEffect}
             align={align}
             printableHeight={trimH}
             onChange={patch}
@@ -249,6 +261,11 @@ export default function App() {
             strokeOn={strokeOn}
             strokeWidth={strokeWidth}
             strokeColor={strokeColor}
+            effectId={textEffect.id}
+            shadowDxIn={shadowOffset.dx}
+            shadowDyIn={shadowOffset.dy}
+            effectStrokeWidthIn={outline.widthIn}
+            effectStrokeColor={outline.color}
             printOverlap={printOverlap}
             showTrim={showTrim}
             showSafe={showSafe}
@@ -306,6 +323,11 @@ export default function App() {
         strokeOn={strokeOn}
         strokeWidth={strokeWidth}
         strokeColor={strokeColor}
+        effectId={textEffect.id}
+        shadowDxIn={shadowOffset.dx}
+        shadowDyIn={shadowOffset.dy}
+        effectStrokeWidthIn={outline.widthIn}
+        effectStrokeColor={outline.color}
         printOverlap={printOverlap}
         overlap={overlap}
         printTrim={printTrim}

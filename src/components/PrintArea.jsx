@@ -20,6 +20,11 @@ export function PrintArea({
   strokeOn,
   strokeWidth,
   strokeColor,
+  effectId,
+  shadowDxIn,
+  shadowDyIn,
+  effectStrokeWidthIn,
+  effectStrokeColor,
   printOverlap,
   overlap,
   printTrim,
@@ -74,6 +79,10 @@ export function PrintArea({
                 align={align}
                 strokeOn={strokeOn}
                 strokeCss={`${strokeWidth}in ${strokeColor}`}
+                effectId={effectId}
+                effectDx={`${shadowDxIn}in`}
+                effectDy={`${shadowDyIn}in`}
+                effectStrokeCss={`${effectStrokeWidthIn}in ${effectStrokeColor}`}
               />
             </div>
           </div>

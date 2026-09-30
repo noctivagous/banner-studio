@@ -1,4 +1,4 @@
-import { FONTS, glyphMaxInches } from './layout.js'
+import { FONTS, glyphMaxInches, normalizeTextEffect } from './layout.js'
 import { PAPERS, sheetSize } from './paper.js'
 
 export const SCHEMA = 'tile-banner-studio'
@@ -16,6 +16,7 @@ const TEXT_KEYS = [
   'strokeOn',
   'strokeWidth',
   'strokeColor',
+  'textEffect',
   'align',
 ]
 
@@ -103,6 +104,7 @@ export function exportDocument(settings) {
         strokeOn: settings.strokeOn,
         strokeWidth: settings.strokeWidth,
         strokeColor: settings.strokeColor,
+        textEffect: normalizeTextEffect(settings.textEffect),
         align: settings.align,
       },
     },
@@ -215,6 +217,7 @@ export function importDocument(raw, defaults) {
     strokeOn: asBool(textSplit.known.strokeOn, defaults.strokeOn),
     strokeWidth: clamp(textSplit.known.strokeWidth, 0, 0.12, defaults.strokeWidth),
     strokeColor: asHex(textSplit.known.strokeColor, defaults.strokeColor),
+    textEffect: normalizeTextEffect(textSplit.known.textEffect, defaults.textEffect),
     align: asEnum(textSplit.known.align, ['left', 'center', 'right'], defaults.align),
     margins,
     overlap: clamp(viewSplit.known.overlap, 0, 0.5, defaults.overlap),
