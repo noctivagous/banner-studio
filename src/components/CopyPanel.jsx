@@ -35,6 +35,89 @@ import {
 
 const ANGLE_ARROWS = ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗']
 
+function PresetPreview({ presetId, font }) {
+  const face = {
+    fontFamily: `"${font.family}", Impact, sans-serif`,
+    fontWeight: font.weight,
+    fontSize: 30,
+    lineHeight: 1,
+  }
+  const tile =
+    'h-14 rounded-[3px] bg-white flex items-center justify-center overflow-hidden'
+  if (presetId === TEXT_EFFECT_NONE) {
+    return (
+      <div className={tile}>
+        <span style={{ ...face, color: '#000000' }}>Aa</span>
+      </div>
+    )
+  }
+  if (presetId === TEXT_EFFECT_OUTLINE_COPY_SHADOW) {
+    return (
+      <div className={tile}>
+        <span
+          style={{
+            ...face,
+            color: '#FFFFFF',
+            WebkitTextStroke: '1.5px #000000',
+            paintOrder: 'stroke fill',
+            textShadow: '2px 2px 0 #000000',
+          }}
+        >
+          Aa
+        </span>
+      </div>
+    )
+  }
+  if (presetId === TEXT_EFFECT_HATCH_SHADOW) {
+    return (
+      <div className={tile}>
+        <span
+          style={{
+            ...face,
+            ...hatchStyle({
+              angleDeg: 90,
+              spacing: 5,
+              lineWidth: 1.5,
+              color: '#000000',
+              unit: 'px',
+            }),
+            WebkitTextStroke: '1.5px #000000',
+            paintOrder: 'stroke fill',
+            textShadow: '2px 2px 0 #000000',
+          }}
+        >
+          Aa
+        </span>
+      </div>
+    )
+  }
+  const angle = presetId === TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG ? 0 : 90
+  return (
+    <div className={tile}>
+      <span style={{ ...face, position: 'relative', color: '#000000' }}>
+        Aa
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            transform: 'translate(2px, 2px)',
+            ...hatchStyle({
+              angleDeg: angle,
+              spacing: 4,
+              lineWidth: 1,
+              color: '#000000',
+              unit: 'px',
+            }),
+          }}
+        >
+          Aa
+        </span>
+      </span>
+    </div>
+  )
+}
+
 function HatchFields({ values, resolved, onPatch, keys }) {
   const k = keys || { angle: 'angle', spacingPct: 'spacingPct', lineWidthPct: 'lineWidthPct' }
   return (
@@ -485,26 +568,6 @@ export function CopyPanel({
             </div>
 
             <div>
-              <FieldLabel icon={<TransformIcon />}>Text Transform</FieldLabel>
-              <div className="grid grid-cols-3 gap-1.5">
-                {['uppercase', 'lowercase', 'asIs'].map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => onChange({ transform: mode })}
-                    className={`h-8 rounded-[4px] border text-[11px] font-mono uppercase tracking-[0.08em] transition-all ${
-                      transform === mode
-                        ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                        : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
-                    }`}
-                  >
-                    {mode === 'asIs' ? 'As Is' : mode}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
               <FieldLabel icon={<EffectIcon />}>Text Effects</FieldLabel>
               <div className="mb-2 font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
                 Text Shadow
@@ -655,13 +718,20 @@ export function CopyPanel({
                     type="button"
                     onClick={() => applyPreset(option.id)}
                     aria-pressed={matchedPreset === option.id}
-                    className={`min-h-8 px-2 py-1.5 rounded-[4px] border text-[11px] font-mono uppercase tracking-[0.06em] transition-all ${
+                    className={`px-2 py-1.5 rounded-[4px] border transition-all flex flex-col gap-1.5 ${
                       matchedPreset === option.id
-                        ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
+                        ? 'bg-[#E3FF33] text-black border-[#E3FF33]'
                         : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
                     }`}
                   >
-                    {option.label}
+                    <PresetPreview presetId={option.id} font={font} />
+                    <span
+                      className={`text-[11px] font-mono uppercase tracking-[0.06em] ${
+                        matchedPreset === option.id ? 'font-bold' : ''
+                      }`}
+                    >
+                      {option.label}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -682,6 +752,26 @@ export function CopyPanel({
                 stroke, and a solid black shadow. Fill + Hatch-Shadow uses
                 black fill with a hatch shadow at 90° or 0°.
               </p>
+            </div>
+
+            <div>
+              <FieldLabel icon={<TransformIcon />}>Text Transform</FieldLabel>
+              <div className="grid grid-cols-3 gap-1.5">
+                {['uppercase', 'lowercase', 'asIs'].map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => onChange({ transform: mode })}
+                    className={`h-8 rounded-[4px] border text-[11px] font-mono uppercase tracking-[0.08em] transition-all ${
+                      transform === mode
+                        ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
+                        : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
+                    }`}
+                  >
+                    {mode === 'asIs' ? 'As Is' : mode}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
