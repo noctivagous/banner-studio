@@ -39,11 +39,11 @@ function PresetPreview({ presetId, font }) {
   const face = {
     fontFamily: `"${font.family}", Impact, sans-serif`,
     fontWeight: font.weight,
-    fontSize: 30,
+    fontSize: 42,
     lineHeight: 1,
   }
   const tile =
-    'h-14 rounded-[3px] bg-white flex items-center justify-center overflow-hidden'
+    'h-20 rounded-[3px] bg-white flex items-center justify-center overflow-hidden'
   if (presetId === TEXT_EFFECT_NONE) {
     return (
       <div className={tile}>
