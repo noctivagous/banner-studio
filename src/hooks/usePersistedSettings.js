@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  DEFAULT_FILL_OVERLAY,
-  DEFAULT_TEXT_SHADOW,
-  normalizeFillOverlay,
-  normalizeTextShadow,
+  DEFAULT_TEXT_LAYER,
+  createLayerId,
+  legacyToTextLayers,
+  normalizeTextLayers,
 } from '../lib/layout.js'
 
 export const STORAGE_KEY = 'tile-banner-studio'
+
+export const DEFAULT_LAYERS = [{ ...DEFAULT_TEXT_LAYER, id: 'layer-face' }]
 
 export const DEFAULT_SETTINGS = {
   copy: 'Open House',
@@ -15,12 +17,7 @@ export const DEFAULT_SETTINGS = {
   lineHeight: 0.85,
   letterSpacing: 0.02,
   transform: 'asIs',
-  fill: '#000000',
-  strokeOn: false,
-  strokeWidth: 0.02,
-  strokeColor: '#000000',
-  textShadow: { ...DEFAULT_TEXT_SHADOW },
-  fillOverlay: { ...DEFAULT_FILL_OVERLAY },
+  layers: DEFAULT_LAYERS.map((layer) => ({ ...layer })),
   align: 'center',
   paperId: 'letter',
   orientation: 'landscape',
@@ -42,26 +39,81 @@ export const DEFAULT_SETTINGS = {
   extensions: {},
 }
 
+function hasLegacyPaint(parsed) {
+  return (
+    parsed &&
+    (parsed.fill !== undefined ||
+      parsed.strokeOn !== undefined ||
+      parsed.strokeWidth !== undefined ||
+      parsed.strokeColor !== undefined ||
+      parsed.textShadow !== undefined ||
+      parsed.fillOverlay !== undefined)
+  )
+}
+
+function resolveLayers(parsed) {
+  if (Array.isArray(parsed?.layers) && parsed.layers.length > 0) {
+    return normalizeTextLayers(parsed.layers, DEFAULT_SETTINGS.layers)
+  }
+  if (hasLegacyPaint(parsed)) {
+    return legacyToTextLayers(parsed, {
+      glyphHeightIn: Number(parsed.glyphHeight) || DEFAULT_SETTINGS.glyphHeight,
+      fontId: parsed.fontId || DEFAULT_SETTINGS.fontId,
+    })
+  }
+  return normalizeTextLayers(DEFAULT_SETTINGS.layers)
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_SETTINGS
     const parsed = JSON.parse(raw)
-    return {
+    const { layers, ...rest } = parsed
+    void layers
+    const next = {
       ...DEFAULT_SETTINGS,
-      ...parsed,
+      ...rest,
       margins: { ...DEFAULT_SETTINGS.margins, ...(parsed.margins || {}) },
-      textShadow: normalizeTextShadow(parsed.textShadow, DEFAULT_SETTINGS.textShadow),
-      fillOverlay: normalizeFillOverlay(parsed.fillOverlay, DEFAULT_SETTINGS.fillOverlay),
+      layers: resolveLayers(parsed),
       extensions:
         parsed.extensions && typeof parsed.extensions === 'object' && !Array.isArray(parsed.extensions)
           ? parsed.extensions
           : {},
     }
+    // Legacy paint keys are migrated into layers and dropped.
+    delete next.fill
+    delete next.strokeOn
+    delete next.strokeWidth
+    delete next.strokeColor
+    delete next.textShadow
+    delete next.fillOverlay
+    if (!Array.isArray(next.layers) || next.layers.length === 0) {
+      next.layers = normalizeTextLayers(DEFAULT_SETTINGS.layers)
+    }
+    return next
   } catch {
     return DEFAULT_SETTINGS
   }
 }
+
+// Normalize layers for states that bypass load() (e.g. DocumentMenu import
+// of a raw settings object). Legacy paint keys migrate the same way.
+export function normalizeSettingsLayers(settings) {
+  if (!settings || typeof settings !== 'object') return normalizeTextLayers(DEFAULT_SETTINGS.layers)
+  if (Array.isArray(settings.layers) && settings.layers.length > 0) {
+    return normalizeTextLayers(settings.layers, DEFAULT_SETTINGS.layers)
+  }
+  if (hasLegacyPaint(settings)) {
+    return legacyToTextLayers(settings, {
+      glyphHeightIn: Number(settings.glyphHeight) || DEFAULT_SETTINGS.glyphHeight,
+      fontId: settings.fontId || DEFAULT_SETTINGS.fontId,
+    })
+  }
+  return normalizeTextLayers(DEFAULT_SETTINGS.layers)
+}
+
+export { createLayerId }
 
 export function usePersistedSettings() {
   const [settings, setSettings] = useState(load)

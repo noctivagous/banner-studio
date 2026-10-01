@@ -442,3 +442,320 @@ export function resolveShadowOffsetIn(shadow, glyphHeightIn, fontId) {
 
 // The shadow copy is always solid black; the face always uses the live
 // fill and stroke settings, so presets never need to own the outline.
+
+// ---------------------------------------------------------------------------
+// Text-layer stack builder.
+//
+// A stack is an ordered array of full glyph copies of the same banner text.
+// Index 0 is drawn first (back); the last entry is drawn last (front).
+// Each layer carries its own paint (solid fill, optional hatch overlay,
+// optional stroke) plus an absolute offset in inches. Presets are one-shot
+// writers that replace the whole stack; the matcher derives the preset badge
+// from visible layers so manual edits still show as Custom.
+// ---------------------------------------------------------------------------
+
+export const MAX_TEXT_LAYERS = 5
+
+export const DEFAULT_TEXT_LAYER = {
+  name: 'Face',
+  visible: true,
+  dxIn: 0,
+  dyIn: 0,
+  fill: '#000000',
+  strokeOn: false,
+  strokeWidthIn: 0.02,
+  strokeColor: '#000000',
+  overlayOn: false,
+  overlayColor: '#000000',
+  overlayAngle: 90,
+  overlaySpacingPct: 10,
+  overlayLineWidthPct: 2,
+}
+
+export function createLayerId() {
+  return `layer-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffffff)
+    .toString(36)
+    .padStart(4, '0')}`
+}
+
+function clampOffset(value, fallback) {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.min(2, Math.max(-2, number)) : fallback
+}
+
+function asLayerName(value, fallback) {
+  if (typeof value === 'string' && value.trim() !== '') return value.trim().slice(0, 24)
+  return fallback
+}
+
+export function normalizeTextLayer(value, fallback) {
+  const base = { ...DEFAULT_TEXT_LAYER, ...(fallback || {}) }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ...base, id: typeof value?.id === 'string' ? value.id : createLayerId() }
+  }
+  return {
+    id: typeof value.id === 'string' && value.id !== '' ? value.id : createLayerId(),
+    name: asLayerName(value.name, base.name),
+    visible: typeof value.visible === 'boolean' ? value.visible : base.visible,
+    dxIn: clampOffset(value.dxIn, base.dxIn),
+    dyIn: clampOffset(value.dyIn, base.dyIn),
+    fill: asHexColor(value.fill, base.fill),
+    strokeOn: typeof value.strokeOn === 'boolean' ? value.strokeOn : base.strokeOn,
+    strokeWidthIn: clampPct(value.strokeWidthIn ?? base.strokeWidthIn, base.strokeWidthIn, 0, 0.12),
+    strokeColor: asHexColor(value.strokeColor, base.strokeColor),
+    overlayOn: typeof value.overlayOn === 'boolean' ? value.overlayOn : base.overlayOn,
+    overlayColor: asHexColor(value.overlayColor, base.overlayColor),
+    overlayAngle: clampAngle(value.overlayAngle, base.overlayAngle),
+    overlaySpacingPct: clampPct(value.overlaySpacingPct, base.overlaySpacingPct, 2, 50),
+    overlayLineWidthPct: clampPct(value.overlayLineWidthPct, base.overlayLineWidthPct, 0.5, 25),
+  }
+}
+
+export function normalizeTextLayers(value, fallback) {
+  const base = Array.isArray(fallback) && fallback.length > 0 ? fallback : [{ ...DEFAULT_TEXT_LAYER }]
+  if (!Array.isArray(value) || value.length === 0) {
+    return base.map((layer) => normalizeTextLayer(layer))
+  }
+  const seen = new Set()
+  const layers = []
+  for (const entry of value.slice(0, MAX_TEXT_LAYERS)) {
+    const normalized = normalizeTextLayer(entry)
+    while (seen.has(normalized.id)) normalized.id = createLayerId()
+    seen.add(normalized.id)
+    layers.push(normalized)
+  }
+  return layers.length > 0 ? layers : base.map((layer) => normalizeTextLayer(layer))
+}
+
+// Convert the legacy single-face settings (fill / stroke / shadow copy /
+// face overlay) into an equivalent 1-2 layer stack. Auto shadow distances are
+// snapshotted with the current glyph height and font; afterwards the offset
+// is absolute until the user presses Auto again.
+export function legacyToTextLayers(legacy, context) {
+  const glyphHeightIn = context?.glyphHeightIn
+  const fontId = context?.fontId
+  const shadow = normalizeTextShadow(legacy?.textShadow)
+  const overlay = normalizeFillOverlay(legacy?.fillOverlay)
+  const layers = []
+  if (shadow.on) {
+    const offset = resolveShadowOffsetIn(shadow, glyphHeightIn, fontId)
+    layers.push(
+      normalizeTextLayer({
+        id: createLayerId(),
+        name: 'Shadow',
+        visible: true,
+        dxIn: offset.dx,
+        dyIn: offset.dy,
+        fill: shadow.color,
+        strokeOn: false,
+        strokeWidthIn: DEFAULT_TEXT_LAYER.strokeWidthIn,
+        strokeColor: shadow.color,
+        overlayOn: shadow.fillType === SHADOW_FILL_HATCH,
+        overlayColor: shadow.color,
+        overlayAngle: shadow.hatchAngle,
+        overlaySpacingPct: shadow.hatchSpacingPct,
+        overlayLineWidthPct: shadow.hatchLineWidthPct,
+      }),
+    )
+  }
+  layers.push(
+    normalizeTextLayer({
+      id: createLayerId(),
+      name: 'Face',
+      visible: true,
+      dxIn: 0,
+      dyIn: 0,
+      fill: typeof legacy?.fill === 'string' ? legacy.fill : DEFAULT_TEXT_LAYER.fill,
+      strokeOn: legacy?.strokeOn === true,
+      strokeWidthIn: Number.isFinite(Number(legacy?.strokeWidth))
+        ? Number(legacy.strokeWidth)
+        : DEFAULT_TEXT_LAYER.strokeWidthIn,
+      strokeColor: legacy?.strokeColor,
+      overlayOn: overlay.on,
+      overlayColor: overlay.color,
+      overlayAngle: overlay.angle,
+      overlaySpacingPct: overlay.spacingPct,
+      overlayLineWidthPct: overlay.lineWidthPct,
+    }),
+  )
+  return layers
+}
+
+// Hatch overlay of one layer, resolved to absolute inches.
+export function resolveLayerHatchIn(layer, glyphHeightIn, fontId) {
+  return resolveHatchIn(
+    {
+      angle: layer?.overlayAngle,
+      spacingPct: layer?.overlaySpacingPct,
+      lineWidthPct: layer?.overlayLineWidthPct,
+    },
+    glyphHeightIn,
+    fontId,
+  )
+}
+
+// Absolute offset of one layer: { distance, angle, dx, dy } in inches.
+export function resolveLayerOffsetIn(layer) {
+  const dx = Number(layer?.dxIn)
+  const dy = Number(layer?.dyIn)
+  const x = Number.isFinite(dx) ? dx : 0
+  const y = Number.isFinite(dy) ? dy : 0
+  const distance = Math.hypot(x, y)
+  const angle = distance > 0 ? ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360 : 45
+  return { distance, angle, dx: x, dy: y }
+}
+
+function layerIsSolidBlack(layer) {
+  return (
+    layer && isBlack(layer.fill) && layer.overlayOn !== true && layer.strokeOn !== true
+  )
+}
+
+function layerIsSolidBlackAnyFill(layer) {
+  return layer && isBlack(layer.fill) && layer.overlayOn !== true
+}
+
+// Preset badge derived from the visible layers, mirroring the legacy
+// matchGlyphPreset bundles: exact hatch textures and paint roles must match,
+// offsets and stroke widths are ignored.
+export function matchLayerPreset(layers) {
+  const visible = (Array.isArray(layers) ? layers : []).filter((layer) => layer?.visible !== false)
+  if (
+    visible.length === 1 &&
+    isBlack(visible[0].fill) &&
+    visible[0].strokeOn !== true &&
+    visible[0].overlayOn !== true &&
+    Math.hypot(Number(visible[0].dxIn) || 0, Number(visible[0].dyIn) || 0) < 1e-9
+  ) {
+    return TEXT_EFFECT_NONE
+  }
+  if (visible.length === 2) {
+    const [back, front] = visible
+    if (
+      layerIsSolidBlackAnyFill(back) &&
+      back.strokeOn !== true &&
+      isWhite(front.fill) &&
+      front.strokeOn === true &&
+      isBlack(front.strokeColor) &&
+      front.overlayOn === true &&
+      isBlack(front.overlayColor) &&
+      front.overlayAngle === HATCH_SHADOW_OVERLAY.angle &&
+      Number(front.overlaySpacingPct) === HATCH_SHADOW_OVERLAY.spacingPct &&
+      Number(front.overlayLineWidthPct) === HATCH_SHADOW_OVERLAY.lineWidthPct
+    ) {
+      return TEXT_EFFECT_HATCH_SHADOW
+    }
+    if (
+      layerIsSolidBlackAnyFill(back) &&
+      back.strokeOn !== true &&
+      isWhite(front.fill) &&
+      front.strokeOn === true &&
+      front.overlayOn !== true
+    ) {
+      return TEXT_EFFECT_OUTLINE_COPY_SHADOW
+    }
+    if (
+      layerIsSolidBlack(front) &&
+      back.overlayOn === true &&
+      isBlack(back.overlayColor) &&
+      Number(back.overlaySpacingPct) === FILL_HATCH_SHADOW.hatchSpacingPct &&
+      Number(back.overlayLineWidthPct) === FILL_HATCH_SHADOW.hatchLineWidthPct &&
+      (Number(back.overlayAngle) === 90 || Number(back.overlayAngle) === 0)
+    ) {
+      return Number(back.overlayAngle) === 90
+        ? TEXT_EFFECT_FILL_HATCH_SHADOW
+        : TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG
+    }
+  }
+  return TEXT_EFFECT_CUSTOM
+}
+
+// One-shot preset writer: replaces the whole stack. The front layer keeps the
+// user's stroke width and stroke color where the bundle allows; shadow offsets
+// reset to Auto (0.9 x bar width at 45deg) for the current type size.
+export function applyLayerPreset(presetId, context) {
+  const layers = Array.isArray(context?.layers) ? context.layers : []
+  const front = layers.length > 0 ? layers[layers.length - 1] : null
+  const keepWidth = Number(front?.strokeWidthIn)
+  const strokeWidthIn = Number.isFinite(keepWidth)
+    ? Math.min(0.12, Math.max(0, keepWidth))
+    : DEFAULT_TEXT_LAYER.strokeWidthIn
+  const keepColor = asHexColor(front?.strokeColor, DEFAULT_TEXT_LAYER.strokeColor)
+  const auto = resolveShadowOffsetIn(
+    { shadowDistance: null, shadowAngle: 45 },
+    context?.glyphHeightIn,
+    context?.fontId,
+  )
+  const back = (name, paint) =>
+    normalizeTextLayer({
+      id: createLayerId(),
+      name,
+      visible: true,
+      dxIn: auto.dx,
+      dyIn: auto.dy,
+      ...paint,
+    })
+  const face = (name, paint) =>
+    normalizeTextLayer({
+      id: createLayerId(),
+      name,
+      visible: true,
+      dxIn: 0,
+      dyIn: 0,
+      ...paint,
+    })
+  const solidBlackBack = () =>
+    back('Shadow', {
+      fill: '#000000',
+      strokeOn: false,
+      strokeColor: '#000000',
+      overlayOn: false,
+    })
+  if (presetId === TEXT_EFFECT_HATCH_SHADOW) {
+    return {
+      layers: [
+        solidBlackBack(),
+        face('Face', {
+          fill: '#FFFFFF',
+          strokeOn: true,
+          strokeWidthIn,
+          strokeColor: '#000000',
+          overlayOn: true,
+          overlayColor: '#000000',
+          overlayAngle: HATCH_SHADOW_OVERLAY.angle,
+          overlaySpacingPct: HATCH_SHADOW_OVERLAY.spacingPct,
+          overlayLineWidthPct: HATCH_SHADOW_OVERLAY.lineWidthPct,
+        }),
+      ],
+    }
+  }
+  if (
+    presetId === TEXT_EFFECT_FILL_HATCH_SHADOW ||
+    presetId === TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG
+  ) {
+    return {
+      layers: [
+        back('Shadow', {
+          fill: '#000000',
+          strokeOn: false,
+          strokeColor: '#000000',
+          overlayOn: true,
+          overlayColor: '#000000',
+          overlayAngle: presetId === TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG ? 0 : 90,
+          overlaySpacingPct: FILL_HATCH_SHADOW.hatchSpacingPct,
+          overlayLineWidthPct: FILL_HATCH_SHADOW.hatchLineWidthPct,
+        }),
+        face('Face', { fill: '#000000' }),
+      ],
+    }
+  }
+  if (presetId === TEXT_EFFECT_OUTLINE_COPY_SHADOW) {
+    return {
+      layers: [
+        solidBlackBack(),
+        face('Face', { fill: '#FFFFFF', strokeOn: true, strokeWidthIn, strokeColor: keepColor }),
+      ],
+    }
+  }
+  return { layers: [face('Face', { fill: '#000000' })] }
+}

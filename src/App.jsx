@@ -14,8 +14,7 @@ import {
   clampGlyphHeight,
   formatLength,
   measureTextWidthPx,
-  resolveHatchIn,
-  resolveShadowOffsetIn,
+  normalizeTextLayers,
   transformLines,
 } from './lib/layout.js'
 import { PAPERS, sheetSize } from './lib/paper.js'
@@ -29,12 +28,7 @@ export default function App() {
     lineHeight,
     letterSpacing,
     transform,
-    fill,
-    strokeOn,
-    strokeWidth,
-    strokeColor,
-    textShadow,
-    fillOverlay,
+    layers,
     align,
     paperId,
     orientation,
@@ -61,36 +55,9 @@ export default function App() {
   const contentW = Math.max(0.1, trimW - overlap)
   const lines = useMemo(() => transformLines(copy, transform), [copy, transform])
   const fontPx = glyphHeight * PX_PER_INCH * 0.9
-  const shadowOffset = useMemo(
-    () => resolveShadowOffsetIn(textShadow, glyphHeight, font.id),
-    [textShadow, glyphHeight, font.id],
-  )
-  const overlayHatch = useMemo(
-    () =>
-      resolveHatchIn(
-        {
-          angle: fillOverlay.angle,
-          spacingPct: fillOverlay.spacingPct,
-          lineWidthPct: fillOverlay.lineWidthPct,
-        },
-        glyphHeight,
-        font.id,
-      ),
-    [fillOverlay, glyphHeight, font.id],
-  )
-  const shadowHatch = useMemo(
-    () =>
-      resolveHatchIn(
-        {
-          angle: textShadow.hatchAngle,
-          spacingPct: textShadow.hatchSpacingPct,
-          lineWidthPct: textShadow.hatchLineWidthPct,
-        },
-        glyphHeight,
-        font.id,
-      ),
-    [textShadow, glyphHeight, font.id],
-  )
+  // Layers render their own hatch/offset per entry; normalize once here so
+  // hand-edited or imported stacks always render safely.
+  const stack = useMemo(() => normalizeTextLayers(layers), [layers])
 
   const [textWidthPx, setTextWidthPx] = useState(0)
 
@@ -249,12 +216,7 @@ export default function App() {
             lineHeight={lineHeight}
             letterSpacing={letterSpacing}
             transform={transform}
-            fill={fill}
-            strokeOn={strokeOn}
-            strokeWidth={strokeWidth}
-            strokeColor={strokeColor}
-            textShadow={textShadow}
-            fillOverlay={fillOverlay}
+            layers={stack}
             align={align}
             printableHeight={trimH}
             onChange={patch}
@@ -278,26 +240,12 @@ export default function App() {
             fontPx={fontPx}
             lines={lines}
             font={font}
+            glyphHeightIn={glyphHeight}
+            fontId={font.id}
             lineHeight={lineHeight}
             letterSpacing={letterSpacing}
-            fill={fill}
             align={align}
-            strokeOn={strokeOn}
-            strokeWidth={strokeWidth}
-            strokeColor={strokeColor}
-            shadowOn={textShadow.on}
-            shadowDxIn={shadowOffset.dx}
-            shadowDyIn={shadowOffset.dy}
-            shadowColor={textShadow.color}
-            shadowFillType={textShadow.fillType}
-            shadowHatchAngle={shadowHatch.angle}
-            shadowHatchSpacingIn={shadowHatch.spacingIn}
-            shadowHatchLineWidthIn={shadowHatch.lineWidthIn}
-            overlayOn={fillOverlay.on}
-            overlayAngle={overlayHatch.angle}
-            overlaySpacingIn={overlayHatch.spacingIn}
-            overlayLineWidthIn={overlayHatch.lineWidthIn}
-            overlayColor={fillOverlay.color}
+            layers={stack}
             printOverlap={printOverlap}
             showTrim={showTrim}
             showSafe={showSafe}
@@ -348,26 +296,11 @@ export default function App() {
         lines={lines}
         font={font}
         glyphHeight={glyphHeight}
+        fontId={font.id}
         lineHeight={lineHeight}
         letterSpacing={letterSpacing}
-        fill={fill}
         align={align}
-        strokeOn={strokeOn}
-        strokeWidth={strokeWidth}
-        strokeColor={strokeColor}
-        shadowOn={textShadow.on}
-        shadowDxIn={shadowOffset.dx}
-        shadowDyIn={shadowOffset.dy}
-        shadowColor={textShadow.color}
-        shadowFillType={textShadow.fillType}
-        shadowHatchAngle={shadowHatch.angle}
-        shadowHatchSpacingIn={shadowHatch.spacingIn}
-        shadowHatchLineWidthIn={shadowHatch.lineWidthIn}
-        overlayOn={fillOverlay.on}
-        overlayAngle={overlayHatch.angle}
-        overlaySpacingIn={overlayHatch.spacingIn}
-        overlayLineWidthIn={overlayHatch.lineWidthIn}
-        overlayColor={fillOverlay.color}
+        layers={stack}
         printOverlap={printOverlap}
         overlap={overlap}
         printTrim={printTrim}

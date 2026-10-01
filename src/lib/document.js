@@ -1,8 +1,15 @@
-import { FONTS, glyphMaxInches, normalizeFillOverlay, normalizeTextShadow } from './layout.js'
+import {
+  FONTS,
+  glyphMaxInches,
+  legacyToTextLayers,
+  normalizeFillOverlay,
+  normalizeTextLayers,
+  normalizeTextShadow,
+} from './layout.js'
 import { PAPERS, sheetSize } from './paper.js'
 
 export const SCHEMA = 'tile-banner-studio'
-export const DOCUMENT_VERSION = 1
+export const DOCUMENT_VERSION = 2
 const UNKNOWN_KEY = 'tile-banner-studio.unknown'
 
 const TEXT_KEYS = [
@@ -12,13 +19,18 @@ const TEXT_KEYS = [
   'lineHeight',
   'letterSpacing',
   'transform',
+  'layers',
+  'align',
+]
+
+// Version 1 paint keys, migrated into layers on import.
+const LEGACY_TEXT_KEYS = [
   'fill',
   'strokeOn',
   'strokeWidth',
   'strokeColor',
   'textShadow',
   'fillOverlay',
-  'align',
 ]
 
 const VIEW_KEYS = [
@@ -101,12 +113,7 @@ export function exportDocument(settings) {
         lineHeight: settings.lineHeight,
         letterSpacing: settings.letterSpacing,
         transform: settings.transform,
-        fill: settings.fill,
-        strokeOn: settings.strokeOn,
-        strokeWidth: settings.strokeWidth,
-        strokeColor: settings.strokeColor,
-        textShadow: normalizeTextShadow(settings.textShadow),
-        fillOverlay: normalizeFillOverlay(settings.fillOverlay),
+        layers: normalizeTextLayers(settings.layers),
         align: settings.align,
       },
     },
@@ -153,7 +160,8 @@ export function importDocument(raw, defaults) {
     throw new Error('This version only opens type banners, not vector artwork.')
   }
   if (kind !== 'text') throw new Error('That file has no type content.')
-  const textSplit = splitKnown(content.text, TEXT_KEYS)
+  const textKeys = [...TEXT_KEYS, ...(parsed.version < 2 ? LEGACY_TEXT_KEYS : [])]
+  const textSplit = splitKnown(content.text, textKeys)
   const viewSplit = splitKnown(parsed.view, VIEW_KEYS)
 
   const rows = layoutSplit.known.rows ?? 1
@@ -198,6 +206,29 @@ export function importDocument(raw, defaults) {
     extensions[UNKNOWN_KEY] = { ...prior, ...unknown }
   }
 
+  const glyphHeight = clamp(
+    textSplit.known.glyphHeight,
+    0.8,
+    glyphMaxInches(sheetSize(paperId, orientation).pageH - margins.top - margins.bottom),
+    defaults.glyphHeight,
+  )
+  const layers = Array.isArray(textSplit.known.layers)
+    ? normalizeTextLayers(textSplit.known.layers, defaults.layers)
+    : legacyToTextLayers(
+        {
+          fill:
+            typeof textSplit.known.fill === 'string'
+              ? asHex(textSplit.known.fill, '#000000')
+              : '#000000',
+          strokeOn: asBool(textSplit.known.strokeOn, false),
+          strokeWidth: clamp(textSplit.known.strokeWidth, 0, 0.12, 0.02),
+          strokeColor: asHex(textSplit.known.strokeColor, '#000000'),
+          textShadow: normalizeTextShadow(textSplit.known.textShadow),
+          fillOverlay: normalizeFillOverlay(textSplit.known.fillOverlay),
+        },
+        { glyphHeightIn: glyphHeight, fontId },
+      )
+
   return {
     ...defaults,
     paperId,
@@ -206,21 +237,11 @@ export function importDocument(raw, defaults) {
     contentKind: 'text',
     copy: typeof textSplit.known.copy === 'string' ? textSplit.known.copy : defaults.copy,
     fontId,
-    glyphHeight: clamp(
-      textSplit.known.glyphHeight,
-      0.8,
-      glyphMaxInches(sheetSize(paperId, orientation).pageH - margins.top - margins.bottom),
-      defaults.glyphHeight,
-    ),
+    glyphHeight,
     lineHeight: clamp(textSplit.known.lineHeight, 0.6, 1.8, defaults.lineHeight),
     letterSpacing: clamp(textSplit.known.letterSpacing, -0.05, 0.3, defaults.letterSpacing),
     transform: asEnum(textSplit.known.transform, ['asIs', 'uppercase', 'lowercase'], defaults.transform),
-    fill: asHex(textSplit.known.fill, defaults.fill),
-    strokeOn: asBool(textSplit.known.strokeOn, defaults.strokeOn),
-    strokeWidth: clamp(textSplit.known.strokeWidth, 0, 0.12, defaults.strokeWidth),
-    strokeColor: asHex(textSplit.known.strokeColor, defaults.strokeColor),
-    textShadow: normalizeTextShadow(textSplit.known.textShadow, defaults.textShadow),
-    fillOverlay: normalizeFillOverlay(textSplit.known.fillOverlay, defaults.fillOverlay),
+    layers,
     align: asEnum(textSplit.known.align, ['left', 'center', 'right'], defaults.align),
     margins,
     overlap: clamp(viewSplit.known.overlap, 0, 0.5, defaults.overlap),

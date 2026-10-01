@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { CUT_LINE_BLEND, SHADOW_FILL_HATCH, overlapCutSlack } from '../lib/layout.js'
+import { CUT_LINE_BLEND, overlapCutSlack } from '../lib/layout.js'
 import { BannerType } from './Preview.jsx'
 
 export function PrintArea({
@@ -13,26 +13,11 @@ export function PrintArea({
   lines,
   font,
   glyphHeight,
+  fontId,
   lineHeight,
   letterSpacing,
-  fill,
   align,
-  strokeOn,
-  strokeWidth,
-  strokeColor,
-  shadowOn,
-  shadowDxIn,
-  shadowDyIn,
-  shadowColor,
-  shadowFillType,
-  shadowHatchAngle,
-  shadowHatchSpacingIn,
-  shadowHatchLineWidthIn,
-  overlayOn,
-  overlayAngle,
-  overlaySpacingIn,
-  overlayLineWidthIn,
-  overlayColor,
+  layers,
   printOverlap,
   overlap,
   printTrim,
@@ -83,35 +68,12 @@ export function PrintArea({
                 fontSize={`${glyphHeight * 0.9}in`}
                 lineHeight={lineHeight}
                 letterSpacing={letterSpacing}
-                fill={fill}
                 align={align}
-                strokeOn={strokeOn}
-                strokeCss={`${strokeWidth}in ${strokeColor}`}
-                shadowOn={shadowOn}
-                shadowDx={`${shadowDxIn}in`}
-                shadowDy={`${shadowDyIn}in`}
-                shadowColor={shadowColor}
-                shadowHatch={
-                  shadowFillType === SHADOW_FILL_HATCH
-                    ? {
-                        angleDeg: shadowHatchAngle,
-                        spacing: shadowHatchSpacingIn,
-                        lineWidth: shadowHatchLineWidthIn,
-                        color: shadowColor,
-                      }
-                    : null
-                }
-                overlayHatch={
-                  overlayOn
-                    ? {
-                        angleDeg: overlayAngle,
-                        spacing: overlaySpacingIn,
-                        lineWidth: overlayLineWidthIn,
-                        color: overlayColor,
-                      }
-                    : null
-                }
+                layers={layers}
+                glyphHeightIn={glyphHeight}
+                fontId={fontId}
                 hatchUnit="in"
+                unitPerInch={1}
               />
             </div>
           </div>

@@ -3,9 +3,9 @@ import { SegmentControl } from './SegmentControl.jsx'
 import {
   PREVIEW_CUT_LINE,
   PX_PER_INCH,
-  SHADOW_FILL_HATCH,
   hatchStyle,
   overlapCutSlack,
+  resolveLayerHatchIn,
 } from '../lib/layout.js'
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
@@ -16,22 +16,20 @@ function BannerType({
   fontSize,
   lineHeight,
   letterSpacing,
-  fill,
   align,
-  strokeOn,
-  strokeCss,
-  shadowOn,
-  shadowDx,
-  shadowDy,
-  shadowColor,
-  shadowHatch,
-  overlayHatch,
+  layers,
+  glyphHeightIn,
+  fontId,
   hatchUnit,
+  unitPerInch,
 }) {
+  // Stack order: index 0 is drawn first (back), last entry is front. A hidden
+  // sizer sets the line box so layer offsets never shift layout. Within one
+  // layer the stroke lives on the topmost paint so outlines sit above hatch.
+  const scale = hatchUnit === 'px' ? unitPerInch : 1
   return lines.map((line, i) => {
     const text = line || '\u00a0'
-    // Layer order: shadow copy, base face, hatch overlay. The stroke lives on
-    // the topmost face layer so the outline sits above the hatch lines.
+    const visible = (layers || []).filter((layer) => layer?.visible !== false)
     return (
       <div
         key={i}
@@ -47,48 +45,64 @@ function BannerType({
           position: 'relative',
         }}
       >
-        {shadowOn && (
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              transform: `translate(${shadowDx}, ${shadowDy})`,
-              ...(shadowHatch
-                ? hatchStyle({ ...shadowHatch, unit: hatchUnit })
-                : { color: shadowColor, WebkitTextStroke: '0px transparent' }),
-            }}
-          >
-            {text}
-          </div>
-        )}
-        <span
-          style={{
-            position: 'relative',
-            color: fill,
-            ...(strokeOn && !overlayHatch
-              ? { WebkitTextStroke: strokeCss, paintOrder: 'stroke fill' }
-              : {}),
-          }}
-        >
+        <span aria-hidden="true" style={{ position: 'relative', visibility: 'hidden' }}>
           {text}
         </span>
-        {overlayHatch && (
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              ...hatchStyle({
-                ...overlayHatch,
-                unit: hatchUnit,
-                ...(strokeOn ? { strokeCss } : {}),
-              }),
-            }}
-          >
-            {text}
-          </div>
-        )}
+        {visible.map((layer) => {
+          const hatch = layer.overlayOn
+            ? resolveLayerHatchIn(layer, glyphHeightIn, fontId)
+            : null
+          const dx = (Number(layer.dxIn) || 0) * scale
+          const dy = (Number(layer.dyIn) || 0) * scale
+          const strokeCss = `${(Number(layer.strokeWidthIn) || 0) * scale}${hatchUnit} ${layer.strokeColor}`
+          const hatchProps = hatch
+            ? {
+                angleDeg: hatch.angle,
+                spacing: hatch.spacingIn * scale,
+                lineWidth: hatch.lineWidthIn * scale,
+                color: layer.overlayColor,
+              }
+            : null
+          return (
+            <div
+              key={layer.id}
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                transform: `translate(${dx}${hatchUnit}, ${dy}${hatchUnit})`,
+              }}
+            >
+              <span
+                style={{
+                  position: 'relative',
+                  color: layer.fill,
+                  ...(layer.strokeOn && !hatchProps
+                    ? { WebkitTextStroke: strokeCss, paintOrder: 'stroke fill' }
+                    : {}),
+                }}
+              >
+                {text}
+              </span>
+              {hatchProps && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    ...hatchStyle({
+                      ...hatchProps,
+                      unit: hatchUnit,
+                      ...(layer.strokeOn ? { strokeCss } : {}),
+                    }),
+                  }}
+                >
+                  {text}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
     )
   })
@@ -261,26 +275,12 @@ export function Preview({
   fontPx,
   lines,
   font,
+  glyphHeightIn,
+  fontId,
   lineHeight,
   letterSpacing,
-  fill,
   align,
-  strokeOn,
-  strokeWidth,
-  strokeColor,
-  shadowOn,
-  shadowDxIn,
-  shadowDyIn,
-  shadowColor,
-  shadowFillType,
-  shadowHatchAngle,
-  shadowHatchSpacingIn,
-  shadowHatchLineWidthIn,
-  overlayOn,
-  overlayAngle,
-  overlaySpacingIn,
-  overlayLineWidthIn,
-  overlayColor,
+  layers,
   printOverlap,
   showTrim,
   showSafe,
@@ -596,35 +596,12 @@ export function Preview({
                           fontSize={typePx}
                           lineHeight={lineHeight}
                           letterSpacing={letterSpacing}
-                          fill={fill}
                           align={align}
-                          strokeOn={strokeOn}
-                          strokeCss={`${strokeWidth * px}px ${strokeColor}`}
-                          shadowOn={shadowOn}
-                          shadowDx={`${shadowDxIn * px}px`}
-                          shadowDy={`${shadowDyIn * px}px`}
-                          shadowColor={shadowColor}
-                          shadowHatch={
-                            shadowFillType === SHADOW_FILL_HATCH
-                              ? {
-                                  angleDeg: shadowHatchAngle,
-                                  spacing: shadowHatchSpacingIn * px,
-                                  lineWidth: shadowHatchLineWidthIn * px,
-                                  color: shadowColor,
-                                }
-                              : null
-                          }
-                          overlayHatch={
-                            overlayOn
-                              ? {
-                                  angleDeg: overlayAngle,
-                                  spacing: overlaySpacingIn * px,
-                                  lineWidth: overlayLineWidthIn * px,
-                                  color: overlayColor,
-                                }
-                              : null
-                          }
+                          layers={layers}
+                          glyphHeightIn={glyphHeightIn}
+                          fontId={fontId}
                           hatchUnit="px"
+                          unitPerInch={px}
                         />
                       </div>
                     </div>
