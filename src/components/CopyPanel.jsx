@@ -50,7 +50,13 @@ import {
 const rowBtn =
   'w-6 h-6 rounded-[3px] border border-transparent text-[#7A7A80] hover:text-white hover:border-[#43434E] disabled:opacity-25 disabled:hover:text-[#7A7A80] disabled:hover:border-transparent font-mono text-[11px] leading-none flex items-center justify-center'
 
-function TreeRow({ selected, indent = 0, onClick, label, hint, children }) {
+const TREE_TINT = {
+  container: 'bg-[#23232E]',
+  stack: 'bg-[#1A1A22]',
+  line: 'bg-[#0F0F15]',
+}
+
+function TreeRow({ selected, indent = 0, onClick, label, hint, kind = 'line', media, children }) {
   return (
     <div
       role="option"
@@ -60,10 +66,11 @@ function TreeRow({ selected, indent = 0, onClick, label, hint, children }) {
       className={`flex items-center gap-1.5 px-1.5 py-1.5 rounded-[4px] border cursor-pointer transition-colors ${
         selected
           ? 'bg-[#26262E] border-[#E3FF33]'
-          : 'bg-[#0F0F15] border-[#43434E] hover:border-[#5E5E69]'
+          : `${TREE_TINT[kind] || TREE_TINT.line} border-[#43434E] hover:border-[#5E5E69]`
       }`}
       style={{ marginLeft: indent }}
     >
+      {media}
       <span className="flex-1 min-w-0 font-mono text-[11px] tracking-[0.04em] text-[#F0F0F2] truncate uppercase">
         {label}
       </span>
@@ -577,6 +584,13 @@ export function CopyPanel({
               onClick={() => onSelect({ kind: 'container', id: container.id })}
               label={container.name}
               hint="rect"
+              kind="container"
+              media={
+                <span
+                  aria-hidden="true"
+                  className="w-4 h-4 rounded-[2px] border-[1.5px] border-[#E3FF33]/70 shrink-0"
+                />
+              }
             />
             {stack && (
               <TreeRow
@@ -585,6 +599,12 @@ export function CopyPanel({
                 onClick={() => onSelect({ kind: 'stack', id: stack.id })}
                 label="Stack"
                 hint={stack.align}
+                kind="stack"
+                media={
+                  <span aria-hidden="true" className="text-[11px] leading-none text-[#7A7A80] shrink-0 w-4 text-center">
+                    {stack.align === 'left' ? '◧' : stack.align === 'center' ? '⬌' : '◨'}
+                  </span>
+                }
               />
             )}
             {lines.map((entry, index) => {
@@ -598,6 +618,16 @@ export function CopyPanel({
                   onClick={() => onSelect({ kind: 'line', id: entry.id })}
                   label={preview}
                   hint={font.label}
+                  kind="line"
+                  media={
+                    <span
+                      aria-hidden="true"
+                      className="text-[14px] leading-none text-[#F0F0F2] shrink-0 w-6 text-center"
+                      style={{ fontFamily: `"${font.family}", Impact, sans-serif` }}
+                    >
+                      Ag
+                    </span>
+                  }
                 >
                   <button
                     type="button"
