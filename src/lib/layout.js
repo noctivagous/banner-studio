@@ -133,6 +133,10 @@ export const TEXT_EFFECT_OUTLINE_COPY_SHADOW = 'outline-copy-shadow'
 export const TEXT_EFFECT_HATCH_SHADOW = 'hatch-shadow'
 export const TEXT_EFFECT_FILL_HATCH_SHADOW = 'fill-hatch-shadow'
 export const TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG = 'fill-hatch-shadow-0deg'
+export const TEXT_EFFECT_SHADE = 'shade'
+export const TEXT_EFFECT_KEYLINE = 'keyline'
+export const TEXT_EFFECT_BLOCK_SHADE = 'block-shade'
+export const TEXT_EFFECT_SIGNAL = 'signal'
 export const TEXT_EFFECT_CUSTOM = 'custom'
 
 // Default back-copy offset direction: 45deg drops the copy down and to the
@@ -434,6 +438,34 @@ export function matchLayerPreset(layers) {
       return TEXT_EFFECT_OUTLINE_COPY_SHADOW
     }
     if (
+      layerIsSolidBlackAnyFill(back) &&
+      back.strokeOn !== true &&
+      isWhite(front.fill) &&
+      front.strokeOn !== true &&
+      front.overlayOn !== true
+    ) {
+      return TEXT_EFFECT_SHADE
+    }
+    if (
+      layerIsSolidBlackAnyFill(back) &&
+      back.strokeOn === true &&
+      Math.hypot(Number(back.dxIn) || 0, Number(back.dyIn) || 0) < 1e-9 &&
+      isWhite(front.fill) &&
+      front.strokeOn !== true &&
+      front.overlayOn !== true
+    ) {
+      return TEXT_EFFECT_KEYLINE
+    }
+    if (
+      layerIsSolidBlackAnyFill(back) &&
+      back.strokeOn !== true &&
+      front.fill?.trim?.().toUpperCase() === '#C1272D' &&
+      front.strokeOn !== true &&
+      front.overlayOn !== true
+    ) {
+      return TEXT_EFFECT_SIGNAL
+    }
+    if (
       layerIsSolidBlack(front) &&
       back.overlayOn === true &&
       isBlack(back.overlayColor) &&
@@ -445,6 +477,27 @@ export function matchLayerPreset(layers) {
       return Number(back.overlayAngle) === FILL_HATCH_SHADOW.hatchAngle
         ? TEXT_EFFECT_FILL_HATCH_SHADOW
         : TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG
+    }
+  }
+  if (visible.length === 3) {
+    const [deep, mid, front] = visible
+    const d1 = Math.hypot(Number(mid.dxIn) || 0, Number(mid.dyIn) || 0)
+    const d2 = Math.hypot(Number(deep.dxIn) || 0, Number(deep.dyIn) || 0)
+    const a1 = (Math.atan2(Number(mid.dyIn) || 0, Number(mid.dxIn) || 0) * 180) / Math.PI
+    const a2 = (Math.atan2(Number(deep.dyIn) || 0, Number(deep.dxIn) || 0) * 180) / Math.PI
+    let spread = Math.abs(a1 - a2) % 360
+    if (spread > 180) spread = 360 - spread
+    if (
+      layerIsSolidBlack(mid) &&
+      layerIsSolidBlack(deep) &&
+      isWhite(front.fill) &&
+      front.strokeOn !== true &&
+      front.overlayOn !== true &&
+      d1 > 1e-9 &&
+      d2 > d1 &&
+      spread <= 15
+    ) {
+      return TEXT_EFFECT_BLOCK_SHADE
     }
   }
   return TEXT_EFFECT_CUSTOM
@@ -538,6 +591,44 @@ export function applyLayerPreset(presetId, context) {
         solidBlackBack(),
         face('Face', { fill: '#FFFFFF', strokeOn: true, strokeWidthIn, strokeColor: keepColor }),
       ],
+    }
+  }
+  if (presetId === TEXT_EFFECT_SHADE) {
+    return {
+      layers: [solidBlackBack(), face('Face', { fill: '#FFFFFF' })],
+    }
+  }
+  if (presetId === TEXT_EFFECT_KEYLINE) {
+    return {
+      layers: [
+        normalizeTextLayer({
+          id: createLayerId(),
+          name: 'Keyline',
+          visible: true,
+          dxIn: 0,
+          dyIn: 0,
+          fill: '#000000',
+          strokeOn: true,
+          strokeWidthIn: Math.max(strokeWidthIn, 0.06),
+          strokeColor: '#000000',
+          overlayOn: false,
+        }),
+        face('Face', { fill: '#FFFFFF' }),
+      ],
+    }
+  }
+  if (presetId === TEXT_EFFECT_BLOCK_SHADE) {
+    return {
+      layers: [
+        back('Shade Deep', { fill: '#000000', strokeOn: false, strokeColor: '#000000', overlayOn: false, dxIn: auto.dx * 2, dyIn: auto.dy * 2 }),
+        back('Shade', { fill: '#000000', strokeOn: false, strokeColor: '#000000', overlayOn: false }),
+        face('Face', { fill: '#FFFFFF' }),
+      ],
+    }
+  }
+  if (presetId === TEXT_EFFECT_SIGNAL) {
+    return {
+      layers: [solidBlackBack(), face('Face', { fill: '#C1272D' })],
     }
   }
   return { layers: [face('Face', { fill: '#000000' })] }

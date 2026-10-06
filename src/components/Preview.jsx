@@ -358,7 +358,9 @@ export function BannerComposition({
         const selected = selectedId === box.id
         const baselineFromTop = (box.baselineY - box.y) * scale
         const editing = editingLineId === box.id
+        const hitWidth = Math.max(box.width, interactive ? 1 : 0)
         const boxW = `${box.width * scale}${hatchUnit}`
+        const hitW = `${hitWidth * scale}${hatchUnit}`
         const boxH = `${box.height * scale}${hatchUnit}`
         return (
           <div
@@ -395,7 +397,7 @@ export function BannerComposition({
               position: 'absolute',
               left: `${box.x * scale}${hatchUnit}`,
               top: `${box.y * scale}${hatchUnit}`,
-              width: boxW,
+              width: hitW,
               height: boxH,
               outline: selected && showGuides ? '1px solid #E3FF33' : undefined,
               outlineOffset: 1,
@@ -407,7 +409,7 @@ export function BannerComposition({
             {editing ? (
               <LineEditor
                 line={box.line}
-                width={boxW}
+                width={hitW}
                 height={boxH}
                 hatchUnit={hatchUnit}
                 scale={scale}
@@ -1002,6 +1004,14 @@ export function Preview({
                     >
                       <div
                         className="h-full flex flex-col"
+                        onClick={
+                          onSelect
+                            ? (event) => {
+                                if (event.target !== event.currentTarget) return
+                                onSelect({ kind: 'container', id: composition.container.id })
+                              }
+                            : undefined
+                        }
                         style={{
                           transform: `translateX(-${i * contentPx}px)`,
                           width: Math.max(sheetCount * contentPx, contentPx) + (printOverlap ? overlap * px : 0),

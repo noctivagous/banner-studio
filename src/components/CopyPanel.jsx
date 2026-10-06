@@ -693,7 +693,10 @@ export function CopyPanel({
 
         <div>
           <div className="mb-3">
-            <span className="inline-flex items-center px-2 py-1 rounded-[4px] bg-[var(--ctl)] border border-[#43434E] font-mono text-[10px] tracking-[0.1em] text-[#F0F0F2] uppercase">
+            <span
+              data-inspector-kind={kind}
+              className="inline-flex items-center px-2 py-1 rounded-[4px] bg-[var(--ctl)] border border-[#43434E] font-mono text-[10px] tracking-[0.1em] text-[#F0F0F2] uppercase"
+            >
               {kind === 'container' && 'Frame'}
               {kind === 'stack' && 'Y-stack'}
               {kind === 'line' && 'Display line'}
