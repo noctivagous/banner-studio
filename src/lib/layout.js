@@ -137,7 +137,14 @@ export const TEXT_EFFECT_SHADE = 'shade'
 export const TEXT_EFFECT_KEYLINE = 'keyline'
 export const TEXT_EFFECT_BLOCK_SHADE = 'block-shade'
 export const TEXT_EFFECT_SIGNAL = 'signal'
+export const TEXT_EFFECT_CAST = 'cast'
+export const TEXT_EFFECT_CUTOUT = 'cutout'
 export const TEXT_EFFECT_CUSTOM = 'custom'
+
+// Shear applied to a glyph copy, in degrees. A sheared offset copy reads as
+// a shadow cast on the surface behind the type; zero leaves type upright.
+export const MAX_SKEW_DEG = 45
+export const CAST_SKEW_DEG = -25
 
 // Default back-copy offset direction: 45deg drops the copy down and to the
 // right (0deg east, 90deg south, y down).
@@ -296,6 +303,7 @@ export const DEFAULT_TEXT_LAYER = {
   visible: true,
   dxIn: 0,
   dyIn: 0,
+  skewXDeg: 0,
   fill: '#000000',
   strokeOn: false,
   strokeWidthIn: 0.02,
@@ -318,6 +326,12 @@ function clampOffset(value, fallback) {
   return Number.isFinite(number) ? Math.min(2, Math.max(-2, number)) : fallback
 }
 
+function clampSkew(value, fallback) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return fallback
+  return Math.min(MAX_SKEW_DEG, Math.max(-MAX_SKEW_DEG, Math.round(number)))
+}
+
 function asLayerName(value, fallback) {
   if (typeof value === 'string' && value.trim() !== '') return value.trim().slice(0, 24)
   return fallback
@@ -334,6 +348,7 @@ export function normalizeTextLayer(value, fallback) {
     visible: typeof value.visible === 'boolean' ? value.visible : base.visible,
     dxIn: clampOffset(value.dxIn, base.dxIn),
     dyIn: clampOffset(value.dyIn, base.dyIn),
+    skewXDeg: clampSkew(value.skewXDeg, base.skewXDeg),
     fill: asHexColor(value.fill, base.fill),
     strokeOn: typeof value.strokeOn === 'boolean' ? value.strokeOn : base.strokeOn,
     strokeWidthIn: clampPct(value.strokeWidthIn ?? base.strokeWidthIn, base.strokeWidthIn, 0, 0.12),
@@ -414,6 +429,9 @@ export function matchLayerPreset(layers) {
   }
   if (visible.length === 2) {
     const [back, front] = visible
+    const backSkew = Number(back.skewXDeg) || 0
+    if (backSkew !== 0 && backSkew !== CAST_SKEW_DEG) return TEXT_EFFECT_CUSTOM
+    if (Number(front.skewXDeg) || 0) return TEXT_EFFECT_CUSTOM
     if (
       layerIsSolidBlackAnyFill(back) &&
       back.strokeOn !== true &&
@@ -440,6 +458,7 @@ export function matchLayerPreset(layers) {
     if (
       layerIsSolidBlackAnyFill(back) &&
       back.strokeOn !== true &&
+      !Number(back.skewXDeg) &&
       isWhite(front.fill) &&
       front.strokeOn !== true &&
       front.overlayOn !== true
@@ -466,6 +485,17 @@ export function matchLayerPreset(layers) {
       return TEXT_EFFECT_SIGNAL
     }
     if (
+      layerIsSolidBlackAnyFill(back) &&
+      back.strokeOn !== true &&
+      Number(back.skewXDeg) === CAST_SKEW_DEG &&
+      Math.hypot(Number(back.dxIn) || 0, Number(back.dyIn) || 0) > 1e-9 &&
+      isWhite(front.fill) &&
+      front.strokeOn !== true &&
+      front.overlayOn !== true
+    ) {
+      return TEXT_EFFECT_CAST
+    }
+    if (
       layerIsSolidBlack(front) &&
       back.overlayOn === true &&
       isBlack(back.overlayColor) &&
@@ -479,8 +509,39 @@ export function matchLayerPreset(layers) {
         : TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG
     }
   }
+  if (visible.length === 5) {
+    const [d4, d3, d2, d1, front] = visible
+    if ([d1, d2, d3, d4, front].some((layer) => Number(layer.skewXDeg) || 0)) {
+      return TEXT_EFFECT_CUSTOM
+    }
+    const steps = [d1, d2, d3, d4].map((layer) =>
+      Math.hypot(Number(layer.dxIn) || 0, Number(layer.dyIn) || 0),
+    )
+    const angles = [d1, d2, d3, d4].map(
+      (layer) => (Math.atan2(Number(layer.dyIn) || 0, Number(layer.dxIn) || 0) * 180) / Math.PI,
+    )
+    const increasing = steps.every((d, i) => (i === 0 ? d > 1e-9 : d > steps[i - 1]))
+    const aligned = angles.every((a) => {
+      let spread = Math.abs(a - angles[0]) % 360
+      if (spread > 180) spread = 360 - spread
+      return spread <= 15
+    })
+    if (
+      [d1, d2, d3, d4].every(layerIsSolidBlack) &&
+      isWhite(front.fill) &&
+      front.strokeOn !== true &&
+      front.overlayOn !== true &&
+      increasing &&
+      aligned
+    ) {
+      return TEXT_EFFECT_CUTOUT
+    }
+  }
   if (visible.length === 3) {
     const [deep, mid, front] = visible
+    if ([deep, mid, front].some((layer) => Number(layer.skewXDeg) || 0)) {
+      return TEXT_EFFECT_CUSTOM
+    }
     const d1 = Math.hypot(Number(mid.dxIn) || 0, Number(mid.dyIn) || 0)
     const d2 = Math.hypot(Number(deep.dxIn) || 0, Number(deep.dyIn) || 0)
     const a1 = (Math.atan2(Number(mid.dyIn) || 0, Number(mid.dxIn) || 0) * 180) / Math.PI
@@ -629,6 +690,35 @@ export function applyLayerPreset(presetId, context) {
   if (presetId === TEXT_EFFECT_SIGNAL) {
     return {
       layers: [solidBlackBack(), face('Face', { fill: '#C1272D' })],
+    }
+  }
+  if (presetId === TEXT_EFFECT_CAST) {
+    return {
+      layers: [
+        back('Cast Shadow', {
+          fill: '#000000',
+          strokeOn: false,
+          strokeColor: '#000000',
+          overlayOn: false,
+          skewXDeg: CAST_SKEW_DEG,
+        }),
+        face('Face', { fill: '#FFFFFF' }),
+      ],
+    }
+  }
+  if (presetId === TEXT_EFFECT_CUTOUT) {
+    const step = (n) =>
+      back(`Cutout ${n}`, {
+        fill: '#000000',
+        strokeOn: false,
+        strokeColor: '#000000',
+        overlayOn: false,
+        skewXDeg: 0,
+        dxIn: auto.dx * n,
+        dyIn: auto.dy * n,
+      })
+    return {
+      layers: [step(4), step(3), step(2), step(1), face('Face', { fill: '#FFFFFF' })],
     }
   }
   return { layers: [face('Face', { fill: '#000000' })] }

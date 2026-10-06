@@ -6,7 +6,9 @@ import {
   FILL_HATCH_SHADOW_0DEG_ANGLE,
   MAX_TEXT_LAYERS,
   TEXT_EFFECT_BLOCK_SHADE,
+  TEXT_EFFECT_CAST,
   TEXT_EFFECT_CUSTOM,
+  TEXT_EFFECT_CUTOUT,
   TEXT_EFFECT_FILL_HATCH_SHADOW,
   TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG,
   TEXT_EFFECT_HATCH_SHADOW,
@@ -118,6 +120,43 @@ function PresetPreview({ presetId, font }) {
             ...face,
             color: '#C1272D',
             textShadow: '2px 2px 0 #000000',
+          }}
+        >
+          Aa
+        </span>
+      </div>
+    )
+  }
+  if (presetId === TEXT_EFFECT_CAST) {
+    return (
+      <div className={tile}>
+        <span style={{ ...face, position: 'relative', color: '#FFFFFF' }}>
+          Aa
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              transform: 'translate(3px, 3px) skewX(-25deg)',
+              transformOrigin: '50% 100%',
+              color: '#000000',
+            }}
+          >
+            Aa
+          </span>
+        </span>
+      </div>
+    )
+  }
+  if (presetId === TEXT_EFFECT_CUTOUT) {
+    return (
+      <div className={tile}>
+        <span
+          style={{
+            ...face,
+            color: '#FFFFFF',
+            textShadow:
+              '1px 1px 0 #000000, 2px 2px 0 #000000, 3px 3px 0 #000000, 4px 4px 0 #000000',
           }}
         >
           Aa
@@ -668,6 +707,28 @@ export function GlyphStack({ line, font, onPatchLine }) {
               <span className="font-mono text-[8px] text-[#7A7A80]">45° ↘ default</span>
             </div>
           </div>
+          <div>
+            <div className="flex justify-between mb-1">
+              <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Skew</span>
+              <span className="font-mono text-[10px] text-[#F0F0F2]">
+                {Math.round(Number(selected.skewXDeg) || 0)}°
+              </span>
+            </div>
+            <input
+              type="range"
+              min={-45}
+              max={45}
+              step={5}
+              value={Math.round(Number(selected.skewXDeg) || 0)}
+              onChange={(e) => setSelected({ skewXDeg: parseFloat(e.target.value) })}
+              className="w-full"
+              aria-label="Layer skew degrees"
+            />
+            <div className="flex justify-between mt-1">
+              <span className="font-mono text-[8px] text-[#7A7A80]">-45° ⁄</span>
+              <span className="font-mono text-[8px] text-[#7A7A80]">cast shadow −25°</span>
+            </div>
+          </div>
           <div className="font-mono text-[10px] text-[#7A7A80]">
             dx {offset.dx.toFixed(2)}&quot; · dy {offset.dy.toFixed(2)}&quot;
           </div>
@@ -682,6 +743,8 @@ export function GlyphStack({ line, font, onPatchLine }) {
             { id: TEXT_EFFECT_KEYLINE, label: 'Keyline' },
             { id: TEXT_EFFECT_BLOCK_SHADE, label: '3D Block' },
             { id: TEXT_EFFECT_SIGNAL, label: 'Signal' },
+            { id: TEXT_EFFECT_CAST, label: 'Cast' },
+            { id: TEXT_EFFECT_CUTOUT, label: 'Cutout 3D' },
             { id: TEXT_EFFECT_OUTLINE_COPY_SHADOW, label: 'Outline + Shadow' },
             { id: TEXT_EFFECT_HATCH_SHADOW, label: 'Hatch + Shadow' },
             { id: TEXT_EFFECT_FILL_HATCH_SHADOW, label: 'Fill + Hatch-Shadow 90deg' },
@@ -724,7 +787,9 @@ export function GlyphStack({ line, font, onPatchLine }) {
           Presets set up the glyph stack above: fill, stroke, overlay and offsets
           together. Shade is a clean offset block with no outline; Keyline adds
           a heavy outline ring; 3D Block steps the shade twice for an extruded
-          look; Signal is a red face on a black shade. Hatch + Shadow uses white
+          look; Signal is a red face on a black shade. Cast shears the shade so it
+          falls like a shadow on the surface behind the type; Cutout 3D stacks
+          four solid shade steps for a cut-block letterform. Hatch + Shadow uses white
           fill, black hatch at 90°, black stroke, and a solid black copy behind.
           Fill + Hatch-Shadow uses black fill with a hatch copy behind at 90° or 0°.
         </p>

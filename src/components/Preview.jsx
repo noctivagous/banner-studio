@@ -127,6 +127,7 @@ function GlyphLine({ line, width, height, hatchUnit, scale }) {
           : null
         const dx = (Number(layer.dxIn) || 0) * scale
         const dy = (Number(layer.dyIn) || 0) * scale
+        const skew = Number(layer.skewXDeg) || 0
         const strokeCss = `${(Number(layer.strokeWidthIn) || 0) * scale}${hatchUnit} ${layer.strokeColor}`
         const hatchProps = hatch
           ? {
@@ -143,7 +144,10 @@ function GlyphLine({ line, width, height, hatchUnit, scale }) {
             style={{
               position: 'absolute',
               inset: 0,
-              transform: `translate(${dx}${hatchUnit}, ${dy}${hatchUnit})`,
+              transform: `translate(${dx}${hatchUnit}, ${dy}${hatchUnit})${
+                skew ? ` skewX(${skew}deg)` : ''
+              }`,
+              ...(skew ? { transformOrigin: '50% 100%' } : {}),
             }}
           >
             <span
