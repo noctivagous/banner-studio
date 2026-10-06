@@ -4,6 +4,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        stencil: ['"Saira Stencil One"', 'Anton', 'Impact', 'sans-serif'],
         mono: [
           '"JetBrains Mono"',
           'ui-monospace',

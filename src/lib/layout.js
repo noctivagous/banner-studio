@@ -117,14 +117,14 @@ export function measureTextWidthPx(lines, font, fontPx, letterSpacingEm) {
 }
 
 export function glyphMaxInches(printableHeight) {
-  const room = Math.max(0.8, printableHeight - 0.05)
-  return Math.max(0.8, Math.floor(room * 10) / 10)
+  const room = Math.max(0.5, printableHeight - 0.05)
+  return Math.max(0.5, Math.floor(room * 2) / 2)
 }
 
 export function clampGlyphHeight(height, printableHeight) {
   const max = glyphMaxInches(printableHeight)
-  if (height > max) return parseFloat(max.toFixed(1))
-  if (height < 0.8) return 0.8
+  if (height > max) return max
+  if (height < 0.5) return 0.5
   return height
 }
 
@@ -135,45 +135,33 @@ export const TEXT_EFFECT_FILL_HATCH_SHADOW = 'fill-hatch-shadow'
 export const TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG = 'fill-hatch-shadow-0deg'
 export const TEXT_EFFECT_CUSTOM = 'custom'
 
-export const SHADOW_FILL_SOLID = 'solid'
-export const SHADOW_FILL_HATCH = 'hatch'
+// Default back-copy offset direction: 45deg drops the copy down and to the
+// right (0deg east, 90deg south, y down).
+export const DEFAULT_SHADOW_ANGLE = 45
 
-export const OVERLAY_TYPE_HATCH = 'hatch'
+// Default hatch line direction for overlays.
+export const DEFAULT_HATCH_ANGLE = 90
 
-export const DEFAULT_TEXT_SHADOW = {
-  on: false,
-  shadowDistance: null,
-  shadowAngle: 45,
-  fillType: SHADOW_FILL_SOLID,
-  color: '#000000',
-  hatchAngle: 45,
-  hatchSpacingPct: 10,
-  hatchLineWidthPct: 2,
-}
+// Auto copy distance is this multiple of the font's estimated bar width.
+export const AUTO_SHADOW_BAR_FACTOR = 0.9
 
-export const DEFAULT_FILL_OVERLAY = {
-  on: false,
-  type: OVERLAY_TYPE_HATCH,
-  color: '#000000',
-  angle: 90,
-  spacingPct: 10,
-  lineWidthPct: 2,
-}
-
-// Hatch texture written by the Hatch + Shadow preset. Kept separate from the
-// overlay defaults so tuning the preset values never moves manual defaults.
+// Hatch texture written by the Hatch + Shadow preset. Preset bundles keep
+// their own values so tuning a default never redefines a preset.
 export const HATCH_SHADOW_OVERLAY = {
   angle: 90,
   spacingPct: 2,
   lineWidthPct: 1,
 }
 
-// Shadow hatch texture written by the Fill + Hatch-Shadow preset.
+// Back-copy hatch texture written by the Fill + Hatch-Shadow preset.
 export const FILL_HATCH_SHADOW = {
   hatchAngle: 90,
   hatchSpacingPct: 2,
   hatchLineWidthPct: 1,
 }
+
+// Back-copy hatch direction for the Fill + Hatch-Shadow 0deg variant.
+export const FILL_HATCH_SHADOW_0DEG_ANGLE = 0
 
 // Heuristic stem-width fraction of glyph height, keyed by font id.
 // Heavy display faces have thick bars; thin/line faces much less.
@@ -215,42 +203,6 @@ function asHexColor(value, fallback) {
   return fallback
 }
 
-export function normalizeTextShadow(value, fallback) {
-  const base = { ...DEFAULT_TEXT_SHADOW, ...(fallback || {}) }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return base
-  const on = typeof value.on === 'boolean' ? value.on : base.on
-  let shadowDistance = base.shadowDistance
-  if (value.shadowDistance === null || value.shadowDistance === undefined) {
-    shadowDistance = null
-  } else {
-    const distance = Number(value.shadowDistance)
-    shadowDistance = Number.isFinite(distance) ? Math.min(2, Math.max(0, distance)) : null
-  }
-  return {
-    on,
-    shadowDistance,
-    shadowAngle: clampAngle(value.shadowAngle, base.shadowAngle),
-    fillType: value.fillType === SHADOW_FILL_HATCH ? SHADOW_FILL_HATCH : SHADOW_FILL_SOLID,
-    color: asHexColor(value.color, base.color),
-    hatchAngle: clampAngle(value.hatchAngle, base.hatchAngle),
-    hatchSpacingPct: clampPct(value.hatchSpacingPct, base.hatchSpacingPct, 2, 50),
-    hatchLineWidthPct: clampPct(value.hatchLineWidthPct, base.hatchLineWidthPct, 0.5, 25),
-  }
-}
-
-export function normalizeFillOverlay(value, fallback) {
-  const base = { ...DEFAULT_FILL_OVERLAY, ...(fallback || {}) }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return base
-  return {
-    on: typeof value.on === 'boolean' ? value.on : base.on,
-    type: OVERLAY_TYPE_HATCH,
-    color: asHexColor(value.color, base.color),
-    angle: clampAngle(value.angle, base.angle),
-    spacingPct: clampPct(value.spacingPct, base.spacingPct, 2, 50),
-    lineWidthPct: clampPct(value.lineWidthPct, base.lineWidthPct, 0.5, 25),
-  }
-}
-
 // Heuristic x-height fraction of glyph height. Only the default is established;
 // add per-font entries here once measured against real renderings.
 const X_HEIGHT_FRACTION_BY_FONT = {}
@@ -267,7 +219,7 @@ export function estimateXHeightInches(glyphHeightIn, fontId) {
 export function resolveHatchIn({ angle, spacingPct, lineWidthPct }, glyphHeightIn, fontId) {
   const xHeight = estimateXHeightInches(glyphHeightIn, fontId)
   return {
-    angle: clampAngle(angle, DEFAULT_FILL_OVERLAY.angle),
+    angle: clampAngle(angle, DEFAULT_HATCH_ANGLE),
     spacingIn: (Number(spacingPct) / 100) * xHeight,
     lineWidthIn: (Number(lineWidthPct) / 100) * xHeight,
   }
@@ -303,124 +255,6 @@ function isBlack(value) {
   return typeof value === 'string' && value.trim().toUpperCase() === '#000000'
 }
 
-// Glyph Effects display is derived from live control values, so any manual
-// edit that breaks a preset bundle shows as Custom with no stored flag.
-export function matchGlyphPreset({ fill, strokeOn, strokeColor, textShadow, fillOverlay }) {
-  const shadow = textShadow ?? DEFAULT_TEXT_SHADOW
-  const overlay = fillOverlay ?? DEFAULT_FILL_OVERLAY
-  const shadowOn = shadow.on === true
-  const overlayOn = overlay.on === true
-  const shadowSolid = shadow.fillType !== SHADOW_FILL_HATCH
-  if (
-    isWhite(fill) &&
-    strokeOn &&
-    isBlack(strokeColor) &&
-    shadowOn &&
-    isBlack(shadow.color) &&
-    shadowSolid &&
-    overlayOn &&
-    isBlack(overlay.color) &&
-    overlay.angle === HATCH_SHADOW_OVERLAY.angle &&
-    overlay.spacingPct === HATCH_SHADOW_OVERLAY.spacingPct &&
-    overlay.lineWidthPct === HATCH_SHADOW_OVERLAY.lineWidthPct
-  ) {
-    return TEXT_EFFECT_HATCH_SHADOW
-  }
-  if (
-    isWhite(fill) &&
-    strokeOn &&
-    shadowOn &&
-    isBlack(shadow.color) &&
-    shadowSolid &&
-    !overlayOn
-  ) {
-    return TEXT_EFFECT_OUTLINE_COPY_SHADOW
-  }
-  if (
-    isBlack(fill) &&
-    !strokeOn &&
-    !overlayOn &&
-    shadowOn &&
-    shadow.fillType === SHADOW_FILL_HATCH &&
-    isBlack(shadow.color) &&
-    shadow.hatchSpacingPct === FILL_HATCH_SHADOW.hatchSpacingPct &&
-    shadow.hatchLineWidthPct === FILL_HATCH_SHADOW.hatchLineWidthPct &&
-    (shadow.hatchAngle === 90 || shadow.hatchAngle === 0)
-  ) {
-    return shadow.hatchAngle === 90
-      ? TEXT_EFFECT_FILL_HATCH_SHADOW
-      : TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG
-  }
-  if (isBlack(fill) && !strokeOn && !shadowOn && !overlayOn) {
-    return TEXT_EFFECT_NONE
-  }
-  return TEXT_EFFECT_CUSTOM
-}
-
-// Presets are one-shot writers: they set ordinary control values and keep the
-// user's tuned stroke width and shadow tuning where the bundle allows.
-export function applyGlyphPreset(presetId, settings) {
-  const shadow = settings?.textShadow ?? DEFAULT_TEXT_SHADOW
-  const overlay = settings?.fillOverlay ?? DEFAULT_FILL_OVERLAY
-  if (presetId === TEXT_EFFECT_HATCH_SHADOW) {
-    return {
-      fill: '#FFFFFF',
-      strokeOn: true,
-      strokeColor: '#000000',
-      fillOverlay: { ...overlay, ...HATCH_SHADOW_OVERLAY, on: true, color: '#000000' },
-      textShadow: {
-        ...shadow,
-        on: true,
-        shadowDistance: null,
-        shadowAngle: 45,
-        fillType: SHADOW_FILL_SOLID,
-        color: '#000000',
-      },
-    }
-  }
-  if (
-    presetId === TEXT_EFFECT_FILL_HATCH_SHADOW ||
-    presetId === TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG
-  ) {
-    return {
-      fill: '#000000',
-      strokeOn: false,
-      fillOverlay: { ...overlay, on: false },
-      textShadow: {
-        ...shadow,
-        on: true,
-        shadowDistance: null,
-        shadowAngle: 45,
-        fillType: SHADOW_FILL_HATCH,
-        color: '#000000',
-        ...FILL_HATCH_SHADOW,
-        hatchAngle: presetId === TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG ? 0 : 90,
-      },
-    }
-  }
-  if (presetId === TEXT_EFFECT_OUTLINE_COPY_SHADOW) {
-    return {
-      fill: '#FFFFFF',
-      strokeOn: true,
-      fillOverlay: { ...overlay, on: false },
-      textShadow: {
-        ...shadow,
-        on: true,
-        shadowDistance: null,
-        shadowAngle: 45,
-        fillType: SHADOW_FILL_SOLID,
-        color: '#000000',
-      },
-    }
-  }
-  return {
-    fill: '#000000',
-    strokeOn: false,
-    fillOverlay: { ...overlay, on: false },
-    textShadow: { ...shadow, on: false, fillType: SHADOW_FILL_SOLID },
-  }
-}
-
 // Angle convention: 0deg points east (+x), 90deg points south (+y, down-screen),
 // so the default 45deg drops the copy down and to the right.
 export function resolveShadowOffsetIn(shadow, glyphHeightIn, fontId) {
@@ -428,9 +262,9 @@ export function resolveShadowOffsetIn(shadow, glyphHeightIn, fontId) {
   const distance =
     typeof manual === 'number' && Number.isFinite(manual)
       ? Math.max(0, manual)
-      : 0.9 * estimateBarWidthInches(glyphHeightIn, fontId)
+      : AUTO_SHADOW_BAR_FACTOR * estimateBarWidthInches(glyphHeightIn, fontId)
   const rawAngle = Number(shadow?.shadowAngle)
-  const angle = Number.isFinite(rawAngle) ? rawAngle : DEFAULT_TEXT_SHADOW.shadowAngle
+  const angle = Number.isFinite(rawAngle) ? rawAngle : DEFAULT_SHADOW_ANGLE
   const radians = (angle * Math.PI) / 180
   return {
     distance,
@@ -439,9 +273,6 @@ export function resolveShadowOffsetIn(shadow, glyphHeightIn, fontId) {
     dy: distance * Math.sin(radians),
   }
 }
-
-// The shadow copy is always solid black; the face always uses the live
-// fill and stroke settings, so presets never need to own the outline.
 
 // ---------------------------------------------------------------------------
 // Text-layer stack builder.
@@ -467,7 +298,7 @@ export const DEFAULT_TEXT_LAYER = {
   strokeColor: '#000000',
   overlayOn: false,
   overlayColor: '#000000',
-  overlayAngle: 90,
+  overlayAngle: DEFAULT_HATCH_ANGLE,
   overlaySpacingPct: 10,
   overlayLineWidthPct: 2,
 }
@@ -527,60 +358,6 @@ export function normalizeTextLayers(value, fallback) {
   return layers.length > 0 ? layers : base.map((layer) => normalizeTextLayer(layer))
 }
 
-// Convert the legacy single-face settings (fill / stroke / shadow copy /
-// face overlay) into an equivalent 1-2 layer stack. Auto shadow distances are
-// snapshotted with the current glyph height and font; afterwards the offset
-// is absolute until the user presses Auto again.
-export function legacyToTextLayers(legacy, context) {
-  const glyphHeightIn = context?.glyphHeightIn
-  const fontId = context?.fontId
-  const shadow = normalizeTextShadow(legacy?.textShadow)
-  const overlay = normalizeFillOverlay(legacy?.fillOverlay)
-  const layers = []
-  if (shadow.on) {
-    const offset = resolveShadowOffsetIn(shadow, glyphHeightIn, fontId)
-    layers.push(
-      normalizeTextLayer({
-        id: createLayerId(),
-        name: 'Shadow',
-        visible: true,
-        dxIn: offset.dx,
-        dyIn: offset.dy,
-        fill: shadow.color,
-        strokeOn: false,
-        strokeWidthIn: DEFAULT_TEXT_LAYER.strokeWidthIn,
-        strokeColor: shadow.color,
-        overlayOn: shadow.fillType === SHADOW_FILL_HATCH,
-        overlayColor: shadow.color,
-        overlayAngle: shadow.hatchAngle,
-        overlaySpacingPct: shadow.hatchSpacingPct,
-        overlayLineWidthPct: shadow.hatchLineWidthPct,
-      }),
-    )
-  }
-  layers.push(
-    normalizeTextLayer({
-      id: createLayerId(),
-      name: 'Face',
-      visible: true,
-      dxIn: 0,
-      dyIn: 0,
-      fill: typeof legacy?.fill === 'string' ? legacy.fill : DEFAULT_TEXT_LAYER.fill,
-      strokeOn: legacy?.strokeOn === true,
-      strokeWidthIn: Number.isFinite(Number(legacy?.strokeWidth))
-        ? Number(legacy.strokeWidth)
-        : DEFAULT_TEXT_LAYER.strokeWidthIn,
-      strokeColor: legacy?.strokeColor,
-      overlayOn: overlay.on,
-      overlayColor: overlay.color,
-      overlayAngle: overlay.angle,
-      overlaySpacingPct: overlay.spacingPct,
-      overlayLineWidthPct: overlay.lineWidthPct,
-    }),
-  )
-  return layers
-}
-
 // Hatch overlay of one layer, resolved to absolute inches.
 export function resolveLayerHatchIn(layer, glyphHeightIn, fontId) {
   return resolveHatchIn(
@@ -601,7 +378,10 @@ export function resolveLayerOffsetIn(layer) {
   const x = Number.isFinite(dx) ? dx : 0
   const y = Number.isFinite(dy) ? dy : 0
   const distance = Math.hypot(x, y)
-  const angle = distance > 0 ? ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360 : 45
+  const angle =
+    distance > 0
+      ? ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360
+      : DEFAULT_SHADOW_ANGLE
   return { distance, angle, dx: x, dy: y }
 }
 
@@ -615,9 +395,8 @@ function layerIsSolidBlackAnyFill(layer) {
   return layer && isBlack(layer.fill) && layer.overlayOn !== true
 }
 
-// Preset badge derived from the visible layers, mirroring the legacy
-// matchGlyphPreset bundles: exact hatch textures and paint roles must match,
-// offsets and stroke widths are ignored.
+// Preset badge derived from the visible layers: exact hatch textures and
+// paint roles must match; offsets and stroke widths are ignored.
 export function matchLayerPreset(layers) {
   const visible = (Array.isArray(layers) ? layers : []).filter((layer) => layer?.visible !== false)
   if (
@@ -660,9 +439,10 @@ export function matchLayerPreset(layers) {
       isBlack(back.overlayColor) &&
       Number(back.overlaySpacingPct) === FILL_HATCH_SHADOW.hatchSpacingPct &&
       Number(back.overlayLineWidthPct) === FILL_HATCH_SHADOW.hatchLineWidthPct &&
-      (Number(back.overlayAngle) === 90 || Number(back.overlayAngle) === 0)
+      (Number(back.overlayAngle) === FILL_HATCH_SHADOW.hatchAngle ||
+        Number(back.overlayAngle) === FILL_HATCH_SHADOW_0DEG_ANGLE)
     ) {
-      return Number(back.overlayAngle) === 90
+      return Number(back.overlayAngle) === FILL_HATCH_SHADOW.hatchAngle
         ? TEXT_EFFECT_FILL_HATCH_SHADOW
         : TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG
     }
@@ -671,8 +451,8 @@ export function matchLayerPreset(layers) {
 }
 
 // One-shot preset writer: replaces the whole stack. The front layer keeps the
-// user's stroke width and stroke color where the bundle allows; shadow offsets
-// reset to Auto (0.9 x bar width at 45deg) for the current type size.
+// user's stroke width and stroke color where the bundle allows; back-copy
+// offsets reset to the Auto distance at the default angle for the type size.
 export function applyLayerPreset(presetId, context) {
   const layers = Array.isArray(context?.layers) ? context.layers : []
   const front = layers.length > 0 ? layers[layers.length - 1] : null
@@ -682,7 +462,7 @@ export function applyLayerPreset(presetId, context) {
     : DEFAULT_TEXT_LAYER.strokeWidthIn
   const keepColor = asHexColor(front?.strokeColor, DEFAULT_TEXT_LAYER.strokeColor)
   const auto = resolveShadowOffsetIn(
-    { shadowDistance: null, shadowAngle: 45 },
+    { shadowDistance: null, shadowAngle: DEFAULT_SHADOW_ANGLE },
     context?.glyphHeightIn,
     context?.fontId,
   )
@@ -741,7 +521,10 @@ export function applyLayerPreset(presetId, context) {
           strokeColor: '#000000',
           overlayOn: true,
           overlayColor: '#000000',
-          overlayAngle: presetId === TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG ? 0 : 90,
+          overlayAngle:
+            presetId === TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG
+              ? FILL_HATCH_SHADOW_0DEG_ANGLE
+              : FILL_HATCH_SHADOW.hatchAngle,
           overlaySpacingPct: FILL_HATCH_SHADOW.hatchSpacingPct,
           overlayLineWidthPct: FILL_HATCH_SHADOW.hatchLineWidthPct,
         }),

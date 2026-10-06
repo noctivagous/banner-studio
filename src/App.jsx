@@ -1,37 +1,31 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AssembleGuide } from './components/AssembleGuide.jsx'
+import { BannerModeControl } from './components/BannerModeControl.jsx'
 import { CopyPanel } from './components/CopyPanel.jsx'
 import { DocumentMenu } from './components/DocumentMenu.jsx'
 import { PrintButton } from './components/PrintButton.jsx'
+import { SectionSpine } from './components/SectionChrome.jsx'
 import { Output } from './components/Output.jsx'
 import { Preview } from './components/Preview.jsx'
 import { PrintArea } from './components/PrintArea.jsx'
 import { PrinterSafe } from './components/PrinterSafe.jsx'
 import { usePersistedSettings } from './hooks/usePersistedSettings.js'
 import {
-  FONTS,
-  PX_PER_INCH,
-  clampGlyphHeight,
-  formatLength,
-  measureTextWidthPx,
-  normalizeTextLayers,
-  transformLines,
-} from './lib/layout.js'
+  fitCompositionToTrim,
+  getStack,
+  measureComposition,
+  normalizeComposition,
+} from './lib/composition.js'
+import { formatLength } from './lib/layout.js'
 import { PAPERS, sheetSize } from './lib/paper.js'
 
 export default function App() {
   const [settings, patch] = usePersistedSettings()
   const {
-    copy,
-    fontId,
-    glyphHeight,
-    lineHeight,
-    letterSpacing,
-    transform,
-    layers,
-    align,
+    composition,
     paperId,
     orientation,
+    bannerMode,
     margins,
     overlap,
     showTrim,
@@ -47,25 +41,34 @@ export default function App() {
     scaleToFit,
   } = settings
 
-  const font = useMemo(() => FONTS.find((f) => f.id === fontId) || FONTS[0], [fontId])
   const sheet = sheetSize(paperId, orientation)
   const { pageW, pageH } = sheet
   const trimW = pageW - margins.left - margins.right
   const trimH = pageH - margins.top - margins.bottom
   const contentW = Math.max(0.1, trimW - overlap)
-  const lines = useMemo(() => transformLines(copy, transform), [copy, transform])
-  const fontPx = glyphHeight * PX_PER_INCH * 0.9
-  // Layers render their own hatch/offset per entry; normalize once here so
-  // hand-edited or imported stacks always render safely.
-  const stack = useMemo(() => normalizeTextLayers(layers), [layers])
+  const normalized = useMemo(() => normalizeComposition(composition), [composition])
+  const [selection, setSelection] = useState(() => {
+    const stack = getStack(normalized)
+    return { kind: 'line', id: stack?.lines?.[0]?.id }
+  })
 
-  const [textWidthPx, setTextWidthPx] = useState(0)
+  const [measured, setMeasured] = useState(null)
+
+  const setComposition = useCallback(
+    (next, preferLineId) => {
+      patch((prev) => {
+        const incoming = typeof next === 'function' ? next(prev.composition) : next
+        return { ...prev, composition: fitCompositionToTrim(incoming, trimH, preferLineId) }
+      })
+    },
+    [patch, trimH],
+  )
 
   useEffect(() => {
     patch((prev) => {
-      const next = clampGlyphHeight(prev.glyphHeight, trimH)
-      if (next === prev.glyphHeight) return prev
-      return { ...prev, glyphHeight: next }
+      const current = measureComposition(prev.composition, { maxHeight: trimH })
+      if (current.height <= trimH + 1e-6) return prev
+      return { ...prev, composition: fitCompositionToTrim(prev.composition, trimH) }
     })
   }, [trimH, patch])
 
@@ -78,18 +81,14 @@ export default function App() {
         /* fonts.ready is optional */
       }
       if (cancelled) return
-      if (copy.trim() === '') {
-        setTextWidthPx(0)
-        return
-      }
-      setTextWidthPx(measureTextWidthPx(lines, font, fontPx, letterSpacing))
+      setMeasured(measureComposition(normalized, { maxHeight: trimH }))
     })()
     return () => {
       cancelled = true
     }
-  }, [lines, font, fontPx, letterSpacing, copy])
+  }, [normalized, trimH])
 
-  const textWidthIn = textWidthPx / PX_PER_INCH
+  const textWidthIn = measured?.width ?? 0
   const sheetCount =
     textWidthIn <= 0
       ? 0
@@ -133,6 +132,10 @@ export default function App() {
                 TILE<span className="text-[#7A7A80] mx-[5px]">/</span>BANNER STUDIO
               </span>
               <div className="hidden md:inline-flex items-center gap-1.5">
+                <BannerModeControl
+                  value={bannerMode}
+                  onChange={(mode) => patch({ bannerMode: mode })}
+                />
                 <label className="relative">
                   <span className="sr-only">Page size</span>
                   <select
@@ -209,17 +212,11 @@ export default function App() {
 
         <div className="flex-1 flex flex-col xl:flex-row overflow-hidden min-h-0 min-w-0">
           <CopyPanel
-            copy={copy}
-            font={font}
-            fontId={fontId}
-            glyphHeight={glyphHeight}
-            lineHeight={lineHeight}
-            letterSpacing={letterSpacing}
-            transform={transform}
-            layers={stack}
-            align={align}
+            composition={normalized}
+            selection={selection}
+            onSelect={setSelection}
             printableHeight={trimH}
-            onChange={patch}
+            onChange={setComposition}
           />
           <Preview
             zoom={zoom}
@@ -235,17 +232,9 @@ export default function App() {
             trimW={trimW}
             trimH={trimH}
             contentW={contentW}
-            textWidthIn={textWidthIn}
-            textWidthPx={textWidthPx}
-            fontPx={fontPx}
-            lines={lines}
-            font={font}
-            glyphHeightIn={glyphHeight}
-            fontId={font.id}
-            lineHeight={lineHeight}
-            letterSpacing={letterSpacing}
-            align={align}
-            layers={stack}
+            composition={normalized}
+            measured={measured}
+            selection={selection}
             printOverlap={printOverlap}
             showTrim={showTrim}
             showSafe={showSafe}
@@ -254,16 +243,30 @@ export default function App() {
             showCutMarks={showCutMarks}
           />
           <div className="w-full xl:w-[320px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#121214] xl:border-l border-t xl:border-t-0 border-[#43434E] overflow-y-auto">
-            <div className="p-5">
-              <PrinterSafe
-                margins={margins}
-                overlap={overlap}
-                paperId={paperId}
-                orientation={orientation}
-                onChange={patch}
-              />
-              <div aria-hidden="true" className="h-px -mx-5 my-7 bg-[#43434E]/60" />
-              <Output
+            <div className="p-5 space-y-5">
+              <section className="flex flex-row rounded-[6px] bg-[#1A1611] border border-[#4A4438]/60 overflow-hidden">
+                <SectionSpine label="Printer Safe" sub="02" />
+                <div className="flex-1 min-w-0 p-4">
+                  <PrinterSafe
+                    margins={margins}
+                    overlap={overlap}
+                    paperId={paperId}
+                    orientation={orientation}
+                    onChange={patch}
+                  />
+                </div>
+              </section>
+              <div aria-hidden="true" className="flex items-center gap-3 -mx-5">
+                <span className="flex-1 h-px bg-[#43434E]/60" />
+                <span className="font-mono text-[9px] tracking-[0.2em] text-[#5A5A60] uppercase">
+                  Output below
+                </span>
+                <span className="flex-1 h-px bg-[#43434E]/60" />
+              </div>
+              <section className="flex flex-row rounded-[6px] bg-[#131A0E] border border-[#E3FF33]/25 overflow-hidden">
+                <SectionSpine label="Output" sub="03" />
+                <div className="flex-1 min-w-0 p-4">
+                  <Output
                 sheetCount={sheetCount}
                 assembledInches={assembledInches}
                 trimW={trimW}
@@ -279,6 +282,8 @@ export default function App() {
                 printMarks={{ printOverlap, printTrim, printNumbers, printCutMarks }}
                 pageLabel={pageLabel}
               />
+                </div>
+              </section>
             </div>
           </div>
         </div>
@@ -292,15 +297,8 @@ export default function App() {
         contentW={contentW}
         trimW={trimW}
         trimH={trimH}
-        textWidthIn={textWidthIn}
-        lines={lines}
-        font={font}
-        glyphHeight={glyphHeight}
-        fontId={font.id}
-        lineHeight={lineHeight}
-        letterSpacing={letterSpacing}
-        align={align}
-        layers={stack}
+        composition={normalized}
+        measured={measured}
         printOverlap={printOverlap}
         overlap={overlap}
         printTrim={printTrim}

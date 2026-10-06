@@ -1,6 +1,7 @@
 import { MARGIN_PRESETS, detectPreset } from '../lib/layout.js'
 import { PAPERS } from '../lib/paper.js'
 import { FieldLabel } from './FieldLabel.jsx'
+import { ZoneHeader } from './SectionChrome.jsx'
 import { SegmentControl } from './SegmentControl.jsx'
 import { LandscapeIcon, MarginIcon, OverlapIcon, PortraitIcon, PrinterIcon } from './icons.jsx'
 
@@ -18,13 +19,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-mono text-[11px] tracking-[0.14em] text-[#E3FF33] uppercase flex items-center gap-1.5">
-          <PrinterIcon />
-          02 / Printer Safe
-        </span>
-        <span className="w-6 h-px bg-[#E3FF33]/50" />
-      </div>
+      <ZoneHeader index="02" title="Printer Safe" icon={<PrinterIcon />} />
       <div className="bg-[#08080A] border border-[#43434E] rounded-[4px] p-3 mb-4">
         <p className="font-mono text-[11px] leading-[1.5] text-[#7A7A80]">
           Printers can&apos;t print to the edge. This tool lays out type{' '}

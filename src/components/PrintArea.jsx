@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
+import { placeFrameInTrim } from '../lib/grid.js'
 import { CUT_LINE_BLEND, overlapCutSlack } from '../lib/layout.js'
-import { BannerType } from './Preview.jsx'
+import { BannerComposition } from './Preview.jsx'
 
 export function PrintArea({
   sheetCount,
@@ -10,14 +11,8 @@ export function PrintArea({
   contentW,
   trimW,
   trimH,
-  lines,
-  font,
-  glyphHeight,
-  fontId,
-  lineHeight,
-  letterSpacing,
-  align,
-  layers,
+  composition,
+  measured,
   printOverlap,
   overlap,
   printTrim,
@@ -59,22 +54,26 @@ export function PrintArea({
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'center',
+                justifyContent: 'flex-start',
+                paddingTop:
+                  measured && measured.height > 0
+                    ? `${placeFrameInTrim(
+                        composition.container.layout.alignY,
+                        measured.height,
+                        trimH,
+                        composition.alignMode,
+                      )}in`
+                    : 0,
               }}
             >
-              <BannerType
-                lines={lines}
-                font={font}
-                fontSize={`${glyphHeight * 0.9}in`}
-                lineHeight={lineHeight}
-                letterSpacing={letterSpacing}
-                align={align}
-                layers={layers}
-                glyphHeightIn={glyphHeight}
-                fontId={fontId}
-                hatchUnit="in"
-                unitPerInch={1}
-              />
+              {measured && measured.width > 0 && (
+                <BannerComposition
+                  composition={composition}
+                  measured={measured}
+                  hatchUnit="in"
+                  unitPerInch={1}
+                />
+              )}
             </div>
           </div>
           {printTrim &&

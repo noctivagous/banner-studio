@@ -1,11 +1,8 @@
 import {
-  FONTS,
-  glyphMaxInches,
-  legacyToTextLayers,
-  normalizeFillOverlay,
-  normalizeTextLayers,
-  normalizeTextShadow,
-} from './layout.js'
+  compositionFromLegacy,
+  normalizeComposition,
+} from './composition.js'
+import { FONTS, glyphMaxInches, normalizeTextLayers } from './layout.js'
 import { PAPERS, sheetSize } from './paper.js'
 
 export const SCHEMA = 'tile-banner-studio'
@@ -21,16 +18,7 @@ const TEXT_KEYS = [
   'transform',
   'layers',
   'align',
-]
-
-// Version 1 paint keys, migrated into layers on import.
-const LEGACY_TEXT_KEYS = [
-  'fill',
-  'strokeOn',
-  'strokeWidth',
-  'strokeColor',
-  'textShadow',
-  'fillOverlay',
+  'composition',
 ]
 
 const VIEW_KEYS = [
@@ -49,7 +37,11 @@ const VIEW_KEYS = [
   'scaleToFit',
 ]
 
-const LAYOUT_KEYS = ['paperId', 'orientation', 'rows']
+const LAYOUT_KEYS = ['paperId', 'orientation', 'rows', 'bannerMode']
+
+export function normalizeBannerMode(_value) {
+  return 'horiz'
+}
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -76,20 +68,6 @@ function asBool(value, fallback) {
   return typeof value === 'boolean' ? value : fallback
 }
 
-function asHex(value, fallback) {
-  if (typeof value !== 'string') return fallback
-  const match = value.trim().match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
-  if (!match) return fallback
-  if (match[1].length === 3) {
-    return `#${match[1]
-      .split('')
-      .map((ch) => ch + ch)
-      .join('')
-      .toUpperCase()}`
-  }
-  return `#${match[1].toUpperCase()}`
-}
-
 function asEnum(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback
 }
@@ -103,19 +81,11 @@ export function exportDocument(settings) {
       paperId: settings.paperId,
       orientation: settings.orientation,
       rows: settings.rows,
+      bannerMode: normalizeBannerMode(settings.bannerMode),
     },
     content: {
       kind: settings.contentKind,
-      text: {
-        copy: settings.copy,
-        fontId: settings.fontId,
-        glyphHeight: settings.glyphHeight,
-        lineHeight: settings.lineHeight,
-        letterSpacing: settings.letterSpacing,
-        transform: settings.transform,
-        layers: normalizeTextLayers(settings.layers),
-        align: settings.align,
-      },
+      composition: normalizeComposition(settings.composition),
     },
     view: {
       margins: { ...settings.margins },
@@ -160,8 +130,12 @@ export function importDocument(raw, defaults) {
     throw new Error('This version only opens type banners, not vector artwork.')
   }
   if (kind !== 'text') throw new Error('That file has no type content.')
-  const textKeys = [...TEXT_KEYS, ...(parsed.version < 2 ? LEGACY_TEXT_KEYS : [])]
-  const textSplit = splitKnown(content.text, textKeys)
+  const textSource = isPlainObject(content.composition)
+    ? { composition: content.composition }
+    : isPlainObject(content.text)
+      ? content.text
+      : {}
+  const textSplit = splitKnown(textSource, TEXT_KEYS)
   const viewSplit = splitKnown(parsed.view, VIEW_KEYS)
 
   const rows = layoutSplit.known.rows ?? 1
@@ -177,13 +151,6 @@ export function importDocument(raw, defaults) {
   if (!paperId) throw new Error('That file uses an unknown paper size.')
   const orientation = asEnum(layoutSplit.known.orientation, ['landscape', 'portrait'], null)
   if (!orientation) throw new Error('That file has no page orientation.')
-
-  const fontId = asEnum(
-    textSplit.known.fontId,
-    FONTS.map((font) => font.id),
-    null,
-  )
-  if (!fontId) throw new Error('That file uses an unknown font.')
 
   const marginsIn = isPlainObject(viewSplit.known.margins) ? viewSplit.known.margins : {}
   const margins = {
@@ -206,43 +173,42 @@ export function importDocument(raw, defaults) {
     extensions[UNKNOWN_KEY] = { ...prior, ...unknown }
   }
 
-  const glyphHeight = clamp(
-    textSplit.known.glyphHeight,
-    0.8,
-    glyphMaxInches(sheetSize(paperId, orientation).pageH - margins.top - margins.bottom),
-    defaults.glyphHeight,
-  )
-  const layers = Array.isArray(textSplit.known.layers)
-    ? normalizeTextLayers(textSplit.known.layers, defaults.layers)
-    : legacyToTextLayers(
-        {
-          fill:
-            typeof textSplit.known.fill === 'string'
-              ? asHex(textSplit.known.fill, '#000000')
-              : '#000000',
-          strokeOn: asBool(textSplit.known.strokeOn, false),
-          strokeWidth: clamp(textSplit.known.strokeWidth, 0, 0.12, 0.02),
-          strokeColor: asHex(textSplit.known.strokeColor, '#000000'),
-          textShadow: normalizeTextShadow(textSplit.known.textShadow),
-          fillOverlay: normalizeFillOverlay(textSplit.known.fillOverlay),
-        },
-        { glyphHeightIn: glyphHeight, fontId },
-      )
+  let composition
+  if (textSplit.known.composition) {
+    composition = normalizeComposition(textSplit.known.composition, defaults.composition)
+  } else {
+    const fontId = asEnum(
+      textSplit.known.fontId,
+      FONTS.map((font) => font.id),
+      null,
+    )
+    if (!fontId) throw new Error('That file uses an unknown font.')
+    const trimH = sheetSize(paperId, orientation).pageH - margins.top - margins.bottom
+    const glyphHeight = clamp(
+      textSplit.known.glyphHeight,
+      0.8,
+      glyphMaxInches(trimH),
+      4.5,
+    )
+    composition = compositionFromLegacy({
+      copy: typeof textSplit.known.copy === 'string' ? textSplit.known.copy : 'Open House',
+      fontId,
+      glyphHeight,
+      letterSpacing: clamp(textSplit.known.letterSpacing, -0.05, 0.3, 0.02),
+      transform: asEnum(textSplit.known.transform, ['asIs', 'uppercase', 'lowercase'], 'asIs'),
+      layers: normalizeTextLayers(textSplit.known.layers),
+      align: asEnum(textSplit.known.align, ['left', 'center', 'right'], 'center'),
+    })
+  }
 
   return {
     ...defaults,
     paperId,
     orientation,
     rows: 1,
+    bannerMode: normalizeBannerMode(layoutSplit.known.bannerMode),
     contentKind: 'text',
-    copy: typeof textSplit.known.copy === 'string' ? textSplit.known.copy : defaults.copy,
-    fontId,
-    glyphHeight,
-    lineHeight: clamp(textSplit.known.lineHeight, 0.6, 1.8, defaults.lineHeight),
-    letterSpacing: clamp(textSplit.known.letterSpacing, -0.05, 0.3, defaults.letterSpacing),
-    transform: asEnum(textSplit.known.transform, ['asIs', 'uppercase', 'lowercase'], defaults.transform),
-    layers,
-    align: asEnum(textSplit.known.align, ['left', 'center', 'right'], defaults.align),
+    composition,
     margins,
     overlap: clamp(viewSplit.known.overlap, 0, 0.5, defaults.overlap),
     showTrim: asBool(viewSplit.known.showTrim, defaults.showTrim),

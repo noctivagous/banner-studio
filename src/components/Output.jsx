@@ -1,5 +1,6 @@
 import { formatLength } from '../lib/layout.js'
 import { PrintButton } from './PrintButton.jsx'
+import { ZoneHeader } from './SectionChrome.jsx'
 import { Toggle } from './Toggle.jsx'
 import { OutputIcon } from './icons.jsx'
 
@@ -29,12 +30,7 @@ export function Output({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-mono text-[11px] tracking-[0.14em] text-[#E3FF33] uppercase flex items-center gap-1.5">
-          <OutputIcon />
-          03 / Output
-        </span>
-      </div>
+      <ZoneHeader index="03" title="Output" icon={<OutputIcon />} />
       <div className="bg-[#26262E] border border-[#43434E] rounded-[4px] p-3.5 space-y-2.5">
         <div className="flex justify-between items-center">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">

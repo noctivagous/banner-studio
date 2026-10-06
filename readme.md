@@ -47,13 +47,15 @@ npx vercel --prod dist
 - With Tape overlap on, each sheet clips `trimWidth` of type and advances by `contentWidth`, so the overlap strip is duplicated; with it off, the window is `contentWidth` and the tape strip is blank
 - Canvas `measureText` of the banner strip → sheet count (`ceil((textWidth − overlap) / contentWidth)` when overlap copy is on)
 - Assembled length = `sheets × trimWidth − (sheets − 1) × overlap`
-- Glyph height runs from 0.8" up to the current sheet’s printable height (page size and orientation, minus the top and bottom margins)
+- Glyph height, padding, and gap snap to 0.5" (half of the 1" baseline grid), from 0.5" up to the current sheet’s printable height
 
 ## GUI
 
-**Left — 01 / Copy:** banner text, font (Anton, Bebas Neue, Oswald 700, Impact, Archivo Black, Black Ops One, Monoton, Space Grotesk Bold), glyph height, letter-spacing, transform, fill + stroke.
+**Header:** layout mode sits left of page size — 1D Horiz. (current strip), 1D Vert and Tile 2D visible but not available yet. Page size and orientation still pick the sheet.
 
-**Center — Preview:** inch/foot ruler, sheet cards at 90px per inch with zoom 25/50/75/100%, dotted safe area, lime trim, yellow tape zone, sheet numbers.
+**Left — 01 / Copy:** composition tree (frame → Y-stack → display lines). Auto mode cascades left/center/right from the frame through the stack to the lines; Grid mode overlays a 1" snap grid and sits each line’s alphabetic baseline on the baseline grid. On sheet places the frame top/center/bottom in the trim. Each line has its own copy, font, glyph height, tracking, transform, and glyph stack (Z copies). The frame is a hugging rectangle with optional aspect lock, padding, round or cut corners, and fill/stroke. Documents are schema v2 (`composition`); v1 files still open.
+
+**Center — Preview:** inch/foot ruler, sheet cards at 90px per inch with zoom 25/50/75/100%, always-on 1" baseline grid (0.5" halves), optional 1" square overlay in Grid mode, dotted safe area, lime trim, yellow tape zone, sheet numbers. Print omits the grid.
 
 **Right — 02 / Printer Safe & 03 / Output:** paper and orientation, margin presets, overlap 0.15 / 0.25 / 0.35 / 0.50" (default 0.50"), stats, display toggles, assembly diagram, **Print** (Tape overlap and Scissor edge guide on by default).
 

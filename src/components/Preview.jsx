@@ -1,6 +1,14 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { SegmentControl } from './SegmentControl.jsx'
 import {
+  cornerLengthIn,
+  cutPolygonCss,
+  cutPolygonPoints,
+  fontOf,
+  lineText,
+} from '../lib/composition.js'
+import { GRID_HALF_IN, GRID_PITCH_IN, gridLinesIn, placeFrameInTrim } from '../lib/grid.js'
+import {
   PREVIEW_CUT_LINE,
   PX_PER_INCH,
   hatchStyle,
@@ -10,102 +18,318 @@ import {
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
 
-function BannerType({
-  lines,
-  font,
-  fontSize,
-  lineHeight,
-  letterSpacing,
-  align,
-  layers,
-  glyphHeightIn,
-  fontId,
-  hatchUnit,
-  unitPerInch,
-}) {
-  // Stack order: index 0 is drawn first (back), last entry is front. A hidden
-  // sizer sets the line box so layer offsets never shift layout. Within one
-  // layer the stroke lives on the topmost paint so outlines sit above hatch.
-  const scale = hatchUnit === 'px' ? unitPerInch : 1
-  return lines.map((line, i) => {
-    const text = line || '\u00a0'
-    const visible = (layers || []).filter((layer) => layer?.visible !== false)
-    return (
-      <div
-        key={i}
-        style={{
-          fontFamily: `"${font.family}", Impact, sans-serif`,
-          fontWeight: font.weight,
-          fontSize,
-          letterSpacing: `${letterSpacing}em`,
-          lineHeight,
-          textAlign: align,
-          width: '100%',
-          whiteSpace: 'nowrap',
-          position: 'relative',
-        }}
-      >
-        <span aria-hidden="true" style={{ position: 'relative', visibility: 'hidden' }}>
-          {text}
-        </span>
-        {visible.map((layer) => {
-          const hatch = layer.overlayOn
-            ? resolveLayerHatchIn(layer, glyphHeightIn, fontId)
-            : null
-          const dx = (Number(layer.dxIn) || 0) * scale
-          const dy = (Number(layer.dyIn) || 0) * scale
-          const strokeCss = `${(Number(layer.strokeWidthIn) || 0) * scale}${hatchUnit} ${layer.strokeColor}`
-          const hatchProps = hatch
-            ? {
-                angleDeg: hatch.angle,
-                spacing: hatch.spacingIn * scale,
-                lineWidth: hatch.lineWidthIn * scale,
-                color: layer.overlayColor,
-              }
-            : null
-          return (
-            <div
-              key={layer.id}
-              aria-hidden="true"
+function GlyphLine({ line, width, height, hatchUnit, scale }) {
+  const font = fontOf(line)
+  const text = lineText(line) || '\u00a0'
+  const fontSize = `${line.glyphHeight * 0.9 * scale}${hatchUnit}`
+  const visible = (line.layers || []).filter((layer) => layer?.visible !== false)
+  return (
+    <div
+      style={{
+        fontFamily: `"${font.family}", Impact, sans-serif`,
+        fontWeight: font.weight,
+        fontSize,
+        letterSpacing: `${line.letterSpacing}em`,
+        lineHeight: height,
+        width,
+        height,
+        whiteSpace: 'nowrap',
+        position: 'relative',
+        overflow: 'visible',
+      }}
+    >
+      <span aria-hidden="true" style={{ position: 'relative', visibility: 'hidden' }}>
+        {text}
+      </span>
+      {visible.map((layer) => {
+        const hatch = layer.overlayOn
+          ? resolveLayerHatchIn(layer, line.glyphHeight, line.fontId)
+          : null
+        const dx = (Number(layer.dxIn) || 0) * scale
+        const dy = (Number(layer.dyIn) || 0) * scale
+        const strokeCss = `${(Number(layer.strokeWidthIn) || 0) * scale}${hatchUnit} ${layer.strokeColor}`
+        const hatchProps = hatch
+          ? {
+              angleDeg: hatch.angle,
+              spacing: hatch.spacingIn * scale,
+              lineWidth: hatch.lineWidthIn * scale,
+              color: layer.overlayColor,
+            }
+          : null
+        return (
+          <div
+            key={layer.id}
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              transform: `translate(${dx}${hatchUnit}, ${dy}${hatchUnit})`,
+            }}
+          >
+            <span
               style={{
-                position: 'absolute',
-                inset: 0,
-                transform: `translate(${dx}${hatchUnit}, ${dy}${hatchUnit})`,
+                position: 'relative',
+                color: layer.fill,
+                ...(layer.strokeOn && !hatchProps
+                  ? { WebkitTextStroke: strokeCss, paintOrder: 'stroke fill' }
+                  : {}),
               }}
             >
-              <span
+              {text}
+            </span>
+            {hatchProps && (
+              <div
+                aria-hidden="true"
                 style={{
-                  position: 'relative',
-                  color: layer.fill,
-                  ...(layer.strokeOn && !hatchProps
-                    ? { WebkitTextStroke: strokeCss, paintOrder: 'stroke fill' }
-                    : {}),
+                  position: 'absolute',
+                  inset: 0,
+                  ...hatchStyle({
+                    ...hatchProps,
+                    unit: hatchUnit,
+                    ...(layer.strokeOn ? { strokeCss } : {}),
+                  }),
                 }}
               >
                 {text}
-              </span>
-              {hatchProps && (
-                <div
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    ...hatchStyle({
-                      ...hatchProps,
-                      unit: hatchUnit,
-                      ...(layer.strokeOn ? { strokeCss } : {}),
-                    }),
-                  }}
-                >
-                  {text}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function ContainerShape({ container, widthIn, heightIn, scale, unit }) {
+  const width = widthIn * scale
+  const height = heightIn * scale
+  const corner = container.decoration.corner
+  const cut = cornerLengthIn(container, widthIn, heightIn) * scale
+  const fill = container.fillOn ? container.fill : 'none'
+  const stroke = container.strokeOn ? container.strokeColor : 'none'
+  const strokeWidth = (container.strokeOn ? container.strokeWidthIn : 0) * scale
+  if (corner === 'cut') {
+    const points = cutPolygonPoints(width, height, cut)
+      .map(([x, y]) => `${x},${y}`)
+      .join(' ')
+    return (
+      <svg
+        aria-hidden="true"
+        viewBox={`0 0 ${width} ${height}`}
+        width={`${width}${unit}`}
+        height={`${height}${unit}`}
+        style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+      >
+        <polygon
+          points={points}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeLinejoin="miter"
+        />
+      </svg>
     )
-  })
+  }
+  const rx = corner === 'round' ? cut : 0
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox={`0 0 ${width} ${height}`}
+      width={`${width}${unit}`}
+      height={`${height}${unit}`}
+      style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+    >
+      <rect
+        x={strokeWidth / 2}
+        y={strokeWidth / 2}
+        width={Math.max(0, width - strokeWidth)}
+        height={Math.max(0, height - strokeWidth)}
+        rx={rx}
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+      />
+    </svg>
+  )
+}
+
+export function BannerComposition({
+  composition,
+  measured,
+  hatchUnit,
+  unitPerInch,
+  selection,
+  showGuides,
+}) {
+  const scale = hatchUnit === 'px' ? unitPerInch : 1
+  const container = composition.container
+  const w = measured.width
+  const h = measured.height
+  const widthU = `${w * scale}${hatchUnit}`
+  const heightU = `${h * scale}${hatchUnit}`
+  const corner = container.decoration.corner
+  const cut = cornerLengthIn(container, w, h)
+  const clipPath =
+    corner === 'cut' ? cutPolygonCss(w * scale, h * scale, cut * scale, hatchUnit) : undefined
+  const borderRadius = corner === 'round' ? `${cut * scale}${hatchUnit}` : 0
+  const selectedId = selection?.id
+  const stack = composition.container.children.find((child) => child.type === 'stack')
+  const guidesOn =
+    showGuides && (selection?.kind === 'stack' || selection?.kind === 'line') && stack
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: widthU,
+        height: heightU,
+        overflow: 'hidden',
+        clipPath,
+        borderRadius,
+      }}
+    >
+      <ContainerShape
+        container={container}
+        widthIn={w}
+        heightIn={h}
+        scale={scale}
+        unit={hatchUnit}
+      />
+      {guidesOn && (
+        <>
+          {['left', 'center', 'right'].map((edge) => {
+            const box = measured.stackBox
+            const x =
+              edge === 'left'
+                ? box.x
+                : edge === 'right'
+                  ? box.x + box.width
+                  : box.x + box.width / 2
+            const active = stack.align === edge
+            return (
+              <div
+                key={edge}
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  left: `${x * scale}${hatchUnit}`,
+                  top: `${box.y * scale}${hatchUnit}`,
+                  width: 0,
+                  height: `${box.height * scale}${hatchUnit}`,
+                  borderLeft: active
+                    ? '1px solid #E3FF33'
+                    : '1px dashed rgba(227,255,51,0.35)',
+                  pointerEvents: 'none',
+                  zIndex: 4,
+                }}
+              />
+            )
+          })}
+        </>
+      )}
+      {measured.lineBoxes.map((box) => {
+        const selected = selectedId === box.id
+        const baselineFromTop = (box.baselineY - box.y) * scale
+        return (
+          <div
+            key={box.id}
+            style={{
+              position: 'absolute',
+              left: `${box.x * scale}${hatchUnit}`,
+              top: `${box.y * scale}${hatchUnit}`,
+              width: `${box.width * scale}${hatchUnit}`,
+              height: `${box.height * scale}${hatchUnit}`,
+              outline: selected && showGuides ? '1px solid #E3FF33' : undefined,
+              outlineOffset: 1,
+            }}
+          >
+            <GlyphLine
+              line={box.line}
+              width={`${box.width * scale}${hatchUnit}`}
+              height={`${box.height * scale}${hatchUnit}`}
+              hatchUnit={hatchUnit}
+              scale={scale}
+            />
+            {selected && showGuides && (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  top: `${baselineFromTop}${hatchUnit}`,
+                  borderTop: '1px solid #E3FF33',
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+          </div>
+        )
+      })}
+      {showGuides && selectedId === container.id && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            outline: '1px solid #E3FF33',
+            outlineOffset: -1,
+            pointerEvents: 'none',
+            zIndex: 5,
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function SheetGrid({ sheetIndex, contentW, trimW, trimH, px, showSquare }) {
+  const startX = sheetIndex * contentW
+  const horizontals = gridLinesIn(0, trimH, GRID_PITCH_IN)
+  const halves = gridLinesIn(0, trimH, GRID_HALF_IN).filter(
+    (y) => Math.abs(y % GRID_PITCH_IN) > 1e-6,
+  )
+  const verticals = showSquare ? gridLinesIn(startX, startX + trimW, GRID_PITCH_IN) : []
+  return (
+    <div className="absolute inset-0 pointer-events-none z-[2]" aria-hidden="true">
+      {halves.map((y) => (
+        <div
+          key={`h2-${y}`}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: y * px,
+            borderTop: '1px solid rgba(227,255,51,0.12)',
+          }}
+        />
+      ))}
+      {horizontals.map((y) => (
+        <div
+          key={`h-${y}`}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: y * px,
+            borderTop: '1px solid rgba(227,255,51,0.28)',
+          }}
+        />
+      ))}
+      {verticals.map((x) => (
+        <div
+          key={`v-${x}`}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: (x - startX) * px,
+            borderLeft: '1px solid rgba(227,255,51,0.22)',
+          }}
+        />
+      ))}
+    </div>
+  )
 }
 
 function ContentRuler({ startIn, widthIn, px }) {
@@ -272,15 +496,9 @@ export function Preview({
   trimW,
   trimH,
   contentW,
-  fontPx,
-  lines,
-  font,
-  glyphHeightIn,
-  fontId,
-  lineHeight,
-  letterSpacing,
-  align,
-  layers,
+  composition,
+  measured,
+  selection,
   printOverlap,
   showTrim,
   showSafe,
@@ -296,7 +514,6 @@ export function Preview({
   const slicePx = sliceW * px
   const cutSlackPx = overlapCutSlack(overlap, printOverlap) * px
   const printableHpx = trimH * px
-  const typePx = fontPx * zoom
   const canvasRef = useRef(null)
   const padRef = useRef(null)
   const rowRef = useRef(null)
@@ -452,6 +669,18 @@ export function Preview({
 
       <div className="flex-1 relative min-h-0 min-w-0">
       <div
+        aria-hidden="true"
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 pointer-events-none flex flex-col items-center gap-2 py-3 px-[4px] rounded-r-[4px] bg-[#121214]/90 border border-l-0 border-[#43434E]"
+      >
+        <span className="w-1 h-1 rounded-full bg-[#E3FF33]" />
+        <span
+          className="font-stencil text-[9px] tracking-[0.3em] text-[#7A7A80] uppercase whitespace-nowrap"
+          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+        >
+          Preview
+        </span>
+      </div>
+      <div
         ref={canvasRef}
         className="absolute inset-0 overflow-auto bg-[#08080A] preview-canvas"
         onScroll={measureScroll}
@@ -584,26 +813,41 @@ export function Preview({
                       }}
                     >
                       <div
-                        className="h-full flex flex-col justify-center"
+                        className="h-full flex flex-col"
                         style={{
                           transform: `translateX(-${i * contentPx}px)`,
                           width: Math.max(sheetCount * contentPx, contentPx) + (printOverlap ? overlap * px : 0),
+                          justifyContent: 'flex-start',
+                          paddingTop:
+                            measured && measured.height > 0
+                              ? placeFrameInTrim(
+                                  composition.container.layout.alignY,
+                                  measured.height,
+                                  trimH,
+                                  composition.alignMode,
+                                ) * px
+                              : 0,
                         }}
                       >
-                        <BannerType
-                          lines={lines}
-                          font={font}
-                          fontSize={typePx}
-                          lineHeight={lineHeight}
-                          letterSpacing={letterSpacing}
-                          align={align}
-                          layers={layers}
-                          glyphHeightIn={glyphHeightIn}
-                          fontId={fontId}
-                          hatchUnit="px"
-                          unitPerInch={px}
-                        />
+                        {measured && measured.width > 0 && (
+                          <BannerComposition
+                            composition={composition}
+                            measured={measured}
+                            hatchUnit="px"
+                            unitPerInch={px}
+                            selection={selection}
+                            showGuides
+                          />
+                        )}
                       </div>
+                      <SheetGrid
+                        sheetIndex={i}
+                        contentW={contentW}
+                        trimW={sliceW}
+                        trimH={trimH}
+                        px={px}
+                        showSquare={composition.alignMode === 'grid'}
+                      />
                     </div>
                     {showTape && overlap > 0 && !printOverlap && i < sheetCount - 1 && (
                       <div
@@ -772,5 +1016,3 @@ export function Preview({
     </div>
   )
 }
-
-export { BannerType }
