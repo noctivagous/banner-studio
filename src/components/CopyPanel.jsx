@@ -22,6 +22,15 @@ import {
 } from '../lib/composition.js'
 import { snapHalfIn } from '../lib/grid.js'
 import { FieldLabel } from './FieldLabel.jsx'
+import {
+  AlignMini,
+  AspectMini,
+  CornerMini,
+  FreeformMini,
+  HugMini,
+  PaddingMini,
+  SheetMini,
+} from './FrameMini.jsx'
 import { FontSelect } from './FontSelect.jsx'
 import { CustomColorWell, GlyphStack } from './GlyphStack.jsx'
 import { SectionSpine, ZoneHeader } from './SectionChrome.jsx'
@@ -85,8 +94,15 @@ function ContainerFields({ container, onPatch, onAlignX }) {
       </div>
       <div>
         <FieldLabel>Size</FieldLabel>
-        <div className="h-8 rounded-[4px] border border-[#E3FF33] bg-[#E3FF33] font-mono text-[11px] uppercase tracking-[0.08em] text-black font-bold flex items-center justify-center">
-          Hug content
+        <div
+          role="status"
+          aria-label="Size: hug content"
+          className="h-[52px] rounded-[4px] border border-[#E3FF33] bg-[#E3FF33] text-black font-bold flex flex-col items-center justify-center gap-1"
+        >
+          <HugMini />
+          <span className="font-mono text-[9px] uppercase tracking-[0.08em] leading-none">
+            Hug content
+          </span>
         </div>
       </div>
       <div>
@@ -95,26 +111,32 @@ function ContainerFields({ container, onPatch, onAlignX }) {
           <button
             type="button"
             onClick={() => onPatch({ size: { aspect: null } })}
-            className={`h-8 rounded-[4px] border font-mono text-[10px] uppercase ${
+            aria-pressed={activeAspect === 'off'}
+            aria-label="Aspect off"
+            className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
               activeAspect === 'off'
                 ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                 : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
             }`}
           >
-            Off
+            <FreeformMini />
+            <span className="font-mono text-[9px] uppercase leading-none">Off</span>
           </button>
           {ASPECT_PRESETS.map((preset) => (
             <button
               key={preset.id}
               type="button"
               onClick={() => onPatch({ size: { aspect: { w: preset.w, h: preset.h } } })}
-              className={`h-8 rounded-[4px] border font-mono text-[10px] uppercase ${
+              aria-pressed={activeAspect === preset.id}
+              aria-label={`Aspect ${preset.id}`}
+              className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
                 activeAspect === preset.id
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                   : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
               }`}
             >
-              {preset.id}
+              <AspectMini w={preset.w} h={preset.h} />
+              <span className="font-mono text-[9px] uppercase leading-none">{preset.id}</span>
             </button>
           ))}
         </div>
@@ -129,18 +151,22 @@ function ContainerFields({ container, onPatch, onAlignX }) {
         >
           Padding
         </FieldLabel>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.5}
-          value={Math.max(pad.top, pad.right, pad.bottom, pad.left)}
-          onChange={(e) => {
-            const n = snapHalfIn(parseFloat(e.target.value), { allowZero: true, max: 1 })
-            onPatch({ size: { padding: { top: n, right: n, bottom: n, left: n } } })
-          }}
-          className="w-full"
-        />
+        <div className="flex items-center gap-3">
+          <PaddingMini value={Math.max(pad.top, pad.right, pad.bottom, pad.left)} />
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.5}
+            value={Math.max(pad.top, pad.right, pad.bottom, pad.left)}
+            onChange={(e) => {
+              const n = snapHalfIn(parseFloat(e.target.value), { allowZero: true, max: 1 })
+              onPatch({ size: { padding: { top: n, right: n, bottom: n, left: n } } })
+            }}
+            className="flex-1"
+            aria-label="Padding inches"
+          />
+        </div>
       </div>
       <div>
         <FieldLabel icon={<AlignIcon />}>Align</FieldLabel>
@@ -150,13 +176,16 @@ function ContainerFields({ container, onPatch, onAlignX }) {
               key={dir}
               type="button"
               onClick={() => onAlignX(dir)}
-              className={`h-8 rounded-[4px] border font-mono text-[10px] uppercase ${
+              aria-pressed={container.layout.alignX === dir}
+              aria-label={`Align ${dir}`}
+              className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
                 container.layout.alignX === dir
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                   : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
               }`}
             >
-              {dir}
+              <AlignMini dir={dir} />
+              <span className="font-mono text-[9px] uppercase leading-none">{dir}</span>
             </button>
           ))}
         </div>
@@ -167,13 +196,16 @@ function ContainerFields({ container, onPatch, onAlignX }) {
               key={dir}
               type="button"
               onClick={() => onPatch({ layout: { alignY: dir } })}
-              className={`h-8 rounded-[4px] border font-mono text-[10px] uppercase ${
+              aria-pressed={container.layout.alignY === dir}
+              aria-label={`Place on sheet ${dir}`}
+              className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
                 container.layout.alignY === dir
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                   : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
               }`}
             >
-              {dir}
+              <SheetMini dir={dir} />
+              <span className="font-mono text-[9px] uppercase leading-none">{dir}</span>
             </button>
           ))}
         </div>
@@ -186,13 +218,16 @@ function ContainerFields({ container, onPatch, onAlignX }) {
               key={mode}
               type="button"
               onClick={() => onPatch({ decoration: { corner: mode } })}
-              className={`h-8 rounded-[4px] border font-mono text-[10px] uppercase ${
+              aria-pressed={container.decoration.corner === mode}
+              aria-label={`Corners ${mode}`}
+              className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
                 container.decoration.corner === mode
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                   : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
               }`}
             >
-              {mode}
+              <CornerMini mode={mode} />
+              <span className="font-mono text-[9px] uppercase leading-none">{mode}</span>
             </button>
           ))}
         </div>
