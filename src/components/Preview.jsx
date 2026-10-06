@@ -758,6 +758,12 @@ export function Preview({
                       boxShadow: stacked && i > 0
                         ? '-10px 0 18px rgba(0,0,0,0.55), 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)'
                         : '0 1px 0 0 rgba(255,255,255,0.12) inset, 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)',
+                      ...((() => {
+                        if (!(stacked && i > 0 && margins.left > 0)) return {}
+                        const edge = margins.left * px
+                        const fade = `linear-gradient(to right, rgba(0,0,0,0.45) 0, rgba(0,0,0,0.45) ${edge}px, black ${edge}px)`
+                        return { WebkitMaskImage: fade, maskImage: fade }
+                      })()),
                     }}
                   >
                     <div
