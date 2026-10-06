@@ -235,6 +235,8 @@ export default function App() {
             composition={normalized}
             measured={measured}
             selection={selection}
+            onSelect={setSelection}
+            onChange={setComposition}
             printOverlap={printOverlap}
             showTrim={showTrim}
             showSafe={showSafe}
@@ -244,7 +246,7 @@ export default function App() {
           />
           <div className="w-full xl:w-[320px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#121214] xl:border-l border-t xl:border-t-0 border-[#43434E] overflow-y-auto">
             <div className="p-5 space-y-5">
-              <section className="flex flex-row rounded-[6px] bg-[#1A1611] border border-[#4A4438]/60 overflow-hidden">
+              <section className="zone-safe flex flex-row rounded-[6px] bg-[#1A1611] border border-[#4A4438]/60 overflow-hidden">
                 <SectionSpine label="Printer Safe" sub="02" />
                 <div className="flex-1 min-w-0 p-4">
                   <PrinterSafe
@@ -263,7 +265,7 @@ export default function App() {
                 </span>
                 <span className="flex-1 h-px bg-[#43434E]/60" />
               </div>
-              <section className="flex flex-row rounded-[6px] bg-[#131A0E] border border-[#E3FF33]/25 overflow-hidden">
+              <section className="zone-output flex flex-row rounded-[6px] bg-[#131A0E] border border-[#E3FF33]/25 overflow-hidden">
                 <SectionSpine label="Output" sub="03" />
                 <div className="flex-1 min-w-0 p-4">
                   <Output

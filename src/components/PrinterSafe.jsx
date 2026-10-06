@@ -57,7 +57,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
               className={`h-8 rounded-[4px] border font-mono text-[11px] tracking-[0.08em] uppercase flex items-center justify-center gap-1.5 ${
                 orientation === id
                   ? 'bg-[#E3FF33] border-[#E3FF33] text-black font-bold'
-                  : 'bg-[#26262E] border-[#43434E] text-[#7A7A80] hover:text-[#F0F0F2]'
+                  : 'bg-[var(--ctl)] border-[#43434E] text-[#7A7A80] hover:text-[#F0F0F2]'
               }`}
             >
               <Icon />
@@ -75,7 +75,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
             className={`h-[44px] rounded-[4px] border px-3 text-left transition-colors ${
               active === preset.id
                 ? 'bg-[#E3FF33] border-[#E3FF33] text-black'
-                : 'bg-[#26262E] border-[#43434E] text-[#7A7A80] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
+                : 'bg-[var(--ctl)] border-[#43434E] text-[#7A7A80] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
             }`}
           >
             <div className="font-mono text-[11px] font-bold tracking-[0.08em] uppercase leading-none">

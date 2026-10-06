@@ -65,7 +65,7 @@ function TreeRow({ selected, indent = 0, onClick, label, hint, kind = 'line', me
       onClick={onClick}
       className={`flex items-center gap-1.5 px-1.5 py-1.5 rounded-[4px] border cursor-pointer transition-colors ${
         selected
-          ? 'bg-[#26262E] border-[#E3FF33]'
+          ? 'bg-[var(--ctl)] border-[#E3FF33]'
           : `${TREE_TINT[kind] || TREE_TINT.line} border-[#43434E] hover:border-[#5E5E69]`
       }`}
       style={{ marginLeft: indent }}
@@ -95,7 +95,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
       </p>
       <div>
         <FieldLabel>Shape</FieldLabel>
-        <div className="h-8 rounded-[4px] border border-[#43434E] bg-[#26262E] font-mono text-[11px] uppercase tracking-[0.08em] text-[#F0F0F2] flex items-center px-2.5">
+        <div className="h-8 rounded-[4px] border border-[#43434E] bg-[var(--ctl)] font-mono text-[11px] uppercase tracking-[0.08em] text-[#F0F0F2] flex items-center px-2.5">
           Rectangle
         </div>
       </div>
@@ -123,7 +123,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
             className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
               activeAspect === 'off'
                 ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
+                : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E]'
             }`}
           >
             <FreeformMini />
@@ -139,7 +139,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
               className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
                 activeAspect === preset.id
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                  : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
+                  : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E]'
               }`}
             >
               <AspectMini w={preset.w} h={preset.h} />
@@ -188,7 +188,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
               className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
                 container.layout.alignX === dir
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                  : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
+                  : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E]'
               }`}
             >
               <AlignMini dir={dir} />
@@ -208,7 +208,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
               className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
                 container.layout.alignY === dir
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                  : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
+                  : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E]'
               }`}
             >
               <SheetMini dir={dir} />
@@ -230,7 +230,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
               className={`h-[52px] rounded-[4px] border flex flex-col items-center justify-center gap-1 ${
                 container.decoration.corner === mode
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                  : 'bg-[#26262E] text-[#7A7A80] border-[#43434E]'
+                  : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E]'
               }`}
             >
               <CornerMini mode={mode} />
@@ -345,7 +345,7 @@ function StackFields({ stack, onPatch, onAlignX }) {
               className={`h-11 rounded-[4px] border transition-colors flex flex-col items-center justify-center gap-0.5 ${
                 stack.align === dir
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                  : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-white'
+                  : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E] hover:text-white'
               }`}
             >
               <span className="text-[12px] leading-none">
@@ -362,7 +362,7 @@ function StackFields({ stack, onPatch, onAlignX }) {
         <FieldLabel
           icon={<LineHeightIcon />}
           value={
-            <span className="font-mono text-[11px] px-1.5 py-0.5 bg-[#26262E] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
+            <span className="font-mono text-[11px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
               {stack.gapIn.toFixed(2)}"
             </span>
           }
@@ -415,7 +415,7 @@ function LineFields({ line, glyphMax, onPatch, align }) {
               : {}),
           }}
         />
-        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-[#26262E] border border-[#43434E] rounded-[3px] font-mono text-[8px] tracking-[0.1em] text-[#7A7A80] uppercase pointer-events-none">
+        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] font-mono text-[8px] tracking-[0.1em] text-[#7A7A80] uppercase pointer-events-none">
           Line
         </div>
       </div>
@@ -423,7 +423,7 @@ function LineFields({ line, glyphMax, onPatch, align }) {
         <FieldLabel
           icon={<GlyphHeightIcon />}
           value={
-            <span className="font-mono text-[11px] px-1.5 py-0.5 bg-[#26262E] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
+            <span className="font-mono text-[11px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
               {line.glyphHeight.toFixed(1)}"
             </span>
           }
@@ -485,7 +485,7 @@ function LineFields({ line, glyphMax, onPatch, align }) {
               className={`h-8 rounded-[4px] border text-[11px] font-mono uppercase tracking-[0.08em] transition-all ${
                 line.transform === mode
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                  : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
+                  : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
               }`}
             >
               {mode === 'asIs' ? 'As Is' : mode}
@@ -549,7 +549,7 @@ export function CopyPanel({
   }
 
   return (
-    <div className="w-full xl:w-[340px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#16161E] xl:border-r border-b xl:border-b-0 border-[#43434E] flex flex-row overflow-hidden">
+    <div className="zone-copy w-full xl:w-[340px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#16161E] xl:border-r border-b xl:border-b-0 border-[#43434E] flex flex-row overflow-hidden">
       <SectionSpine label="Copy Deck" sub="01" />
       <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
       <div className="p-5 space-y-7">
@@ -693,7 +693,7 @@ export function CopyPanel({
 
         <div>
           <div className="mb-3">
-            <span className="inline-flex items-center px-2 py-1 rounded-[4px] bg-[#26262E] border border-[#43434E] font-mono text-[10px] tracking-[0.1em] text-[#F0F0F2] uppercase">
+            <span className="inline-flex items-center px-2 py-1 rounded-[4px] bg-[var(--ctl)] border border-[#43434E] font-mono text-[10px] tracking-[0.1em] text-[#F0F0F2] uppercase">
               {kind === 'container' && 'Frame'}
               {kind === 'stack' && 'Y-stack'}
               {kind === 'line' && 'Display line'}

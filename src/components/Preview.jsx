@@ -1,11 +1,13 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { SegmentControl } from './SegmentControl.jsx'
 import {
   cornerLengthIn,
   cutPolygonCss,
   cutPolygonPoints,
+  findLine,
   fontOf,
   lineText,
+  withLine,
 } from '../lib/composition.js'
 import { GRID_HALF_IN, GRID_PITCH_IN, gridLinesIn, placeFrameInTrim } from '../lib/grid.js'
 import {
@@ -17,6 +19,84 @@ import {
 } from '../lib/layout.js'
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
+
+function LineEditor({ line, width, height, hatchUnit, scale, onChange, onCommit, onCancel }) {
+  const font = fontOf(line)
+  const ref = useRef(null)
+  const cancelled = useRef(false)
+  const visible = (line.layers || []).filter((layer) => layer?.visible !== false)
+  const front = visible[visible.length - 1] ?? line.layers?.[0]
+  const transform =
+    line.transform === 'uppercase'
+      ? 'uppercase'
+      : line.transform === 'lowercase'
+        ? 'lowercase'
+        : 'none'
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.focus({ preventScroll: true })
+    el.select()
+  }, [])
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.width = '0px'
+    const next = Math.max(el.scrollWidth + 2, el.parentElement?.clientWidth || 0)
+    el.style.width = `${next}px`
+  }, [line.copy, width])
+
+  return (
+    <input
+      ref={ref}
+      aria-label="Edit line"
+      value={line.copy}
+      spellCheck={false}
+      onChange={(event) => onChange(event.target.value.replace(/\n/g, ' '))}
+      onBlur={() => {
+        if (!cancelled.current) onCommit()
+      }}
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          event.currentTarget.blur()
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          cancelled.current = true
+          onCancel()
+        }
+      }}
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        margin: 0,
+        padding: 0,
+        border: 0,
+        outline: 'none',
+        background: 'transparent',
+        caretColor: '#111111',
+        fontFamily: `"${font.family}", Impact, sans-serif`,
+        fontWeight: font.weight,
+        fontSize: `${line.glyphHeight * 0.9 * scale}${hatchUnit}`,
+        letterSpacing: `${line.letterSpacing}em`,
+        lineHeight: height,
+        height,
+        minWidth: width,
+        whiteSpace: 'nowrap',
+        color: front?.overlayOn ? '#111111' : front?.fill || '#111111',
+        textTransform: transform,
+        textAlign: 'left',
+        userSelect: 'text',
+      }}
+    />
+  )
+}
 
 function GlyphLine({ line, width, height, hatchUnit, scale }) {
   const font = fontOf(line)
@@ -118,7 +198,7 @@ function ContainerShape({ container, widthIn, heightIn, scale, unit }) {
         viewBox={`0 0 ${width} ${height}`}
         width={`${width}${unit}`}
         height={`${height}${unit}`}
-        style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+        style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}
       >
         <polygon
           points={points}
@@ -137,7 +217,7 @@ function ContainerShape({ container, widthIn, heightIn, scale, unit }) {
       viewBox={`0 0 ${width} ${height}`}
       width={`${width}${unit}`}
       height={`${height}${unit}`}
-      style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+      style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}
     >
       <rect
         x={strokeWidth / 2}
@@ -160,6 +240,12 @@ export function BannerComposition({
   unitPerInch,
   selection,
   showGuides,
+  onSelect,
+  onChangeLine,
+  editingLineId,
+  onEditStart,
+  onEditEnd,
+  onEditCancel,
 }) {
   const scale = hatchUnit === 'px' ? unitPerInch : 1
   const container = composition.container
@@ -176,9 +262,22 @@ export function BannerComposition({
   const stack = composition.container.children.find((child) => child.type === 'stack')
   const guidesOn =
     showGuides && (selection?.kind === 'stack' || selection?.kind === 'line') && stack
+  const interactive = typeof onSelect === 'function'
+  const stackBox = measured.stackBox
+
+  const pick = (event, next) => {
+    if (!interactive) return
+    event.stopPropagation()
+    onSelect(next)
+  }
 
   return (
     <div
+      role={interactive ? 'group' : undefined}
+      aria-label={interactive ? container.name || 'Frame' : undefined}
+      data-preview-node="container"
+      data-node-id={container.id}
+      onClick={interactive ? (event) => pick(event, { kind: 'container', id: container.id }) : undefined}
       style={{
         position: 'relative',
         width: widthU,
@@ -186,6 +285,8 @@ export function BannerComposition({
         overflow: 'hidden',
         clipPath,
         borderRadius,
+        cursor: interactive ? 'pointer' : undefined,
+        userSelect: interactive ? 'none' : undefined,
       }}
     >
       <ContainerShape
@@ -195,6 +296,32 @@ export function BannerComposition({
         scale={scale}
         unit={hatchUnit}
       />
+      {interactive && stack && stackBox && (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Stack"
+          data-preview-node="stack"
+          data-node-id={stack.id}
+          onClick={(event) => pick(event, { kind: 'stack', id: stack.id })}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              event.stopPropagation()
+              onSelect({ kind: 'stack', id: stack.id })
+            }
+          }}
+          style={{
+            position: 'absolute',
+            left: `${stackBox.x * scale}${hatchUnit}`,
+            top: `${stackBox.y * scale}${hatchUnit}`,
+            width: `${stackBox.width * scale}${hatchUnit}`,
+            height: `${stackBox.height * scale}${hatchUnit}`,
+            cursor: 'pointer',
+            zIndex: 1,
+          }}
+        />
+      )}
       {guidesOn && (
         <>
           {['left', 'center', 'right'].map((edge) => {
@@ -230,27 +357,74 @@ export function BannerComposition({
       {measured.lineBoxes.map((box) => {
         const selected = selectedId === box.id
         const baselineFromTop = (box.baselineY - box.y) * scale
+        const editing = editingLineId === box.id
+        const boxW = `${box.width * scale}${hatchUnit}`
+        const boxH = `${box.height * scale}${hatchUnit}`
         return (
           <div
             key={box.id}
+            role={interactive ? 'button' : undefined}
+            tabIndex={interactive ? 0 : undefined}
+            aria-label={interactive ? lineText(box.line) || 'Line' : undefined}
+            data-preview-node="line"
+            data-node-id={box.id}
+            onClick={interactive ? (event) => pick(event, { kind: 'line', id: box.id }) : undefined}
+            onDoubleClick={
+              interactive && onEditStart
+                ? (event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onSelect({ kind: 'line', id: box.id })
+                    onEditStart(box.id)
+                  }
+                : undefined
+            }
+            onKeyDown={
+              interactive
+                ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      onSelect({ kind: 'line', id: box.id })
+                      if (event.key === 'Enter' && onEditStart) onEditStart(box.id)
+                    }
+                  }
+                : undefined
+            }
             style={{
               position: 'absolute',
               left: `${box.x * scale}${hatchUnit}`,
               top: `${box.y * scale}${hatchUnit}`,
-              width: `${box.width * scale}${hatchUnit}`,
-              height: `${box.height * scale}${hatchUnit}`,
+              width: boxW,
+              height: boxH,
               outline: selected && showGuides ? '1px solid #E3FF33' : undefined,
               outlineOffset: 1,
+              cursor: interactive ? 'text' : undefined,
+              overflow: editing ? 'visible' : undefined,
+              zIndex: 2,
             }}
           >
-            <GlyphLine
-              line={box.line}
-              width={`${box.width * scale}${hatchUnit}`}
-              height={`${box.height * scale}${hatchUnit}`}
-              hatchUnit={hatchUnit}
-              scale={scale}
-            />
-            {selected && showGuides && (
+            {editing ? (
+              <LineEditor
+                line={box.line}
+                width={boxW}
+                height={boxH}
+                hatchUnit={hatchUnit}
+                scale={scale}
+                onChange={(copy) => onChangeLine?.(box.id, copy)}
+                onCommit={() => onEditEnd?.()}
+                onCancel={() => onEditCancel?.()}
+              />
+            ) : (
+              <GlyphLine
+                line={box.line}
+                width={boxW}
+                height={boxH}
+                hatchUnit={hatchUnit}
+                scale={scale}
+              />
+            )}
+            {selected && showGuides && !editing && (
               <div
                 aria-hidden="true"
                 style={{
@@ -499,6 +673,8 @@ export function Preview({
   composition,
   measured,
   selection,
+  onSelect,
+  onChange,
   printOverlap,
   showTrim,
   showSafe,
@@ -529,6 +705,7 @@ export function Preview({
   const rulerH = 28
   const zoomPresets = [0.25, 0.5, 0.75, 1]
   const [arrangement, setArrangement] = useState('overlap')
+  const [editing, setEditing] = useState(null)
   const stacked = arrangement === 'overlap' && printOverlap && overlap > 0
   const sheetGap = arrangement === 'separate' ? 24 : stacked ? 0 : 8
 
@@ -553,6 +730,11 @@ export function Preview({
     }
     setScroll({ left, hMax, hView, top, vMax, vView, hTop })
   }, [])
+
+  useEffect(() => {
+    if (!editing) return
+    if (!findLine(composition, editing.lineId)) setEditing(null)
+  }, [composition, editing])
 
   const applyScroll = useCallback((axis, next) => {
     const el = canvasRef.current
@@ -843,6 +1025,27 @@ export function Preview({
                             unitPerInch={px}
                             selection={selection}
                             showGuides
+                            onSelect={onSelect}
+                            onChangeLine={(lineId, copy) => {
+                              if (!onChange) return
+                              onChange(withLine(composition, lineId, { copy }), lineId)
+                            }}
+                            editingLineId={editing?.hostId === i ? editing.lineId : null}
+                            onEditStart={(lineId) => {
+                              const line = findLine(composition, lineId)
+                              onSelect?.({ kind: 'line', id: lineId })
+                              setEditing({ lineId, hostId: i, snapshot: line?.copy ?? '' })
+                            }}
+                            onEditEnd={() => setEditing(null)}
+                            onEditCancel={() => {
+                              if (editing && onChange) {
+                                onChange(
+                                  withLine(composition, editing.lineId, { copy: editing.snapshot }),
+                                  editing.lineId,
+                                )
+                              }
+                              setEditing(null)
+                            }}
                           />
                         )}
                       </div>

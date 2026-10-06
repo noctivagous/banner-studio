@@ -31,7 +31,7 @@ export function Output({
   return (
     <div>
       <ZoneHeader index="03" title="Output" icon={<OutputIcon />} />
-      <div className="bg-[#26262E] border border-[#43434E] rounded-[4px] p-3.5 space-y-2.5">
+      <div className="bg-[var(--ctl)] border border-[#43434E] rounded-[4px] p-3.5 space-y-2.5">
         <div className="flex justify-between items-center">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
             # Sheets

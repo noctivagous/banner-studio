@@ -21,6 +21,25 @@ body {
   font-variant-ligatures: none;
 }
 
+/* Per-zone unselected control surface. Sections set their own tint so
+   buttons and chips contrast with the section background and differ
+   from section to section; lime remains the selection accent. */
+#app-root {
+  --ctl: #26262e;
+}
+
+.zone-copy {
+  --ctl: #2a2a3d;
+}
+
+.zone-safe {
+  --ctl: #34291b;
+}
+
+.zone-output {
+  --ctl: #242e13;
+}
+
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
