@@ -29,7 +29,10 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
 
   return (
     <div>
-      <ZoneHeader index="02" title="Printer Safe" icon={<PrinterIcon />} />
+      <ParamSection
+        sectionId="zone.safe"
+        header={<ZoneHeader index="02" title="Printer Safe" icon={<PrinterIcon />} />}
+      >
       <div className="pro-well border rounded-[3px] p-3 mb-4">
         <p className="font-mono text-[11px] leading-[1.5] text-[#7A7A80]">
           {alignRecut ? (
@@ -207,6 +210,7 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
             label: `${step.toFixed(2)}"`,
           }))}
         />
+      </ParamSection>
       </ParamSection>
     </div>
   )

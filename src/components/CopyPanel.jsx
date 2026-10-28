@@ -620,19 +620,33 @@ export function CopyPanel({
       <SectionSpine label="Copy Deck" sub="01" />
       <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
       <div className="p-5 space-y-7">
-        <div>
-          <ZoneHeader
-            index="01"
-            title="Copy"
-            icon={<CopyIcon />}
-            meta={
-              <span className="font-mono text-[9px] tracking-[0.12em] text-[#7A7A80] uppercase shrink-0">
-                {charCount} chars · {lines.length} lines
+        <ParamSection
+          sectionId="zone.copy"
+          header={
+            <ZoneHeader
+              index="01"
+              title="Copy"
+              icon={<CopyIcon />}
+              meta={
+                <span className="font-mono text-[9px] tracking-[0.12em] text-[#7A7A80] uppercase shrink-0">
+                  {charCount} chars · {lines.length} lines
+                </span>
+              }
+            />
+          }
+        >
+        <div className="space-y-7">
+          <ParamSection
+            title="Composition"
+            sectionId="copy.composition"
+            defaultOpen={false}
+            value={
+              <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+                {lines.length} {lines.length === 1 ? 'line' : 'lines'} ·{' '}
+                {composition.alignMode || 'auto'}
               </span>
             }
-          />
-
-          <FieldLabel>Composition</FieldLabel>
+          >
           <div className="mb-2">
             <SegmentControl
               fill
@@ -756,7 +770,7 @@ export function CopyPanel({
           >
             + Add line · {lines.length}/{MAX_COPY_LINES}
           </button>
-        </div>
+          </ParamSection>
 
         <div>
           <div className="mb-3">
@@ -788,6 +802,8 @@ export function CopyPanel({
             />
           )}
         </div>
+        </div>
+      </ParamSection>
       </div>
       <div className="mt-auto p-5 pt-4 border-t border-[#43434E] bg-black/30">
         <p className="font-mono text-[10px] leading-[1.5] tracking-[0.02em] text-[#5A5A60]">

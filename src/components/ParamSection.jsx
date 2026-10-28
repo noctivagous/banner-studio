@@ -3,8 +3,9 @@ import { useSectionOpen } from '../hooks/usePersistedSections.js'
 
 /* Pro disclosure section: accordion triangle + label header with a
    collapsible body. With a sectionId the open state persists across
-   reloads; otherwise it lives for the session. */
-export function ParamSection({ icon, title, value, defaultOpen = true, sectionId, children }) {
+   reloads; otherwise it lives for the session. A custom header node
+   (e.g. a ZoneHeader) can replace the default FieldLabel row. */
+export function ParamSection({ icon, title, value, header, defaultOpen = true, sectionId, children }) {
   const [open, setOpen] = useSectionOpen(sectionId, defaultOpen)
   const label = typeof title === 'string' ? title : 'section'
   return (
@@ -26,9 +27,11 @@ export function ParamSection({ icon, title, value, defaultOpen = true, sectionId
           </span>
         </button>
         <div className="flex-1 min-w-0">
-          <FieldLabel icon={icon} value={value}>
-            {title}
-          </FieldLabel>
+          {header ?? (
+            <FieldLabel icon={icon} value={value}>
+              {title}
+            </FieldLabel>
+          )}
         </div>
       </div>
       {open ? children : null}

@@ -1,5 +1,6 @@
 import { JOIN_ALIGN_RECUT, formatLength } from '../lib/layout.js'
 import { PrintButton } from './PrintButton.jsx'
+import { ParamSection } from './ParamSection.jsx'
 import { ZoneHeader } from './SectionChrome.jsx'
 import { Toggle } from './Toggle.jsx'
 import { OutputIcon } from './icons.jsx'
@@ -37,7 +38,10 @@ export function Output({
 
   return (
     <div>
-      <ZoneHeader index="03" title="Output" icon={<OutputIcon />} />
+      <ParamSection
+        sectionId="zone.output"
+        header={<ZoneHeader index="03" title="Output" icon={<OutputIcon />} />}
+      >
       <div className="pro-group bg-[var(--ctl)] border rounded-[3px] p-3.5 space-y-2.5">
         <div className="flex justify-between items-center">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
@@ -177,6 +181,7 @@ export function Output({
           Default is type only • {pageLabel} • @page margins 0
         </div>
       </div>
+      </ParamSection>
     </div>
   )
 }
