@@ -737,19 +737,22 @@ stack, the right sidebar gains the inspector.
 Depends on Phase 1b (stack selection + inspector must exist
 first); independent of Phases 2–5.
 
-- [ ] Data model: per-line `place: { mode, dxIn, dyIn }` in
+- [x] Data model: per-line `place: { mode, dxIn, dyIn }` in
   `composition.js`, normalised (default Auto/0/0), round-tripping
-  through export/import via the existing composition path.
-- [ ] Canvas: lock/unlock affordance per stack item; pointer drag
-  on unlocked line boxes in `Preview.jsx`, committing one
-  `withLine` patch on pointer-up; Auto lines never draggable.
-- [ ] Layout: sheet count and slicing from the union bounding box
-  of auto + freeform objects; verify `PrintArea.jsx` renders
-  offsets identically to preview (save PDFs first).
+  through export/import via the existing composition path. Fit
+  calculations use `ignoreFree` so dragging never shrinks type.
+- [x] Canvas: click selects (selection rectangle), second click
+  edits; lock toggle (🔒/🔓) on the selected object; ⠿ drag
+  handle on freeform lines in `Preview.jsx`; Auto lines never
+  draggable. Inspector has a matching Placement control.
+- [x] Layout: sheet count and slicing from the union bounding box
+  of auto + freeform objects; `PrintArea.jsx` renders the same
+  measured boxes as preview (no separate offset path).
 - [ ] Grid-snap mode only if it reuses `src/lib/grid.js`
   snapping with no new snapping code (see §8 D9).
 - [ ] Acceptance: unlock → drag → relock a line; offset survives
-  reload and export/import; preview and print agree.
+  reload and export/import; preview and print agree — needs a
+  human browser run (no browser in this sandbox).
 
 ---
 

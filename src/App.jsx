@@ -85,7 +85,7 @@ export default function App() {
   useEffect(() => {
     patch((prev) => {
       if (prev.bannerMode === 'tile') return prev
-      const current = measureComposition(prev.composition, { maxHeight: trimH })
+      const current = measureComposition(prev.composition, { maxHeight: trimH, ignoreFree: true })
       if (current.height <= trimH + 1e-6) return prev
       return { ...prev, composition: fitCompositionToTrim(prev.composition, trimH) }
     })

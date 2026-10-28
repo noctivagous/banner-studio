@@ -115,6 +115,16 @@ export function aspectId(aspect) {
 
 const FONT_IDS = FONTS.map((font) => font.id)
 
+export function normalizePlace(value, fallback) {
+  const base = isPlainObject(fallback) ? fallback : {}
+  const src = isPlainObject(value) ? value : {}
+  return {
+    mode: asEnum(src.mode, ['auto', 'free'], base.mode || 'auto'),
+    dxIn: clamp(src.dxIn, -24, 24, base.dxIn ?? 0),
+    dyIn: clamp(src.dyIn, -24, 24, base.dyIn ?? 0),
+  }
+}
+
 export function normalizeLine(value, fallback) {
   const base = fallback && typeof fallback === 'object' ? fallback : {}
   const src = isPlainObject(value) ? value : {}
@@ -127,6 +137,7 @@ export function normalizeLine(value, fallback) {
     letterSpacing: clamp(src.letterSpacing, -0.05, 0.3, base.letterSpacing ?? 0.02),
     transform: asEnum(src.transform, ['asIs', 'uppercase', 'lowercase'], base.transform || 'asIs'),
     layers: normalizeTextLayers(src.layers, base.layers || [{ ...DEFAULT_TEXT_LAYER }]),
+    place: normalizePlace(src.place, base.place),
   }
 }
 
@@ -591,12 +602,47 @@ export function measureComposition(composition, options = {}) {
     }
   })
 
+  // Freeform lines ride on top of their auto position by their stored offset.
+  // The frame grows to contain them so sheet count covers the whole union.
+  // Fit calculations pass ignoreFree so dragging never shrinks the type.
+  const offsetBoxes = options.ignoreFree
+    ? lineBoxes
+    : lineBoxes.map((box) => {
+    const place = box.line.place
+    if (place?.mode !== 'free') return box
+    const dx = Number(place.dxIn) || 0
+    const dy = Number(place.dyIn) || 0
+    if (!dx && !dy) return box
+    return { ...box, x: box.x + dx, y: box.y + dy, baselineY: box.baselineY + dy }
+  })
+  let minX = 0
+  let minY = 0
+  let maxX = width
+  let maxY = height
+  for (const box of offsetBoxes) {
+    minX = Math.min(minX, box.x)
+    minY = Math.min(minY, box.y)
+    maxX = Math.max(maxX, box.x + box.width)
+    maxY = Math.max(maxY, Math.max(box.y + box.height, box.baselineY + box.descentIn))
+  }
+  const grownBoxes =
+    minX < 0 || minY < 0
+      ? offsetBoxes.map((box) => ({
+        ...box,
+        x: box.x - minX,
+        y: box.y - minY,
+        baselineY: box.baselineY - minY,
+      }))
+      : offsetBoxes
+
+  const grownWidth = maxX - minX
+  const grownHeight = maxY - minY
   return {
-    width,
-    height,
-    containerBox: { x: 0, y: 0, width, height },
-    stackBox: { x: stackX, y: stackY, width: stackWidth, height: stackHeight },
-    lineBoxes,
+    width: grownWidth,
+    height: grownHeight,
+    containerBox: { x: 0, y: 0, width: grownWidth, height: grownHeight },
+    stackBox: { x: stackX - minX, y: stackY - minY, width: stackWidth, height: stackHeight },
+    lineBoxes: grownBoxes,
     composition: normalized,
   }
 }
@@ -637,7 +683,7 @@ export function cutPolygonCss(width, height, cut, unit) {
 }
 
 export function glyphMaxForLine(composition, lineId, trimH) {
-  const measured = measureComposition(composition, { maxHeight: trimH })
+  const measured = measureComposition(composition, { maxHeight: trimH, ignoreFree: true })
   const box = measured.lineBoxes.find((entry) => entry.id === lineId)
   const hardMax = glyphMaxInches(trimH)
   if (!box) return hardMax
@@ -649,7 +695,7 @@ export function glyphMaxForLine(composition, lineId, trimH) {
 // Tile mode is not clamped to one sheet. The slider still stops at the 24"
 // line cap, after the other lines, the gap, and the frame padding.
 export function glyphMaxForTileLine(composition, lineId) {
-  const measured = measureComposition(composition)
+  const measured = measureComposition(composition, { ignoreFree: true })
   const box = measured.lineBoxes.find((entry) => entry.id === lineId)
   if (!box) return MAX_GLYPH_HEIGHT
   const others = measured.height - box.height
@@ -658,7 +704,7 @@ export function glyphMaxForTileLine(composition, lineId) {
 }
 
 function scaleGlyphsToBudget(composition, trimH) {
-  const measured = measureComposition(composition, { maxHeight: trimH })
+  const measured = measureComposition(composition, { maxHeight: trimH, ignoreFree: true })
   if (measured.height <= trimH + 1e-6) return composition
   const lines = getLines(composition)
   const glyphSum = lines.reduce((sum, line) => sum + line.glyphHeight, 0)
@@ -679,7 +725,7 @@ function scaleGlyphsToBudget(composition, trimH) {
 
 export function fitCompositionToTrim(composition, trimH, preferLineId) {
   let next = normalizeComposition(composition)
-  let measured = measureComposition(next, { maxHeight: trimH })
+  let measured = measureComposition(next, { maxHeight: trimH, ignoreFree: true })
   if (measured.height <= trimH + 1e-6) return next
 
   if (preferLineId) {
@@ -690,14 +736,14 @@ export function fitCompositionToTrim(composition, trimH, preferLineId) {
         next = withLine(next, preferLineId, {
           glyphHeight: snapHalfIn(max, { allowZero: false, min: MIN_GLYPH_HEIGHT }),
         })
-        measured = measureComposition(next, { maxHeight: trimH })
+        measured = measureComposition(next, { maxHeight: trimH, ignoreFree: true })
       }
     }
   }
 
   for (let i = 0; i < 6 && measured.height > trimH + 1e-6; i += 1) {
     next = scaleGlyphsToBudget(next, trimH)
-    measured = measureComposition(next, { maxHeight: trimH })
+    measured = measureComposition(next, { maxHeight: trimH, ignoreFree: true })
   }
 
   if (measured.height <= trimH + 1e-6) return next
@@ -708,7 +754,7 @@ export function fitCompositionToTrim(composition, trimH, preferLineId) {
     const gaps = stack.lines.length - 1
     const nextGap = Math.max(0, roundHundredth(stack.gapIn - overflow / gaps))
     next = withStack(next, { gapIn: nextGap })
-    measured = measureComposition(next, { maxHeight: trimH })
+    measured = measureComposition(next, { maxHeight: trimH, ignoreFree: true })
   }
   if (measured.height <= trimH + 1e-6) return next
 

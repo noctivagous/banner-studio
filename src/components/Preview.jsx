@@ -253,6 +253,7 @@ export function BannerComposition({
   showGuides,
   onSelect,
   onChangeLine,
+  onPatchLine,
   editingLineId,
   onEditStart,
   onEditEnd,
@@ -280,6 +281,60 @@ export function BannerComposition({
     if (!interactive) return
     event.stopPropagation()
     onSelect(next)
+  }
+  const dragRef = useRef(null)
+  const justDraggedRef = useRef(false)
+
+  const toggleLock = (event, box) => {
+    event.stopPropagation()
+    if (typeof onPatchLine !== 'function') return
+    const place = box.line.place || { mode: 'auto', dxIn: 0, dyIn: 0 }
+    const free = place.mode === 'free'
+    onPatchLine(box.id, {
+      place: free ? { mode: 'auto', dxIn: 0, dyIn: 0 } : { ...place, mode: 'free' },
+    })
+  }
+
+  const beginDrag = (event, box) => {
+    event.stopPropagation()
+    event.preventDefault()
+    if (typeof onPatchLine !== 'function') return
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    const place = box.line.place || { mode: 'auto', dxIn: 0, dyIn: 0 }
+    dragRef.current = {
+      id: box.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      baseDx: Number(place.dxIn) || 0,
+      baseDy: Number(place.dyIn) || 0,
+      moved: false,
+    }
+  }
+
+  const moveDrag = (event) => {
+    const drag = dragRef.current
+    if (!drag || typeof onPatchLine !== 'function') return
+    const dxPx = event.clientX - drag.startX
+    const dyPx = event.clientY - drag.startY
+    if (Math.abs(dxPx) + Math.abs(dyPx) > 3) drag.moved = true
+    if (!drag.moved) return
+    const round2 = (n) => Math.round(n * 100) / 100
+    onPatchLine(drag.id, {
+      place: {
+        mode: 'free',
+        dxIn: round2(drag.baseDx + dxPx / scale),
+        dyIn: round2(drag.baseDy + dyPx / scale),
+      },
+    })
+  }
+
+  const endDrag = (event) => {
+    const drag = dragRef.current
+    dragRef.current = null
+    if (drag?.moved) {
+      event.stopPropagation()
+      justDraggedRef.current = true
+    }
   }
 
   return (
@@ -373,6 +428,8 @@ export function BannerComposition({
         const boxW = `${box.width * scale}${hatchUnit}`
         const hitW = `${hitWidth * scale}${hatchUnit}`
         const boxH = `${box.height * scale}${hatchUnit}`
+        const free = (box.line.place?.mode || 'auto') === 'free'
+        const canLock = interactive && typeof onPatchLine === 'function'
         return (
           <div
             key={box.id}
@@ -381,7 +438,22 @@ export function BannerComposition({
             aria-label={interactive ? lineText(box.line) || 'Line' : undefined}
             data-preview-node="line"
             data-node-id={box.id}
-            onClick={interactive ? (event) => pick(event, { kind: 'line', id: box.id }) : undefined}
+            onClick={
+              interactive
+                ? (event) => {
+                    if (justDraggedRef.current) {
+                      justDraggedRef.current = false
+                      return
+                    }
+                    if (selected && !editing && onEditStart) {
+                      event.stopPropagation()
+                      onEditStart(box.id)
+                      return
+                    }
+                    pick(event, { kind: 'line', id: box.id })
+                  }
+                : undefined
+            }
             onDoubleClick={
               interactive && onEditStart
                 ? (event) => {
@@ -410,13 +482,83 @@ export function BannerComposition({
               top: `${box.y * scale}${hatchUnit}`,
               width: hitW,
               height: boxH,
-              outline: selected && showGuides ? '1px solid #E3FF33' : undefined,
-              outlineOffset: 1,
+              outline: selected ? '2px solid #E3FF33' : undefined,
+              outlineOffset: 2,
               cursor: interactive ? 'text' : undefined,
               overflow: editing ? 'visible' : undefined,
-              zIndex: 2,
+              zIndex: selected ? 3 : 2,
             }}
           >
+            {canLock && selected && !editing && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 1,
+                  right: 1,
+                  display: 'flex',
+                  gap: 2,
+                  zIndex: 10,
+                }}
+              >
+                <button
+                  type="button"
+                  title={free ? 'Freeform: drag to move (click to lock to layout)' : 'Locked to layout (click to unlock and drag)'}
+                  aria-label={free ? 'Lock line to layout' : 'Unlock line for freeform drag'}
+                  aria-pressed={free}
+                  onClick={(event) => toggleLock(event, box)}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 3,
+                    border: '1px solid #000',
+                    background: free ? '#E3FF33' : 'rgba(8,8,10,0.85)',
+                    color: free ? '#000' : '#E3FF33',
+                    fontSize: 12,
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  {free ? '🔓' : '🔒'}
+                </button>
+                {free && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    title="Drag to move"
+                    aria-label="Drag line to move"
+                    onPointerDown={(event) => beginDrag(event, box)}
+                    onPointerMove={moveDrag}
+                    onPointerUp={endDrag}
+                    onPointerCancel={endDrag}
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        event.stopPropagation()
+                      }
+                    }}
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 3,
+                      border: '1px solid #000',
+                      background: '#E3FF33',
+                      color: '#000',
+                      fontSize: 12,
+                      lineHeight: '20px',
+                      textAlign: 'center',
+                      cursor: 'grab',
+                      touchAction: 'none',
+                      userSelect: 'none',
+                    }}
+                  >
+                    ⠿
+                  </span>
+                )}
+              </div>
+            )}
             {editing ? (
               <LineEditor
                 line={box.line}
@@ -1106,6 +1248,10 @@ export function Preview({
                             onChangeLine={(lineId, copy) => {
                               if (!onChange) return
                               onChange(withLine(composition, lineId, { copy }), lineId)
+                            }}
+                            onPatchLine={(lineId, patch) => {
+                              if (!onChange) return
+                              onChange(withLine(composition, lineId, patch), lineId)
                             }}
                             editingLineId={editing?.hostId === sheet.index ? editing.lineId : null}
                             onEditStart={(lineId) => {
