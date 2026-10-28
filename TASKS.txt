@@ -1,6 +1,14 @@
 [ ] - Templates and Wizards
-  [  ] design features and task lists for features for the app around
+  [ ] design features and task lists for features for the app around
 the need for a template library and wizard library.
-  [  ] Templates and Wizards should be accessible on workspace
+  [ ] Templates and Wizards should be accessible on workspace
   when it says "Empty Strip".
 
+[ ] - Insert data type - paste or drag and drop.
+  [ ] data tables (CSV)
+  [ ] images (raster, vector)
+
+
+[ ] - use m-w model to audit the code base for
+coherence, user-friendliness, redundant text, unused or unimplemented
+aspects, and leftovers from the web artifact.

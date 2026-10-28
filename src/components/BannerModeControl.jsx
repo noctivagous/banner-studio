@@ -42,9 +42,13 @@ export function BannerModeControl({ value, onChange }) {
         <ModeButton disabled>Vert</ModeButton>
       </span>
       <span className="w-px h-3.5 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)] mx-0.5" aria-hidden="true" />
-      <span title={UNAVAILABLE} className="inline-flex">
-        <ModeButton disabled>Tile: 2D</ModeButton>
-      </span>
+      <ModeButton
+        pressed={value === 'tile'}
+        onClick={() => onChange('tile')}
+        title="Tile the poster across rows and columns"
+      >
+        Tile: 2D
+      </ModeButton>
     </div>
   )
 }

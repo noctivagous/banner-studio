@@ -11,12 +11,18 @@ import {
 } from '../lib/composition.js'
 import { GRID_HALF_IN, GRID_PITCH_IN, gridLinesIn, placeFrameInTrim } from '../lib/grid.js'
 import {
+  JOIN_ALIGN_RECUT,
   PREVIEW_CUT_LINE,
+  PREVIEW_CUT_LINE_H,
   PX_PER_INCH,
   hatchStyle,
+  horizontalCutInches,
+  joinDuplicates,
   overlapCutSlack,
   resolveLayerHatchIn,
+  verticalCutInches,
 } from '../lib/layout.js'
+import { SheetJoinMarks } from './JoinMarks.jsx'
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
 
@@ -463,13 +469,12 @@ export function BannerComposition({
   )
 }
 
-function SheetGrid({ sheetIndex, contentW, trimW, trimH, px, showSquare }) {
-  const startX = sheetIndex * contentW
-  const horizontals = gridLinesIn(0, trimH, GRID_PITCH_IN)
-  const halves = gridLinesIn(0, trimH, GRID_HALF_IN).filter(
+function SheetGrid({ originX, originY, trimW, trimH, px, showSquare }) {
+  const horizontals = gridLinesIn(originY, originY + trimH, GRID_PITCH_IN)
+  const halves = gridLinesIn(originY, originY + trimH, GRID_HALF_IN).filter(
     (y) => Math.abs(y % GRID_PITCH_IN) > 1e-6,
   )
-  const verticals = showSquare ? gridLinesIn(startX, startX + trimW, GRID_PITCH_IN) : []
+  const verticals = showSquare ? gridLinesIn(originX, originX + trimW, GRID_PITCH_IN) : []
   return (
     <div className="absolute inset-0 pointer-events-none z-[2]" aria-hidden="true">
       {halves.map((y) => (
@@ -479,7 +484,7 @@ function SheetGrid({ sheetIndex, contentW, trimW, trimH, px, showSquare }) {
             position: 'absolute',
             left: 0,
             right: 0,
-            top: y * px,
+            top: (y - originY) * px,
             borderTop: '1px solid rgba(227,255,51,0.12)',
           }}
         />
@@ -491,7 +496,7 @@ function SheetGrid({ sheetIndex, contentW, trimW, trimH, px, showSquare }) {
             position: 'absolute',
             left: 0,
             right: 0,
-            top: y * px,
+            top: (y - originY) * px,
             borderTop: '1px solid rgba(227,255,51,0.28)',
           }}
         />
@@ -503,13 +508,37 @@ function SheetGrid({ sheetIndex, contentW, trimW, trimH, px, showSquare }) {
             position: 'absolute',
             top: 0,
             bottom: 0,
-            left: (x - startX) * px,
+            left: (x - originX) * px,
             borderLeft: '1px solid rgba(227,255,51,0.22)',
           }}
         />
       ))}
     </div>
   )
+}
+
+function overlapMask(stacked, col, row, margins, px) {
+  if (!stacked || (col === 0 && row === 0)) return undefined
+  const layers = []
+  if (col > 0 && margins.left > 0) {
+    const edge = margins.left * px
+    layers.push(
+      `linear-gradient(to right, rgba(0,0,0,0.45) 0, rgba(0,0,0,0.45) ${edge}px, black ${edge}px)`,
+    )
+  }
+  if (row > 0 && margins.top > 0) {
+    const edge = margins.top * px
+    layers.push(
+      `linear-gradient(to bottom, rgba(0,0,0,0.45) 0, rgba(0,0,0,0.45) ${edge}px, black ${edge}px)`,
+    )
+  }
+  if (layers.length === 0) return undefined
+  return {
+    WebkitMaskImage: layers.join(', '),
+    maskImage: layers.join(', '),
+    WebkitMaskComposite: layers.length > 1 ? 'source-in' : undefined,
+    maskComposite: layers.length > 1 ? 'intersect' : undefined,
+  }
 }
 
 function ContentRuler({ startIn, widthIn, px }) {
@@ -668,6 +697,10 @@ export function Preview({
   onZoom,
   onScaleToFit,
   sheetCount,
+  sheets = [],
+  cols = 0,
+  rows = 0,
+  tile = false,
   assembledInches,
   margins,
   overlap,
@@ -676,12 +709,14 @@ export function Preview({
   trimW,
   trimH,
   contentW,
+  contentH = 0,
   composition,
   measured,
   selection,
   onSelect,
   onChange,
   printOverlap,
+  join = 'trim-tape',
   showTrim,
   showSafe,
   showTape,
@@ -692,10 +727,15 @@ export function Preview({
   const sheetW = pageW * px
   const sheetH = pageH * px
   const contentPx = contentW * px
-  const sliceW = printOverlap && overlap > 0 ? trimW : contentW
+  const contentHpx = contentH * px
+  const alignRecut = join === JOIN_ALIGN_RECUT
+  const duplicateStrip = joinDuplicates(join, printOverlap) && overlap > 0
+  const sliceW = duplicateStrip ? trimW : contentW
+  const sliceH = tile && !duplicateStrip ? contentH : trimH
   const slicePx = sliceW * px
-  const cutSlackPx = overlapCutSlack(overlap, printOverlap) * px
-  const printableHpx = trimH * px
+  const sliceHpx = sliceH * px
+  const frameBoxH = sliceH
+  const cutSlackPx = overlapCutSlack(overlap, printOverlap && !alignRecut) * px
   const canvasRef = useRef(null)
   const padRef = useRef(null)
   const rowRef = useRef(null)
@@ -712,8 +752,14 @@ export function Preview({
   const zoomPresets = [0.25, 0.5, 0.75, 1]
   const [arrangement, setArrangement] = useState('overlap')
   const [editing, setEditing] = useState(null)
-  const stacked = arrangement === 'overlap' && printOverlap && overlap > 0
+  const stacked = arrangement === 'overlap' && duplicateStrip
   const sheetGap = arrangement === 'separate' ? 24 : stacked ? 0 : 8
+  const labelH = showNumbers ? 28 : 0
+  const cardH = rulerH + sheetH + labelH
+  const pitchX = stacked ? contentPx : sheetW + sheetGap
+  const pitchY = stacked ? contentHpx : cardH + sheetGap
+  const boardW = cols > 0 ? (cols - 1) * pitchX + sheetW : 0
+  const boardH = rows > 0 ? (rows - 1) * pitchY + cardH : 0
 
   const measureScroll = useCallback(() => {
     const el = canvasRef.current
@@ -760,19 +806,20 @@ export function Preview({
     const labelH = showNumbers ? 28 : 0
     const availW = el.clientWidth - padX
     const availH = el.clientHeight - padY
-    if (availW < 40 || availH < 40) return
-    const spanIn =
-      stacked && sheetCount > 0
-        ? pageW + (sheetCount - 1) * contentW
-        : sheetCount * pageW
-    const gapPx = stacked ? 0 : sheetGap
-    const zW = (availW - Math.max(0, sheetCount - 1) * gapPx) / (spanIn * PX_PER_INCH)
-    const zH = (availH - rulerH - labelH) / (pageH * PX_PER_INCH)
+    if (availW < 40 || availH < 40 || cols < 1 || rows < 1) return
+    const spanWIn = stacked ? pageW + (cols - 1) * contentW : cols * pageW
+    const spanHIn = stacked ? pageH + (rows - 1) * contentH : rows * pageH
+    const extraX = stacked ? 0 : Math.max(0, cols - 1) * sheetGap
+    const extraY = stacked
+      ? rulerH + labelH
+      : rows * (rulerH + labelH) + Math.max(0, rows - 1) * sheetGap
+    const zW = (availW - extraX) / (spanWIn * PX_PER_INCH)
+    const zH = (availH - extraY) / (spanHIn * PX_PER_INCH)
     const next = Math.max(0.05, Math.min(zW, zH))
     if (!Number.isFinite(next)) return
     const rounded = Math.round(next * 1000) / 1000
     if (Math.abs(rounded - zoom) > 0.0005) onZoom(rounded)
-  }, [onZoom, pageH, pageW, sheetCount, showNumbers, zoom, stacked, sheetGap, contentW])
+  }, [onZoom, pageH, pageW, cols, rows, showNumbers, zoom, stacked, sheetGap, contentW, contentH])
 
   useEffect(() => {
     if (!scaleToFit || sheetCount === 0) return
@@ -792,7 +839,7 @@ export function Preview({
     ro.observe(el)
     if (rowRef.current) ro.observe(rowRef.current)
     return () => ro.disconnect()
-  }, [measureScroll, sheetCount, zoom, pageW, pageH, showNumbers, arrangement, printOverlap])
+  }, [measureScroll, sheetCount, cols, rows, zoom, pageW, pageH, showNumbers, arrangement, printOverlap, join])
 
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-[#08080A] relative order-first xl:order-none overflow-hidden">
@@ -912,18 +959,22 @@ export function Preview({
           ) : (
             <div
               ref={rowRef}
-              className="relative flex"
-              style={{ width: 'max-content', gap: sheetGap }}
+              className="relative"
+              style={{ width: boardW, height: boardH }}
             >
-              {Array.from({ length: sheetCount }).map((_, i) => (
+              {sheets.map((sheet) => (
                 <div
-                  key={i}
-                  className="relative shrink-0"
+                  key={sheet.index}
+                  data-sheet-index={sheet.index}
+                  data-sheet-col={sheet.col}
+                  data-sheet-row={sheet.row}
+                  className="absolute"
                   style={{
+                    left: sheet.col * pitchX,
+                    top: sheet.row * pitchY,
                     width: sheetW,
-                    height: rulerH + sheetH + (showNumbers ? 28 : 0),
-                    marginLeft: stacked && i > 0 ? -(sheetW - contentPx) : 0,
-                    zIndex: stacked ? i + 1 : 1,
+                    height: cardH,
+                    zIndex: stacked ? sheet.index + 1 : 1,
                   }}
                 >
                   <div
@@ -935,7 +986,7 @@ export function Preview({
                       height: rulerH,
                     }}
                   >
-                    <ContentRuler startIn={i * contentW} widthIn={sliceW} px={px} />
+                    <ContentRuler startIn={sheet.originX} widthIn={sliceW} px={px} />
                   </div>
                   <div
                     className="absolute left-0 bg-white rounded-[2px] overflow-hidden"
@@ -943,15 +994,17 @@ export function Preview({
                       top: rulerH,
                       width: sheetW,
                       height: sheetH,
-                      boxShadow: stacked && i > 0
-                        ? '-10px 0 18px rgba(0,0,0,0.55), 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)'
+                      boxShadow: stacked && (sheet.col > 0 || sheet.row > 0)
+                        ? [
+                            sheet.col > 0 ? '-10px 0 18px rgba(0,0,0,0.55)' : null,
+                            sheet.row > 0 ? '0 -10px 18px rgba(0,0,0,0.55)' : null,
+                            '0 12px 40px rgba(0,0,0,0.7)',
+                            '0 0 0 1px rgba(255,255,255,0.06)',
+                          ]
+                            .filter(Boolean)
+                            .join(', ')
                         : '0 1px 0 0 rgba(255,255,255,0.12) inset, 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)',
-                      ...((() => {
-                        if (!(stacked && i > 0 && margins.left > 0)) return {}
-                        const edge = margins.left * px
-                        const fade = `linear-gradient(to right, rgba(0,0,0,0.45) 0, rgba(0,0,0,0.45) ${edge}px, black ${edge}px)`
-                        return { WebkitMaskImage: fade, maskImage: fade }
-                      })()),
+                      ...overlapMask(stacked, sheet.col, sheet.row, margins, px),
                     }}
                   >
                     <div
@@ -1003,11 +1056,11 @@ export function Preview({
                         left: margins.left * px,
                         top: margins.top * px,
                         width: slicePx,
-                        height: printableHpx,
+                        height: sliceHpx,
                       }}
                     >
                       <div
-                        className="h-full flex flex-col"
+                        className="flex flex-col"
                         onClick={
                           onSelect
                             ? (event) => {
@@ -1017,15 +1070,15 @@ export function Preview({
                             : undefined
                         }
                         style={{
-                          transform: `translateX(-${i * contentPx}px)`,
-                          width: Math.max(sheetCount * contentPx, contentPx) + (printOverlap ? overlap * px : 0),
+                          transform: `translate(${-sheet.originX * px}px, ${-sheet.originY * px}px)`,
+                          width: Math.max(measured?.width ?? 0, sliceW) * px,
                           justifyContent: 'flex-start',
                           paddingTop:
                             measured && measured.height > 0
                               ? placeFrameInTrim(
                                   composition.container.layout.alignY,
                                   measured.height,
-                                  trimH,
+                                  frameBoxH,
                                   composition.alignMode,
                                 ) * px
                               : 0,
@@ -1044,11 +1097,11 @@ export function Preview({
                               if (!onChange) return
                               onChange(withLine(composition, lineId, { copy }), lineId)
                             }}
-                            editingLineId={editing?.hostId === i ? editing.lineId : null}
+                            editingLineId={editing?.hostId === sheet.index ? editing.lineId : null}
                             onEditStart={(lineId) => {
                               const line = findLine(composition, lineId)
                               onSelect?.({ kind: 'line', id: lineId })
-                              setEditing({ lineId, hostId: i, snapshot: line?.copy ?? '' })
+                              setEditing({ lineId, hostId: sheet.index, snapshot: line?.copy ?? '' })
                             }}
                             onEditEnd={() => setEditing(null)}
                             onEditCancel={() => {
@@ -1064,28 +1117,45 @@ export function Preview({
                         )}
                       </div>
                       <SheetGrid
-                        sheetIndex={i}
-                        contentW={contentW}
+                        originX={sheet.originX}
+                        originY={sheet.originY}
                         trimW={sliceW}
-                        trimH={trimH}
+                        trimH={sliceH}
                         px={px}
                         showSquare={composition.alignMode === 'grid'}
                       />
                     </div>
-                    {showTape && overlap > 0 && !printOverlap && i < sheetCount - 1 && (
+                    {showTape && overlap > 0 && !duplicateStrip && sheet.col < cols - 1 && (
                       <div
                         className="absolute pointer-events-none flex items-center justify-center"
                         style={{
                           left: margins.left * px + contentPx,
                           top: margins.top * px,
                           width: overlap * px,
-                          height: printableHpx,
+                          height: sliceHpx,
                           borderLeft: '1px dashed rgba(120,120,0,0.5)',
                         }}
                       >
                         <Hatch style={{ inset: 0 }} />
                         <span className="font-mono text-[8px] font-black tracking-[0.24em] text-black/70 rotate-90">
                           TAPE ↕
+                        </span>
+                      </div>
+                    )}
+                    {showTape && overlap > 0 && !duplicateStrip && tile && sheet.row < rows - 1 && (
+                      <div
+                        className="absolute pointer-events-none flex items-center justify-center"
+                        style={{
+                          left: margins.left * px,
+                          top: margins.top * px + contentHpx,
+                          width: slicePx,
+                          height: overlap * px,
+                          borderTop: '1px dashed rgba(120,120,0,0.5)',
+                        }}
+                      >
+                        <Hatch style={{ inset: 0 }} />
+                        <span className="font-mono text-[8px] font-black tracking-[0.24em] text-black/70">
+                          TAPE ↔
                         </span>
                       </div>
                     )}
@@ -1101,29 +1171,64 @@ export function Preview({
                         }}
                       />
                     )}
-                    {showTrim &&
-                      [
-                        i > 0
-                          ? margins.left * px + (printOverlap ? cutSlackPx : 0)
-                          : null,
-                        !printOverlap && i < sheetCount - 1
-                          ? margins.left * px + contentPx
-                          : null,
-                      ]
-                        .filter((edge) => edge != null)
-                        .map((edge) => (
-                          <div
-                            key={edge}
-                            className="absolute pointer-events-none"
-                            style={{
-                              ...PREVIEW_CUT_LINE,
-                              left: edge,
-                              top: margins.top * px,
-                              height: trimH * px,
-                              zIndex: 4,
-                            }}
-                          />
-                        ))}
+                    {alignRecut && (
+                      <SheetJoinMarks
+                        col={sheet.col}
+                        row={sheet.row}
+                        cols={cols}
+                        rows={rows}
+                        overlap={overlap}
+                        margins={margins}
+                        trimW={trimW}
+                        trimH={trimH}
+                        pageW={pageW}
+                        pageH={pageH}
+                        scale={px}
+                        unit="px"
+                      />
+                    )}
+                    {showTrim && !alignRecut &&
+                      verticalCutInches({
+                        col: sheet.col,
+                        cols,
+                        duplicate: printOverlap,
+                        overlap,
+                        marginLeft: margins.left,
+                        contentW,
+                      }).map((edge) => (
+                        <div
+                          key={`v-${edge}`}
+                          className="absolute pointer-events-none"
+                          style={{
+                            ...PREVIEW_CUT_LINE,
+                            left: edge * px,
+                            top: margins.top * px,
+                            height: sliceHpx,
+                            zIndex: 4,
+                          }}
+                        />
+                      ))}
+                    {showTrim && !alignRecut &&
+                      horizontalCutInches({
+                        row: sheet.row,
+                        rows,
+                        duplicate: printOverlap,
+                        overlap,
+                        marginTop: margins.top,
+                        contentH,
+                      }).map((edge) => (
+                        <div
+                          key={`h-${edge}`}
+                          className="absolute pointer-events-none"
+                          style={{
+                            ...PREVIEW_CUT_LINE_H,
+                            left: margins.left * px,
+                            top: edge * px,
+                            width: slicePx,
+                            zIndex: 4,
+                          }}
+                        />
+                      ))}
                     {showCutMarks && (
                       <Fragment>
                         <div
@@ -1164,8 +1269,10 @@ export function Preview({
                       style={{ top: rulerH + sheetH + 6 }}
                     >
                       <span className="px-1.5 py-0.5 bg-[#26262E] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
-                        SHEET {String(i + 1).padStart(2, '0')} /{' '}
-                        {String(sheetCount).padStart(2, '0')}
+                        {tile
+                          ? `R${String(sheet.row + 1).padStart(2, '0')} C${String(sheet.col + 1).padStart(2, '0')} · `
+                          : 'SHEET '}
+                        {String(sheet.index + 1).padStart(2, '0')} / {String(sheetCount).padStart(2, '0')}
                       </span>
                       <span className="hidden md:inline">
                         {trimW.toFixed(2)}&quot; × {trimH.toFixed(2)}&quot; TRIM
@@ -1174,27 +1281,47 @@ export function Preview({
                   )}
                 </div>
               ))}
-              {showTrim &&
-                Array.from({ length: Math.max(0, sheetCount - 1) }).map((_, i) => {
-                  const pitch = stacked ? contentPx : sheetW + sheetGap
-                  const cutSheet = printOverlap ? i + 1 : i
-                  const cutOnSheet = printOverlap
-                    ? margins.left * px + cutSlackPx
-                    : margins.left * px + contentPx
-                  const cutX = cutSheet * pitch + cutOnSheet
-                  return (
+              {showTrim && !alignRecut &&
+                sheets.flatMap((sheet) => {
+                  const badges = []
+                  const verticalSeam = printOverlap ? sheet.col > 0 : sheet.col < cols - 1
+                  if (verticalSeam) {
+                    const seam = printOverlap ? sheet.col - 1 : sheet.col
+                    const cutSheet = printOverlap ? seam + 1 : seam
+                    const onSheet = printOverlap
+                      ? margins.left * px + cutSlackPx
+                      : margins.left * px + contentPx
+                    badges.push({
+                      key: `vx-${sheet.row}-${seam}`,
+                      left: cutSheet * pitchX + onSheet - 10,
+                      top: sheet.row * pitchY + rulerH + margins.top * px + sliceHpx / 2 - 10,
+                      rotate: 'rotate-[270deg]',
+                    })
+                  }
+                  const horizontalSeam = tile && (printOverlap ? sheet.row > 0 : sheet.row < rows - 1)
+                  if (horizontalSeam) {
+                    const seam = printOverlap ? sheet.row - 1 : sheet.row
+                    const cutSheet = printOverlap ? seam + 1 : seam
+                    const onSheet = printOverlap
+                      ? rulerH + margins.top * px + cutSlackPx
+                      : rulerH + margins.top * px + contentHpx
+                    badges.push({
+                      key: `hy-${sheet.col}-${seam}`,
+                      left: sheet.col * pitchX + margins.left * px + slicePx / 2 - 10,
+                      top: cutSheet * pitchY + onSheet - 10,
+                      rotate: 'rotate-180',
+                    })
+                  }
+                  return badges.map((badge) => (
                     <div
-                      key={i}
+                      key={badge.key}
                       className="absolute z-30 w-5 h-5 rounded-full bg-[#E3FF33] flex items-center justify-center text-[10px] text-black shadow pointer-events-none"
-                      style={{
-                        left: cutX - 10,
-                        top: rulerH + margins.top * px + printableHpx / 2 - 10,
-                      }}
+                      style={{ left: badge.left, top: badge.top }}
                       title={printOverlap ? 'Cut the top sheet inside the overlap' : 'Cut this edge'}
                     >
-                      <span className="inline-block rotate-[270deg] scale-[1.2]">✂</span>
+                      <span className={`inline-block ${badge.rotate} scale-[1.2]`}>✂</span>
                     </div>
-                  )
+                  ))
                 })}
             </div>
           )}

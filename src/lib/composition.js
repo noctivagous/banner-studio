@@ -12,6 +12,7 @@ import {
 
 export const MAX_COPY_LINES = 8
 export const MIN_GLYPH_HEIGHT = 0.5
+export const MAX_GLYPH_HEIGHT = 24
 export const FONT_SIZE_FACTOR = 0.9
 export const ASPECT_PRESETS = [
   { id: '1:1', w: 1, h: 1 },
@@ -122,7 +123,7 @@ export function normalizeLine(value, fallback) {
     id: typeof src.id === 'string' && src.id !== '' ? src.id : createNodeId('line'),
     copy: typeof src.copy === 'string' ? src.copy.replace(/\n/g, ' ') : (base.copy ?? ''),
     fontId,
-    glyphHeight: clamp(src.glyphHeight, MIN_GLYPH_HEIGHT, 24, base.glyphHeight ?? 4.5),
+    glyphHeight: clamp(src.glyphHeight, MIN_GLYPH_HEIGHT, MAX_GLYPH_HEIGHT, base.glyphHeight ?? 4.5),
     letterSpacing: clamp(src.letterSpacing, -0.05, 0.3, base.letterSpacing ?? 0.02),
     transform: asEnum(src.transform, ['asIs', 'uppercase', 'lowercase'], base.transform || 'asIs'),
     layers: normalizeTextLayers(src.layers, base.layers || [{ ...DEFAULT_TEXT_LAYER }]),
@@ -645,6 +646,17 @@ export function glyphMaxForLine(composition, lineId, trimH) {
   return Math.max(MIN_GLYPH_HEIGHT, Math.min(hardMax, Math.floor(room * 2) / 2))
 }
 
+// Tile mode is not clamped to one sheet. The slider still stops at the 24"
+// line cap, after the other lines, the gap, and the frame padding.
+export function glyphMaxForTileLine(composition, lineId) {
+  const measured = measureComposition(composition)
+  const box = measured.lineBoxes.find((entry) => entry.id === lineId)
+  if (!box) return MAX_GLYPH_HEIGHT
+  const others = measured.height - box.height
+  const room = MAX_GLYPH_HEIGHT - others
+  return Math.max(MIN_GLYPH_HEIGHT, Math.min(MAX_GLYPH_HEIGHT, Math.floor(Math.max(0, room) * 2) / 2))
+}
+
 function scaleGlyphsToBudget(composition, trimH) {
   const measured = measureComposition(composition, { maxHeight: trimH })
   if (measured.height <= trimH + 1e-6) return composition
@@ -719,9 +731,10 @@ export function fitCompositionToTrim(composition, trimH, preferLineId) {
   return next
 }
 
-export function canAddCopyLine(composition, trimH) {
+export function canAddCopyLine(composition, trimH, { tile = false } = {}) {
   const stack = getStack(composition)
   if (!stack || stack.lines.length >= MAX_COPY_LINES) return false
+  if (tile) return true
   const added = addCopyLine(composition, stack.lines[stack.lines.length - 1].id)
   const fitted = fitCompositionToTrim(added.composition, trimH)
   return measureComposition(fitted, { maxHeight: trimH }).height <= trimH + 1e-6

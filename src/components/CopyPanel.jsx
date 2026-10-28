@@ -11,6 +11,7 @@ import {
   fontOf,
   getStack,
   glyphMaxForLine,
+  glyphMaxForTileLine,
   lineText,
   moveCopyLine,
   removeCopyLine,
@@ -564,6 +565,7 @@ export function CopyPanel({
   selection,
   onSelect,
   printableHeight,
+  tile = false,
   onChange,
 }) {
   const container = composition.container
@@ -580,8 +582,12 @@ export function CopyPanel({
 
   const kind = selected?.kind || 'line'
   const line = kind === 'line' ? selected.node : null
-  const glyphMax = line ? glyphMaxForLine(composition, line.id, printableHeight) : 4.5
-  const canAdd = canAddCopyLine(composition, printableHeight)
+  const glyphMax = line
+    ? tile
+      ? glyphMaxForTileLine(composition, line.id)
+      : glyphMaxForLine(composition, line.id, printableHeight)
+    : 4.5
+  const canAdd = canAddCopyLine(composition, printableHeight, { tile })
   const charCount = lines.reduce((sum, entry) => sum + (entry.copy?.length || 0), 0)
 
   const patchContainer = (containerPatch) => onChange(withContainer(composition, containerPatch))

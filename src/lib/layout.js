@@ -21,6 +21,20 @@ export const PREVIEW_CUT_LINE = {
   pointerEvents: 'none',
 }
 
+export const CUT_LINE_BLEND_H = {
+  height: '1px',
+  backgroundImage: 'repeating-linear-gradient(to right, #fff 0 4px, transparent 4px 8px)',
+  mixBlendMode: 'difference',
+  pointerEvents: 'none',
+}
+
+export const PREVIEW_CUT_LINE_H = {
+  height: '1px',
+  backgroundImage: 'repeating-linear-gradient(to right, #E3FF33 0 4px, transparent 4px 8px)',
+  mixBlendMode: 'difference',
+  pointerEvents: 'none',
+}
+
 // printOverlap on is asymmetric trim: cut the following sheet's left edge
 // and lay it over the previous sheet's uncut right flap.
 // printOverlap off is an edge-to-edge butt joint: cut both sides of the seam.
@@ -30,6 +44,116 @@ export const ASSEMBLY_EDGE_TO_EDGE = 'edge-to-edge'
 export function overlapCutSlack(overlap, duplicate) {
   if (!duplicate || overlap <= 0) return 0
   return Math.min(OVERLAP_CUT_SLACK, overlap / 2)
+}
+
+// How many sheets cover `span` along one axis.
+// Tape overlap duplicates `overlap` inches, so the first sheet holds `trim`
+// and every further sheet advances by `advance` (trim minus overlap).
+export function axisCount(span, trim, advance, duplicate, overlap) {
+  if (!(span > 0) || !(advance > 0)) return 0
+  if (duplicate && overlap > 0) {
+    if (span <= trim) return 1
+    return Math.ceil((span - overlap) / advance)
+  }
+  return Math.ceil(span / advance)
+}
+
+export function assembledSpan(count, trim, overlap) {
+  if (!(count > 0)) return 0
+  return count * trim - Math.max(0, count - 1) * overlap
+}
+
+export function buildSheets(cols, rows, contentW, contentH) {
+  const sheets = []
+  const safeCols = Math.max(0, cols)
+  const safeRows = Math.max(0, rows)
+  for (let row = 0; row < safeRows; row += 1) {
+    for (let col = 0; col < safeCols; col += 1) {
+      sheets.push({
+        col,
+        row,
+        index: row * safeCols + col,
+        originX: col * contentW,
+        originY: row * contentH,
+      })
+    }
+  }
+  return sheets
+}
+
+// Page-local scissor positions, in inches. `duplicate` is the tape-overlap
+// switch: the following sheet is cut, and the earlier sheet keeps its flap.
+export function verticalCutInches({ col, cols, duplicate, overlap, marginLeft, contentW }) {
+  const slack = overlapCutSlack(overlap, duplicate)
+  const edges = []
+  if (col > 0) edges.push(marginLeft + (duplicate ? slack : 0))
+  if (!duplicate && col < cols - 1) edges.push(marginLeft + contentW)
+  return edges
+}
+
+export function horizontalCutInches({ row, rows, duplicate, overlap, marginTop, contentH }) {
+  const slack = overlapCutSlack(overlap, duplicate)
+  const edges = []
+  if (row > 0) edges.push(marginTop + (duplicate ? slack : 0))
+  if (!duplicate && row < rows - 1) edges.push(marginTop + contentH)
+  return edges
+}
+
+// Align & Recut prints two guides in the duplicated band. The blue align
+// line runs through crosses in the margin. After the sheets are taped, the
+// red line is the cut through both sheets.
+export const JOIN_TRIM_TAPE = 'trim-tape'
+export const JOIN_ALIGN_RECUT = 'align-recut'
+export const ASSEMBLY_ALIGN_RECUT = 'align-recut'
+export const ALIGN_RECUT_MIN_OVERLAP = 0.35
+export const ALIGN_RECUT_STUB = 0.1
+export const ALIGN_RECUT_CUT_GAP = 0.18
+export const ALIGN_COLOR = '#2F6BFF'
+export const RECUT_COLOR = '#E10600'
+export const ALIGN_CROSS_MAX = 0.16
+const ALIGN_CROSS_MIN_MARGIN = 0.08
+
+export function joinDuplicates(join, printOverlap) {
+  return join === JOIN_ALIGN_RECUT || Boolean(printOverlap)
+}
+
+// Distances from the outer edge of the overlap band, in inches.
+// The align line is the outer guide. The recut line sits toward the kept type.
+export function alignRecutMarks(overlap) {
+  const band = Number(overlap) || 0
+  const alignFromOuter = ALIGN_RECUT_STUB
+  const cutFromOuter = ALIGN_RECUT_STUB + ALIGN_RECUT_CUT_GAP
+  return {
+    alignFromOuter,
+    cutFromOuter,
+    fits: band + 1e-9 >= ALIGN_RECUT_MIN_OVERLAP,
+  }
+}
+
+// Page position of the two lines. `side` `end` is the outgoing edge
+// (right or bottom). `side` `start` is the incoming edge (left or top).
+export function alignRecutOffset(overlap, trim, margin, side) {
+  const marks = alignRecutMarks(overlap)
+  if (!marks.fits || !(trim > 0)) return null
+  if (side === 'end') {
+    return {
+      align: margin + trim - marks.alignFromOuter,
+      cut: margin + trim - marks.cutFromOuter,
+    }
+  }
+  return {
+    align: margin + overlap - marks.alignFromOuter,
+    cut: margin + overlap - marks.cutFromOuter,
+  }
+}
+
+// Half-length of one cross arm, in inches. The full cross stays inside the
+// margin: its diameter is at most 0.16" and at least 0.04" inside the margin.
+export function crossArm(margin) {
+  const room = Number(margin) || 0
+  if (room < ALIGN_CROSS_MIN_MARGIN) return 0
+  const diameter = Math.min(ALIGN_CROSS_MAX, Math.max(0, room - 0.04))
+  return diameter / 2
 }
 export const PAGE_W = 11
 export const PAGE_H = 8.5

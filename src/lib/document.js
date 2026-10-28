@@ -2,11 +2,18 @@ import {
   compositionFromLegacy,
   normalizeComposition,
 } from './composition.js'
-import { FONTS, glyphMaxInches, normalizeTextLayers } from './layout.js'
+import {
+  ALIGN_RECUT_MIN_OVERLAP,
+  FONTS,
+  JOIN_ALIGN_RECUT,
+  JOIN_TRIM_TAPE,
+  glyphMaxInches,
+  normalizeTextLayers,
+} from './layout.js'
 import { PAPERS, sheetSize } from './paper.js'
 
 export const SCHEMA = 'tile-banner-studio'
-export const DOCUMENT_VERSION = 2
+export const DOCUMENT_VERSION = 3
 const UNKNOWN_KEY = 'tile-banner-studio.unknown'
 
 const TEXT_KEYS = [
@@ -24,6 +31,7 @@ const TEXT_KEYS = [
 const VIEW_KEYS = [
   'margins',
   'overlap',
+  'join',
   'showTrim',
   'showSafe',
   'showTape',
@@ -39,8 +47,8 @@ const VIEW_KEYS = [
 
 const LAYOUT_KEYS = ['paperId', 'orientation', 'rows', 'bannerMode']
 
-export function normalizeBannerMode(_value) {
-  return 'horiz'
+export function normalizeBannerMode(value) {
+  return value === 'tile' ? 'tile' : 'horiz'
 }
 
 function isPlainObject(value) {
@@ -90,6 +98,7 @@ export function exportDocument(settings) {
     view: {
       margins: { ...settings.margins },
       overlap: settings.overlap,
+      join: settings.join,
       showTrim: settings.showTrim,
       showSafe: settings.showSafe,
       showTape: settings.showTape,
@@ -138,10 +147,8 @@ export function importDocument(raw, defaults) {
   const textSplit = splitKnown(textSource, TEXT_KEYS)
   const viewSplit = splitKnown(parsed.view, VIEW_KEYS)
 
-  const rows = layoutSplit.known.rows ?? 1
-  if (rows !== 1) {
-    throw new Error('This version only prints a single strip, not multiple rows.')
-  }
+  const rowsIn = layoutSplit.known.rows
+  const rows = Number.isInteger(rowsIn) && rowsIn >= 1 ? rowsIn : 1
 
   const paperId = asEnum(
     layoutSplit.known.paperId,
@@ -205,12 +212,28 @@ export function importDocument(raw, defaults) {
     ...defaults,
     paperId,
     orientation,
-    rows: 1,
+    rows,
     bannerMode: normalizeBannerMode(layoutSplit.known.bannerMode),
     contentKind: 'text',
     composition,
     margins,
-    overlap: clamp(viewSplit.known.overlap, 0, 0.5, defaults.overlap),
+    overlap: (() => {
+      const amount = clamp(viewSplit.known.overlap, 0, 0.5, defaults.overlap)
+      const join = asEnum(
+        viewSplit.known.join,
+        [JOIN_TRIM_TAPE, JOIN_ALIGN_RECUT],
+        defaults.join || JOIN_TRIM_TAPE,
+      )
+      if (join === JOIN_ALIGN_RECUT && amount < ALIGN_RECUT_MIN_OVERLAP) {
+        return ALIGN_RECUT_MIN_OVERLAP
+      }
+      return amount
+    })(),
+    join: asEnum(
+      viewSplit.known.join,
+      [JOIN_TRIM_TAPE, JOIN_ALIGN_RECUT],
+      defaults.join || JOIN_TRIM_TAPE,
+    ),
     showTrim: asBool(viewSplit.known.showTrim, defaults.showTrim),
     showSafe: asBool(viewSplit.known.showSafe, defaults.showSafe),
     showTape: asBool(viewSplit.known.showTape, defaults.showTape),

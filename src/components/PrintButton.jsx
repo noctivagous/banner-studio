@@ -12,6 +12,7 @@ export function PrintButton({
   onPrint,
   marks,
   onChange,
+  join = 'trim-tape',
   fullWidth = false,
 }) {
   const [open, setOpen] = useState(false)
@@ -49,7 +50,11 @@ export function PrintButton({
   }
 
   const height = fullWidth ? 'h-9' : 'h-8'
-  const markCount = MARKS.filter((mark) => marks[mark.key]).length
+  const alignRecut = join === 'align-recut'
+  const markCount = MARKS.filter((mark) => {
+    if (alignRecut && (mark.key === 'printOverlap' || mark.key === 'printTrim')) return false
+    return marks[mark.key]
+  }).length
 
   return (
     <div ref={rootRef} className={`relative inline-flex ${fullWidth ? 'w-full mt-3' : ''}`}>
@@ -82,24 +87,32 @@ export function PrintButton({
           <div className="px-2 py-1 font-mono text-[9px] tracking-[0.12em] text-[#7A7A80] uppercase">
             Printed marks
           </div>
-          {MARKS.map((mark) => (
-            <label
-              key={mark.key}
-              className="flex items-center justify-between gap-3 px-2 py-1.5 rounded-[3px] hover:bg-[#26262E] cursor-pointer"
-            >
-              <span className="font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase">
-                {mark.label}
-              </span>
-              <input
-                type="checkbox"
-                checked={Boolean(marks[mark.key])}
-                onChange={() => onChange({ [mark.key]: !marks[mark.key] })}
-                className="accent-[#E3FF33]"
-              />
-            </label>
-          ))}
+          {MARKS.map((mark) => {
+            const locked = alignRecut && (mark.key === 'printOverlap' || mark.key === 'printTrim')
+            return (
+              <label
+                key={mark.key}
+                className={`flex items-center justify-between gap-3 px-2 py-1.5 rounded-[3px] ${
+                  locked ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[#26262E] cursor-pointer'
+                }`}
+              >
+                <span className="font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase">
+                  {mark.label}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={locked ? false : Boolean(marks[mark.key])}
+                  disabled={locked}
+                  onChange={() => onChange({ [mark.key]: !marks[mark.key] })}
+                  className="accent-[#E3FF33]"
+                />
+              </label>
+            )
+          })}
           <p className="px-2 pt-1 pb-1 font-mono text-[9px] leading-[1.4] text-[#5A5A60]">
-            Checked marks print as ink. Screen guides stay on the preview only.
+            {alignRecut
+              ? 'Align and cut lines print with this join. Other checked marks print as ink.'
+              : 'Checked marks print as ink. Screen guides stay on the preview only.'}
           </p>
         </div>
       )}

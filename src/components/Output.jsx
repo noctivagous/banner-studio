@@ -1,4 +1,4 @@
-import { formatLength } from '../lib/layout.js'
+import { JOIN_ALIGN_RECUT, formatLength } from '../lib/layout.js'
 import { PrintButton } from './PrintButton.jsx'
 import { ZoneHeader } from './SectionChrome.jsx'
 import { Toggle } from './Toggle.jsx'
@@ -6,10 +6,15 @@ import { OutputIcon } from './icons.jsx'
 
 export function Output({
   sheetCount,
+  cols = 0,
+  rows = 0,
+  tile = false,
   assembledInches,
+  assembledHeight = 0,
   trimW,
   trimH,
   contentW,
+  contentH = 0,
   showTrim,
   showSafe,
   showTape,
@@ -17,13 +22,15 @@ export function Output({
   showCutMarks,
   onChange,
   onPrint,
+  join = 'trim-tape',
   printMarks,
   pageLabel,
 }) {
+  const alignRecut = join === JOIN_ALIGN_RECUT
   const toggles = [
-    { label: 'Scissor edge guide', key: 'showTrim', value: showTrim },
+    { label: 'Scissor edge guide', key: 'showTrim', value: showTrim, disabled: alignRecut },
     { label: 'Show Safe Area', key: 'showSafe', value: showSafe },
-    { label: 'Show Tape Zones', key: 'showTape', value: showTape },
+    { label: 'Show Tape Zones', key: 'showTape', value: showTape, disabled: alignRecut },
     { label: 'Show Sheet Numbers', key: 'showNumbers', value: showNumbers },
     { label: 'Show Cut Marks', key: 'showCutMarks', value: showCutMarks },
   ]
@@ -36,7 +43,9 @@ export function Output({
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
             # Sheets
           </span>
-          <span className="font-mono text-[13px] font-bold text-[#F0F0F2]">{sheetCount}</span>
+          <span className="font-mono text-[13px] font-bold text-[#F0F0F2]">
+            {tile && sheetCount > 0 ? `${cols} × ${rows}` : sheetCount}
+          </span>
         </div>
         <div className="h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
         <div className="space-y-1">
@@ -46,15 +55,21 @@ export function Output({
             </span>
           </div>
           <div className="font-tech text-[13px] leading-[1.3] text-[#F0F0F2] break-all">
-            {assembledInches > 0 ? formatLength(assembledInches) : '—'}
+            {assembledInches > 0
+              ? tile
+                ? `${formatLength(assembledInches)} × ${formatLength(assembledHeight)}`
+                : formatLength(assembledInches)
+              : '—'}
           </div>
         </div>
         <div className="h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
         <div className="flex justify-between">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
-            Final Height
+            {tile ? 'Assembled Height' : 'Final Height'}
           </span>
-          <span className="font-tech text-[12px] text-[#F0F0F2]">{trimH.toFixed(2)}&quot;</span>
+          <span className="font-tech text-[12px] text-[#F0F0F2]">
+            {(tile ? assembledHeight : trimH).toFixed(2)}&quot;
+          </span>
         </div>
         <div className="flex justify-between">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
@@ -68,7 +83,11 @@ export function Output({
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
             Content / Sheet
           </span>
-          <span className="font-mono text-[11px] text-[#A8A8B0]">{contentW.toFixed(2)}&quot; wide</span>
+          <span className="font-mono text-[11px] text-[#A8A8B0]">
+            {tile
+              ? `${contentW.toFixed(2)}" × ${contentH.toFixed(2)}"`
+              : `${contentW.toFixed(2)}" wide`}
+          </span>
         </div>
       </div>
 
@@ -80,7 +99,11 @@ export function Output({
               {item.label}
             </span>
             <span aria-hidden="true" className="flex-1 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
-            <Toggle on={item.value} onToggle={() => onChange({ [item.key]: !item.value })} />
+            <Toggle
+              on={item.disabled ? false : item.value}
+              disabled={item.disabled}
+              onToggle={() => onChange({ [item.key]: !item.value })}
+            />
           </div>
         ))}
       </div>
@@ -104,9 +127,25 @@ export function Output({
             How to assemble
           </div>
           <div className="font-mono text-[10px] leading-[1.4] text-[#7A7A80] mt-1">
-            Trim on lime dashes.
-            <br />
-            Overlap the hatch, tape back.
+            {alignRecut ? (
+              <>
+                Match the blue crosses.
+                <br />
+                Cut both sheets on red.
+              </>
+            ) : (
+              <>
+                Trim on lime dashes.
+                <br />
+                Overlap the hatch, tape back.
+              </>
+            )}
+            {tile && rows > 1 && (
+              <>
+                <br />
+                Join each row, then stack the rows.
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -117,7 +156,12 @@ export function Output({
             Ready to print
           </span>
           <span className="font-mono text-[10px] tracking-[0.08em] text-[#E3FF33] uppercase">
-            {sheetCount} sheets • {assembledInches > 0 ? formatLength(assembledInches) : '—'}
+            {sheetCount} sheets •{' '}
+            {assembledInches > 0
+              ? tile
+                ? `${formatLength(assembledInches)} × ${formatLength(assembledHeight)}`
+                : formatLength(assembledInches)
+              : '—'}
           </span>
         </div>
         <div className="mt-2 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
@@ -125,6 +169,7 @@ export function Output({
           fullWidth
           disabled={sheetCount === 0}
           onPrint={onPrint}
+          join={join}
           marks={printMarks}
           onChange={onChange}
         />

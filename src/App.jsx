@@ -9,6 +9,7 @@ import { Output } from './components/Output.jsx'
 import { Preview } from './components/Preview.jsx'
 import { PrintArea } from './components/PrintArea.jsx'
 import { PrinterSafe } from './components/PrinterSafe.jsx'
+import { JoinSelect } from './components/JoinMarks.jsx'
 import { usePersistedSettings } from './hooks/usePersistedSettings.js'
 import {
   fitCompositionToTrim,
@@ -16,7 +17,15 @@ import {
   measureComposition,
   normalizeComposition,
 } from './lib/composition.js'
-import { formatLength } from './lib/layout.js'
+import {
+  ALIGN_RECUT_MIN_OVERLAP,
+  JOIN_ALIGN_RECUT,
+  assembledSpan,
+  axisCount,
+  buildSheets,
+  formatLength,
+  joinDuplicates,
+} from './lib/layout.js'
 import { PAPERS, sheetSize } from './lib/paper.js'
 
 export default function App() {
@@ -28,6 +37,7 @@ export default function App() {
     bannerMode,
     margins,
     overlap,
+    join,
     showTrim,
     showSafe,
     showTape,
@@ -46,6 +56,8 @@ export default function App() {
   const trimW = pageW - margins.left - margins.right
   const trimH = pageH - margins.top - margins.bottom
   const contentW = Math.max(0.1, trimW - overlap)
+  const contentH = Math.max(0.1, trimH - overlap)
+  const tile = bannerMode === 'tile'
   const normalized = useMemo(() => normalizeComposition(composition), [composition])
   const [selection, setSelection] = useState(() => {
     const stack = getStack(normalized)
@@ -58,7 +70,13 @@ export default function App() {
     (next, preferLineId) => {
       patch((prev) => {
         const incoming = typeof next === 'function' ? next(prev.composition) : next
-        return { ...prev, composition: fitCompositionToTrim(incoming, trimH, preferLineId) }
+        const nextTile = prev.bannerMode === 'tile'
+        return {
+          ...prev,
+          composition: nextTile
+            ? normalizeComposition(incoming)
+            : fitCompositionToTrim(incoming, trimH, preferLineId),
+        }
       })
     },
     [patch, trimH],
@@ -66,6 +84,7 @@ export default function App() {
 
   useEffect(() => {
     patch((prev) => {
+      if (prev.bannerMode === 'tile') return prev
       const current = measureComposition(prev.composition, { maxHeight: trimH })
       if (current.height <= trimH + 1e-6) return prev
       return { ...prev, composition: fitCompositionToTrim(prev.composition, trimH) }
@@ -81,24 +100,43 @@ export default function App() {
         /* fonts.ready is optional */
       }
       if (cancelled) return
-      setMeasured(measureComposition(normalized, { maxHeight: trimH }))
+      setMeasured(measureComposition(normalized, tile ? {} : { maxHeight: trimH }))
     })()
     return () => {
       cancelled = true
     }
-  }, [normalized, trimH])
+  }, [normalized, trimH, tile])
 
   const textWidthIn = measured?.width ?? 0
-  const sheetCount =
-    textWidthIn <= 0
-      ? 0
-      : printOverlap && overlap > 0
-        ? textWidthIn <= trimW
-          ? 1
-          : Math.ceil((textWidthIn - overlap) / contentW)
-        : Math.ceil(textWidthIn / contentW)
-  const assembledInches =
-    sheetCount > 0 ? sheetCount * trimW - (sheetCount - 1) * overlap : 0
+  const textHeightIn = measured?.height ?? 0
+  const duplicate = joinDuplicates(join, printOverlap) && overlap > 0
+  const setJoin = (next) => {
+    patch((prev) => {
+      if (next === prev.join) return prev
+      if (next === JOIN_ALIGN_RECUT && prev.overlap < ALIGN_RECUT_MIN_OVERLAP) {
+        return { ...prev, join: next, overlap: ALIGN_RECUT_MIN_OVERLAP }
+      }
+      return { ...prev, join: next }
+    })
+  }
+  const cols = axisCount(textWidthIn, trimW, contentW, duplicate, overlap)
+  const rows = tile && textWidthIn > 0
+    ? axisCount(textHeightIn, trimH, contentH, duplicate, overlap)
+    : cols > 0
+      ? 1
+      : 0
+  const sheets = useMemo(
+    () => buildSheets(cols, rows, contentW, contentH),
+    [cols, rows, contentW, contentH],
+  )
+  const sheetCount = sheets.length
+  const assembledInches = assembledSpan(cols, trimW, overlap)
+  const assembledHeight = tile ? assembledSpan(rows, trimH, overlap) : trimH
+  const derivedRows = rows > 0 ? rows : 1
+
+  useEffect(() => {
+    patch((prev) => (prev.rows === derivedRows ? prev : { ...prev, rows: derivedRows }))
+  }, [derivedRows, patch])
 
   const print = () => window.print()
   const pageLabel = `${sheet.label} ${orientation} ${pageW.toFixed(2)}"×${pageH.toFixed(2)}"`
@@ -134,7 +172,19 @@ export default function App() {
               <div className="hidden md:inline-flex items-center gap-1.5">
                 <BannerModeControl
                   value={bannerMode}
-                  onChange={(mode) => patch({ bannerMode: mode })}
+                  onChange={(mode) =>
+                    patch((prev) => {
+                      if (mode === prev.bannerMode) return prev
+                      if (mode === 'horiz') {
+                        return {
+                          ...prev,
+                          bannerMode: mode,
+                          composition: fitCompositionToTrim(prev.composition, trimH),
+                        }
+                      }
+                      return { ...prev, bannerMode: mode }
+                    })
+                  }
                 />
                 <label className="relative">
                   <span className="sr-only">Page size</span>
@@ -169,8 +219,10 @@ export default function App() {
                     ▼
                   </span>
                 </label>
-                <span className="pro-seg inline-flex items-center px-2 py-0.5 rounded-[3px] bg-[#2b2b35] border text-[9px] font-mono tracking-[0.12em] text-[#9A9AA2] uppercase">
-                  {pageW.toFixed(2)}×{pageH.toFixed(2)} — Trim & Tape
+                <span className="pro-seg inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] bg-[#2b2b35] border text-[9px] font-mono tracking-[0.12em] text-[#9A9AA2] uppercase">
+                  {pageW.toFixed(2)}×{pageH.toFixed(2)}
+                  <span aria-hidden="true">—</span>
+                  <JoinSelect value={join} onChange={setJoin} />
                 </span>
               </div>
             </div>
@@ -179,18 +231,27 @@ export default function App() {
               <span className="font-mono text-[10px] tracking-[0.14em] text-[#7A7A80] uppercase">
                 No edge-to-edge • Inside safe area
               </span>
-              <AssembleGuide asymmetric={printOverlap} overlap={overlap} />
+              <AssembleGuide
+                join={join}
+                asymmetric={printOverlap}
+                overlap={overlap}
+                multiRow={tile && rows > 1}
+              />
             </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 pr-1">
               <div className="hidden md:flex items-center gap-3 pr-3 border-r border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]">
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
-                  {sheetCount} Sheets
+                  {tile && sheetCount > 0 ? `${cols}×${rows}` : sheetCount} Sheets
                 </span>
                 <span className="w-px h-3 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)]" />
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#F0F0F2]">
-                  {assembledInches > 0 ? formatLength(assembledInches) : '—'}
+                  {assembledInches > 0
+                    ? tile
+                      ? `${formatLength(assembledInches)} × ${formatLength(assembledHeight)}`
+                      : formatLength(assembledInches)
+                    : '—'}
                 </span>
               </div>
               <div className="pro-seg h-8 px-3 bg-[#2b2b35] border rounded-[3px] flex items-center gap-2">
@@ -202,6 +263,7 @@ export default function App() {
               <PrintButton
                 disabled={sheetCount === 0}
                 onPrint={print}
+                join={join}
                 marks={{ printOverlap, printTrim, printNumbers, printCutMarks }}
                 onChange={patch}
               />
@@ -216,6 +278,7 @@ export default function App() {
             selection={selection}
             onSelect={setSelection}
             printableHeight={trimH}
+            tile={tile}
             onChange={setComposition}
           />
           <Preview
@@ -224,6 +287,10 @@ export default function App() {
             onZoom={(next) => patch({ zoom: next })}
             onScaleToFit={(next) => patch({ scaleToFit: next })}
             sheetCount={sheetCount}
+            sheets={sheets}
+            cols={cols}
+            rows={rows}
+            tile={tile}
             assembledInches={assembledInches}
             margins={margins}
             overlap={overlap}
@@ -232,12 +299,14 @@ export default function App() {
             trimW={trimW}
             trimH={trimH}
             contentW={contentW}
+            contentH={contentH}
             composition={normalized}
             measured={measured}
             selection={selection}
             onSelect={setSelection}
             onChange={setComposition}
             printOverlap={printOverlap}
+            join={join}
             showTrim={showTrim}
             showSafe={showSafe}
             showTape={showTape}
@@ -252,6 +321,8 @@ export default function App() {
                   <PrinterSafe
                     margins={margins}
                     overlap={overlap}
+                    join={join}
+                    onJoin={setJoin}
                     paperId={paperId}
                     orientation={orientation}
                     onChange={patch}
@@ -270,10 +341,15 @@ export default function App() {
                 <div className="flex-1 min-w-0 p-4">
                   <Output
                 sheetCount={sheetCount}
+                cols={cols}
+                rows={rows}
+                tile={tile}
                 assembledInches={assembledInches}
+                assembledHeight={assembledHeight}
                 trimW={trimW}
                 trimH={trimH}
                 contentW={contentW}
+                contentH={contentH}
                 showTrim={showTrim}
                 showSafe={showSafe}
                 showTape={showTape}
@@ -281,6 +357,7 @@ export default function App() {
                 showCutMarks={showCutMarks}
                 onChange={patch}
                 onPrint={print}
+                join={join}
                 printMarks={{ printOverlap, printTrim, printNumbers, printCutMarks }}
                 pageLabel={pageLabel}
               />
@@ -292,16 +369,21 @@ export default function App() {
         <footer className="pro-rail-t h-[10px] shrink-0 bg-[#0c0c0e]" />
       </div>
       <PrintArea
-        sheetCount={sheetCount}
+        sheets={sheets}
+        cols={cols}
+        rows={rows}
+        tile={tile}
         pageW={pageW}
         pageH={pageH}
         margins={margins}
         contentW={contentW}
+        contentH={contentH}
         trimW={trimW}
         trimH={trimH}
         composition={normalized}
         measured={measured}
         printOverlap={printOverlap}
+        join={join}
         overlap={overlap}
         printTrim={printTrim}
         printNumbers={printNumbers}

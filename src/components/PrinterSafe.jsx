@@ -1,4 +1,5 @@
-import { MARGIN_PRESETS, detectPreset } from '../lib/layout.js'
+import { ALIGN_RECUT_MIN_OVERLAP, JOIN_ALIGN_RECUT, MARGIN_PRESETS, detectPreset } from '../lib/layout.js'
+import { JoinSelect } from './JoinMarks.jsx'
 import { PAPERS } from '../lib/paper.js'
 import { FieldLabel } from './FieldLabel.jsx'
 import { ParamSection } from './ParamSection.jsx'
@@ -15,20 +16,52 @@ const PRESET_BUTTONS = [
   { id: 'custom', label: 'Custom', sub: 'Edit' },
 ]
 
-export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }) {
+export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, paperId, orientation, onChange }) {
   const active = detectPreset(margins)
+  const alignRecut = join === JOIN_ALIGN_RECUT
+  const paperLabel = PAPERS.find((paper) => paper.id === paperId)?.label ?? paperId
+  const presetLabel = PRESET_BUTTONS.find((preset) => preset.id === active)?.label ?? active
+  const uniformMargin =
+    margins.top === margins.bottom &&
+    margins.bottom === margins.left &&
+    margins.left === margins.right
+  const orientationLabel = orientation.charAt(0).toUpperCase() + orientation.slice(1)
 
   return (
     <div>
       <ZoneHeader index="02" title="Printer Safe" icon={<PrinterIcon />} />
       <div className="pro-well border rounded-[3px] p-3 mb-4">
         <p className="font-mono text-[11px] leading-[1.5] text-[#7A7A80]">
-          Printers can&apos;t print to the edge. This tool lays out type{' '}
-          <span className="text-[#F0F0F2]">INSIDE</span> your printable area, not to the paper
-          edge. You trim on the dashed line and tape sheets edge-to-edge.
+          {alignRecut ? (
+            <>
+              Printers can&apos;t print to the edge. Align & Recut duplicates a strip of type and
+              prints a blue align line and a red cut line. Match the crosses, tape from the back,
+              then cut both sheets on the red line.
+            </>
+          ) : (
+            <>
+              Printers can&apos;t print to the edge. This tool lays out type{' '}
+              <span className="text-[#F0F0F2]">INSIDE</span> your printable area, not to the paper
+              edge. You trim on the dashed line and tape sheets edge-to-edge.
+            </>
+          )}
         </p>
       </div>
-      <ParamSection icon={<PrinterIcon />} title="Paper">
+      <ParamSection title="Join">
+        <JoinSelect variant="panel" value={join} onChange={onJoin} />
+      </ParamSection>
+      <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
+      <ParamSection
+        icon={<PrinterIcon />}
+        title="Paper"
+        sectionId="safe.paper"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {paperLabel} · {orientationLabel}
+          </span>
+        }
+      >
         <div className="space-y-2">
         <div className="relative">
           <select
@@ -69,7 +102,14 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
         </div>
       </ParamSection>
       <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
-      <ParamSection title="Preset">
+      <ParamSection
+        title="Preset"
+        sectionId="safe.preset"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">{presetLabel}</span>
+        }
+      >
         <div className="grid grid-cols-2 gap-1.5">
         {PRESET_BUTTONS.map((preset) => (
           <button
@@ -97,7 +137,18 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
         </div>
       </ParamSection>
       <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
-      <ParamSection title="Margins">
+      <ParamSection
+        title="Margins"
+        sectionId="safe.margins"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {uniformMargin
+              ? `${margins.top.toFixed(2)}" all`
+              : `${margins.top.toFixed(2)}·${margins.right.toFixed(2)}·${margins.bottom.toFixed(2)}·${margins.left.toFixed(2)}"`}
+          </span>
+        }
+      >
         <div className="grid grid-cols-2 gap-2.5">
         {['top', 'bottom', 'left', 'right'].map((side) => (
           <div key={side} className="space-y-1.5">
@@ -126,7 +177,9 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
       <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
       <ParamSection
         icon={<OverlapIcon />}
-        title="Overlap for Tape"
+        title={alignRecut ? 'Overlap for Marks' : 'Overlap for Tape'}
+        sectionId="safe.overlap"
+        defaultOpen={false}
         value={
           <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[#E3FF33] text-black rounded-[3px]">
             {overlap.toFixed(2)}"
@@ -135,10 +188,12 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
       >
         <SegmentControl
           fill
-          ariaLabel="Overlap for tape"
+          ariaLabel={alignRecut ? 'Overlap for marks' : 'Overlap for tape'}
           value={overlap.toFixed(2)}
           onChange={(next) => onChange({ overlap: Number(next) })}
-          options={OVERLAP_STEPS.map((step) => ({
+          options={OVERLAP_STEPS.filter(
+            (step) => !alignRecut || step + 1e-9 >= ALIGN_RECUT_MIN_OVERLAP,
+          ).map((step) => ({
             value: step.toFixed(2),
             label: `${step.toFixed(2)}"`,
           }))}

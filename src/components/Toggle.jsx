@@ -1,9 +1,10 @@
-export function Toggle({ on, onToggle, offKnob = 'bg-[#7A7A80]' }) {
+export function Toggle({ on, onToggle, offKnob = 'bg-[#7A7A80]', disabled = false }) {
   return (
     <button
       type="button"
-      onClick={onToggle}
-      className={`w-[36px] h-[20px] rounded-[6px] border flex items-center px-0.5 transition-colors ${
+      onClick={disabled ? undefined : onToggle}
+      disabled={disabled}
+      className={`w-[36px] h-[20px] rounded-[6px] border flex items-center px-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         on
           ? 'bg-[#E3FF33] border-[#E3FF33]'
           : 'bg-[#3a3a44] border-black shadow-[inset_0_1px_3px_rgba(0,0,0,0.6),0_1px_0_rgba(255,255,255,0.06)]'
