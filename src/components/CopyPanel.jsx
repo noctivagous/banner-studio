@@ -88,7 +88,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
   const pad = container.size.padding
   const linkedPad = pad.top === pad.right && pad.right === pad.bottom && pad.bottom === pad.left
   return (
-    <div className="space-y-4">
+    <div className="pro-divided">
       <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
         Rectangle hugs the stack. Align cascades to the Y-stack and the lines.
         On sheet places the frame in the trim. Corner size scales with the shorter side.
@@ -327,7 +327,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
 
 function StackFields({ stack, onPatch, onAlignX }) {
   return (
-    <div className="space-y-4">
+    <div className="pro-divided">
       <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
         Alignment lines for the whole Y-stack. Every display line shares this
         left, center, or right edge.
@@ -390,7 +390,7 @@ function LineFields({ line, glyphMax, onPatch, align }) {
   const visible = (line.layers || []).filter((layer) => layer.visible !== false)
   const front = visible[visible.length - 1] ?? line.layers?.[0]
   return (
-    <div className="space-y-4">
+    <div className="pro-divided">
       <div>
         <FieldLabel icon={<FontIcon />}>Font Family</FieldLabel>
         <FontSelect fontId={line.fontId} onChange={onPatch} />

@@ -27,7 +27,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
           edge. You trim on the dashed line and tape sheets edge-to-edge.
         </p>
       </div>
-      <div className="mb-4 space-y-2">
+      <div className="space-y-2">
         <FieldLabel icon={<PrinterIcon />}>Paper</FieldLabel>
         <div className="relative">
           <select
@@ -66,7 +66,8 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-1.5 mb-4">
+      <div aria-hidden="true" className="pro-divider my-4" />
+      <div className="grid grid-cols-2 gap-1.5">
         {PRESET_BUTTONS.map((preset) => (
           <button
             key={preset.id}
@@ -91,6 +92,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
           </button>
         ))}
       </div>
+      <div aria-hidden="true" className="pro-divider my-4" />
       <div className="grid grid-cols-2 gap-2.5">
         {['top', 'bottom', 'left', 'right'].map((side) => (
           <div key={side} className="space-y-1.5">
@@ -115,7 +117,8 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
           </div>
         ))}
       </div>
-      <div className="mt-5">
+      <div aria-hidden="true" className="pro-divider my-4" />
+      <div>
         <FieldLabel
           icon={<OverlapIcon />}
           value={

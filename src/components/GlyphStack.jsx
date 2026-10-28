@@ -389,7 +389,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
     'w-6 h-6 rounded-[3px] border border-transparent text-[#7A7A80] hover:text-white hover:border-[#43434E] disabled:opacity-25 disabled:hover:text-[#7A7A80] disabled:hover:border-transparent font-mono text-[11px] leading-none flex items-center justify-center'
 
   return (
-    <div className="space-y-4">
+    <div className="pro-divided">
       <div>
         <FieldLabel icon={<EffectIcon />}>Glyph stack</FieldLabel>
         <p className="mb-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">

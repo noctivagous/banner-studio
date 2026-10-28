@@ -72,6 +72,7 @@ export function Output({
         </div>
       </div>
 
+      <div aria-hidden="true" className="pro-divider mt-4" />
       <div className="mt-4 space-y-2.5">
         {toggles.map((item) => (
           <div key={item.key} className="flex items-center gap-3">
