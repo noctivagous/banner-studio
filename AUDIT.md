@@ -643,8 +643,8 @@ stack, the right sidebar gains the inspector.
   Transform, Glyph stack (+ Fill/Overlay/Stroke/Offset/Effects),
   Frame, and Stack accordions render the selected node
   (line/stack/frame) and follow selection from stack, canvas, or
-  tree. (Frame/Stack field components are shared from
-  `CopyPanel.jsx` for now.)
+  tree. (Frame/Stack field components now live in
+  `Inspector.jsx` — no code is shared back into `CopyPanel.jsx`.)
 - [x] `CopyPanel.jsx` becomes the stack: each line an editable,
   font-styled preview; + / − buttons in the Copy header replace
   the "+ Add line" bar and the tree's × button.
