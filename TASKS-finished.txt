@@ -1,0 +1,49 @@
+[x] the user should be able to click on elements in the Preview Canvas and then they load in the Copy area.
+[x] double-click a text line in the Preview Canvas to edit it in place.
+
+
+[x]  to the left of [PAGE SIZE] AND [page orientation] dropdowns:  [1D: [ *HORIZ. | VERT]  |  TILE: 2D ]
+   1D horizontal is a horizontal banner (current)
+   1D vertical is a vertical banner (not avail yet.)
+   Tile  (not avail yet.)
+
+
+
+[x] improve the styling of the app such that the different sections have some graphical contrast.
+download any additional technical fonts or resources that you need.  for example the
+Copy Section has the same bg as the Printer Safe and Output sections.  It all looks rather
+undifferentiated.  You can make use of 90 deg rotated text labels for compactness for labeling
+any section or element.
+
+[x] for the tape and trim mode of the banner, make the left margin of the
+overlapping page semi-transparent
+
+[x] 01 / Copy - Stack.
+Right now we have Text Stack
+We want the equivalent for Copy.
+Make it so that multiple Copy (Font)
+can be made.  This may require reorganizing
+the UI to be hierarchical.
+
+[x] AUTO - current: just uses left, center, right alignment for positioning and text alignment
+down the tree of frame, stack, text.
+GRID - overlays a grid and the text can snap to it. initially a 1 inch grid.
+text characters' baseline snaps to baseline grid rather than their box bounds snapping
+related: BASELINE GRID (default on) autosizes text and elements to
+fit in increments or halves of the baseline grid.  always shown.
+
+
+[x] We want to reorganize the UI so that the user can make more than one
+line of text in a vertical stack, a stack of single line display text.
+Left, right, center alignment lines for a whole stack.
+Each line of text will have a stack of glyphs, that's the Z axis, but what we mean is a stack of lines and that's the Y axis.
+Stack can then have assigned container shape and layout relative to that shape.
+The shape obj by default adjusts its size and traits in response to size changes.
+A rect container can have an aspect ratio defined and then grow or shrink in response to the stack's changes.
+A shape can also have decorative configs. A rectangle can be given cut
+corners or rounded corners.  Containers can have rules for subcontainers
+
+container (shape + layout + decoration)
+  └── Y-stack (align, gap)
+        └── line  (copy, font, size, spacing)
+              └── Z-stack  (glyph copies: face, shadow, hatch…)

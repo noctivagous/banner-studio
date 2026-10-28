@@ -1,0 +1,3 @@
+[ ] - Templates and Wizards
+  [  ] design features and task lists for features for the app around
+the need for a template library and wizard library.
