@@ -38,7 +38,7 @@ export function Output({
 
   return (
     <div>
-      <ZoneHeader index="03" title="Output" icon={<OutputIcon />} />
+      <ZoneHeader index="04" title="Output" icon={<OutputIcon />} />
       <div className="pro-group bg-[var(--ctl)] border rounded-[3px] p-3.5 space-y-2.5">
         <div className="flex justify-between items-center">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">

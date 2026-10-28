@@ -35,7 +35,7 @@ export function PrinterSafe({ margins, overlap, join = 'overlap-tape', onJoin, j
 
   return (
     <div>
-      <ZoneHeader index="02" title="Paper & Margins" icon={<PrinterIcon />} />
+      <ZoneHeader index="03" title="Paper & Margins" icon={<PrinterIcon />} />
       <div className="pro-well border rounded-[3px] p-3 mb-4">
         <p className="font-mono text-[11px] leading-[1.5] text-[#7A7A80]">
           {alignRecut ? (

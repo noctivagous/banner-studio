@@ -3,6 +3,7 @@ import { AssembleGuide } from './components/AssembleGuide.jsx'
 import { BannerModeControl } from './components/BannerModeControl.jsx'
 import { CopyPanel } from './components/CopyPanel.jsx'
 import { DocumentMenu } from './components/DocumentMenu.jsx'
+import { Inspector } from './components/Inspector.jsx'
 import { PrintButton } from './components/PrintButton.jsx'
 import { SectionSpine } from './components/SectionChrome.jsx'
 import { Output } from './components/Output.jsx'
@@ -278,8 +279,20 @@ export default function App() {
           />
           <div className="w-full xl:w-[320px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#101014] border-t xl:border-t-0 xl:border-l border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] overflow-y-auto">
             <div className="p-5 space-y-5">
+              <section className="zone-inspector pro-group flex flex-row rounded-[3px] bg-[#14141c] border overflow-hidden">
+                <SectionSpine label="Inspector" sub="02" />
+                <div className="flex-1 min-w-0 p-4">
+                  <Inspector
+                    composition={normalized}
+                    selection={selection}
+                    printableHeight={trimH}
+                    tile={tile}
+                    onChange={setComposition}
+                  />
+                </div>
+              </section>
               <section className="zone-safe pro-group flex flex-row rounded-[3px] bg-[#2d2314] border overflow-hidden">
-                <SectionSpine label="Paper & Margins" sub="02" />
+                <SectionSpine label="Paper & Margins" sub="03" />
                 <div className="flex-1 min-w-0 p-4">
                   <PrinterSafe
                     margins={margins}
@@ -306,7 +319,7 @@ export default function App() {
                 <span className="flex-1 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
               </div>
               <section className="zone-output pro-group flex flex-row rounded-[3px] bg-[#111a0b] border overflow-hidden">
-                <SectionSpine label="Output" sub="03" />
+                <SectionSpine label="Output" sub="04" />
                 <div className="flex-1 min-w-0 p-4">
                   <Output
                 sheetCount={sheetCount}

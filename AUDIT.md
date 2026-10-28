@@ -639,20 +639,25 @@ Do phases in order; each phase leaves the app shippable.
 Supersedes the Phase 1 layout: the left panel becomes the Copy
 stack, the right sidebar gains the inspector.
 
-- [ ] New `Inspector.jsx`: move Font, Glyph Height, Letter
-  Spacing, Transform, Glyph stack (+ Fill/Overlay/Stroke/Offset/
-  Effects), Frame, and Stack accordions out of `CopyPanel.jsx`;
-  inspector renders the selected node (line/stack/frame) and
-  follows selection from stack, canvas, or tree.
-- [ ] `CopyPanel.jsx` becomes the stack: each line an editable,
-  font-styled preview with perimeter size + font controls, a …
-  button for Glyph Effects and hidden options, and + / − buttons
-  replacing the "+ Add line" bar (see §8 D8 for ▲▼⧉× placement).
-- [ ] Right column order: Inspector, Paper & Margins, Output
-  (`App.jsx`).
-- [ ] Acceptance: left panel has zero property accordions; 10
-  lines each select cleanly with full properties on the right;
-  + / − add and remove lines; `npm run build` clean.
+- [x] New `Inspector.jsx`: Font, Glyph Height, Letter Spacing,
+  Transform, Glyph stack (+ Fill/Overlay/Stroke/Offset/Effects),
+  Frame, and Stack accordions render the selected node
+  (line/stack/frame) and follow selection from stack, canvas, or
+  tree. (Frame/Stack field components are shared from
+  `CopyPanel.jsx` for now.)
+- [x] `CopyPanel.jsx` becomes the stack: each line an editable,
+  font-styled preview; + / − buttons in the Copy header replace
+  the "+ Add line" bar and the tree's × button.
+- [x] Right column order: Inspector (02), Paper & Margins (03),
+  Output (04) (`App.jsx`).
+- [ ] Perimeter quick controls on each stack item (size, font)
+  plus a … button for Glyph Effects and hidden options (see §8
+  D6, D8).
+- [ ] Acceptance: left panel has zero property accordions (true
+  in code — only remaining matches are shared component
+  definitions); 10 lines each select cleanly with full
+  properties on the right; + / − add and remove lines;
+  `npm run build` clean (passes).
 
 ### Phase 2 — Seam and control consolidation (P2, P3) (M–L)
 

@@ -1,8 +1,6 @@
 import { useEffect } from 'react'
 import {
   ASPECT_PRESETS,
-  MAX_COPY_LINES,
-  MIN_GLYPH_HEIGHT,
   addCopyLine,
   aspectId,
   canAddCopyLine,
@@ -10,16 +8,11 @@ import {
   findNode,
   fontOf,
   getStack,
-  glyphMaxForLine,
-  glyphMaxForTileLine,
   lineText,
   moveCopyLine,
   removeCopyLine,
   withAlignMode,
-  withAlignX,
-  withContainer,
   withLine,
-  withStack,
 } from '../lib/composition.js'
 import { snapHalfIn } from '../lib/grid.js'
 import { FieldLabel } from './FieldLabel.jsx'
@@ -32,8 +25,7 @@ import {
   PaddingMini,
   SheetMini,
 } from './FrameMini.jsx'
-import { FontSelect } from './FontSelect.jsx'
-import { CustomColorWell, GlyphStack } from './GlyphStack.jsx'
+import { CustomColorWell } from './GlyphStack.jsx'
 import { ParamSection } from './ParamSection.jsx'
 import { SectionSpine, ZoneHeader } from './SectionChrome.jsx'
 import { SegmentControl } from './SegmentControl.jsx'
@@ -41,12 +33,8 @@ import { Toggle } from './Toggle.jsx'
 import {
   AlignIcon,
   CopyIcon,
-  FontIcon,
-  GlyphHeightIcon,
-  LetterSpacingIcon,
   LineHeightIcon,
   StrokeIcon,
-  TransformIcon,
 } from './icons.jsx'
 
 const rowBtn =
@@ -92,7 +80,7 @@ function TreeRow({ selected, indent = 0, onClick, label, hint, kind = 'line', me
   )
 }
 
-function ContainerFields({ container, onPatch, onAlignX }) {
+export function ContainerFields({ container, onPatch, onAlignX }) {
   const aspect = container.size.aspect
   const activeAspect = aspectId(aspect)
   const pad = container.size.padding
@@ -373,7 +361,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
   )
 }
 
-function StackFields({ stack, onPatch, onAlignX }) {
+export function StackFields({ stack, onPatch, onAlignX }) {
   return (
     <div className="pro-divided">
       <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
@@ -451,133 +439,45 @@ function editorInkIsLight(hex) {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.55
 }
 
-function LineFields({ line, glyphMax, onPatch, align }) {
+function StackLineInput({ line, index, align, selected, onSelect, onPatch }) {
   const font = fontOf(line)
   const visible = (line.layers || []).filter((layer) => layer.visible !== false)
   const front = visible[visible.length - 1] ?? line.layers?.[0]
   const ink = front?.overlayOn ? '#F0F0F2' : front?.fill || '#FFFFFF'
   const paper = editorInkIsLight(ink) ? '#08080A' : '#FFFFFF'
   return (
-    <div className="pro-divided">
-      <div className="relative">
-        <input
-          value={line.copy}
-          onChange={(e) => onPatch({ copy: e.target.value.replace(/\n/g, ' ') })}
-          placeholder="TYPE THIS LINE"
-          spellCheck={false}
-          className="w-full border border-[#43434E] rounded-[4px] p-4 text-[28px] leading-[0.9] tracking-[-0.01em] placeholder:text-[#5A5A60] focus:outline-none focus:border-[#E3FF33]/60 min-h-[72px]"
-          style={{
-            fontFamily: `"${font.family}", Impact, sans-serif`,
-            fontWeight: font.weight,
-            textAlign: align || 'center',
-            backgroundColor: paper,
-            color: ink,
-            caretColor: ink,
-            ...(front?.strokeOn
-              ? {
-                  WebkitTextStroke: `1px ${front.strokeColor}`,
-                  paintOrder: 'stroke fill',
-                }
-              : {}),
-          }}
-        />
-        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] font-mono text-[8px] tracking-[0.1em] text-[#7A7A80] uppercase pointer-events-none">
-          Line
-        </div>
+    <div
+      onClick={() => onSelect({ kind: 'line', id: line.id })}
+      className={`relative rounded-[4px] border transition-colors cursor-text ${
+        selected ? 'border-[#E3FF33]' : 'border-[#43434E] hover:border-[#5E5E69]'
+      }`}
+    >
+      <input
+        value={line.copy}
+        onFocus={() => onSelect({ kind: 'line', id: line.id })}
+        onChange={(e) => onPatch(line.id, { copy: e.target.value.replace(/\n/g, ' ') })}
+        placeholder={`LINE ${index + 1}`}
+        spellCheck={false}
+        aria-label={lineText(line) || `Line ${index + 1}`}
+        className="w-full rounded-[4px] px-3 py-2.5 text-[20px] leading-[1] tracking-[-0.01em] placeholder:text-[#5A5A60] focus:outline-none min-h-[48px]"
+        style={{
+          fontFamily: `"${font.family}", Impact, sans-serif`,
+          fontWeight: font.weight,
+          textAlign: align || 'center',
+          backgroundColor: paper,
+          color: ink,
+          caretColor: ink,
+          ...(front?.strokeOn
+            ? {
+                WebkitTextStroke: `1px ${front.strokeColor}`,
+                paintOrder: 'stroke fill',
+              }
+            : {}),
+        }}
+      />
+      <div className="absolute bottom-1 right-1 px-1 py-px bg-[var(--ctl)] border border-[#43434E] rounded-[3px] font-mono text-[8px] tracking-[0.1em] text-[#7A7A80] uppercase pointer-events-none">
+        {font.label}
       </div>
-      <ParamSection
-        icon={<FontIcon />}
-        title="Font Family"
-        defaultOpen
-        value={
-          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">{font.label}</span>
-        }
-      >
-        <FontSelect fontId={line.fontId} onChange={onPatch} />
-      </ParamSection>
-      <ParamSection
-        icon={<GlyphHeightIcon />}
-        title="Glyph Height"
-        defaultOpen
-        value={
-          <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
-            {line.glyphHeight.toFixed(1)}"
-          </span>
-        }
-      >
-        <input
-          type="range"
-          min={MIN_GLYPH_HEIGHT}
-          max={Math.max(MIN_GLYPH_HEIGHT, glyphMax)}
-          step={0.5}
-          value={Math.min(line.glyphHeight, glyphMax)}
-          onChange={(e) =>
-            onPatch({
-              glyphHeight: snapHalfIn(parseFloat(e.target.value), {
-                allowZero: false,
-                min: MIN_GLYPH_HEIGHT,
-                max: Math.max(MIN_GLYPH_HEIGHT, glyphMax),
-              }),
-            })
-          }
-          className="w-full"
-        />
-        <div className="flex justify-between mt-1">
-          <span className="font-mono text-[8px] text-[#7A7A80]">{MIN_GLYPH_HEIGHT}"</span>
-          <span className="font-mono text-[8px] text-[#7A7A80]">{glyphMax.toFixed(1)}" max</span>
-        </div>
-      </ParamSection>
-      <ParamSection
-        icon={<LetterSpacingIcon />}
-        title="Letter Spacing"
-        sectionId="copy.line.letter-spacing"
-        defaultOpen={false}
-        value={
-          <span className="font-tech text-[12px] text-[#F0F0F2]">
-            {line.letterSpacing > 0 ? '+' : ''}
-            {line.letterSpacing.toFixed(2)}em
-          </span>
-        }
-      >
-        <input
-          type="range"
-          min={-0.05}
-          max={0.3}
-          step={0.01}
-          value={line.letterSpacing}
-          onChange={(e) => onPatch({ letterSpacing: parseFloat(e.target.value) })}
-          className="w-full"
-        />
-      </ParamSection>
-      <ParamSection
-        icon={<TransformIcon />}
-        title="Text Transform"
-        sectionId="copy.line.transform"
-        defaultOpen={false}
-        value={
-          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
-            {line.transform === 'asIs' ? 'As Is' : line.transform}
-          </span>
-        }
-      >
-        <div className="grid grid-cols-3 gap-1.5">
-          {['uppercase', 'lowercase', 'asIs'].map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => onPatch({ transform: mode })}
-              className={`h-8 rounded-[4px] border text-[11px] font-mono uppercase tracking-[0.08em] transition-all ${
-                line.transform === mode
-                  ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                  : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
-              }`}
-            >
-              {mode === 'asIs' ? 'As Is' : mode}
-            </button>
-          ))}
-        </div>
-      </ParamSection>
-      <GlyphStack line={line} font={font} onPatchLine={onPatch} />
     </div>
   )
 }
@@ -604,20 +504,11 @@ export function CopyPanel({
 
   const kind = selected?.kind || 'line'
   const line = kind === 'line' ? selected.node : null
-  const glyphMax = line
-    ? tile
-      ? glyphMaxForTileLine(composition, line.id)
-      : glyphMaxForLine(composition, line.id, printableHeight)
-    : 4.5
   const canAdd = canAddCopyLine(composition, printableHeight, { tile })
   const charCount = lines.reduce((sum, entry) => sum + (entry.copy?.length || 0), 0)
 
-  const patchContainer = (containerPatch) => onChange(withContainer(composition, containerPatch))
-  const patchStack = (stackPatch) => onChange(withStack(composition, stackPatch))
-  const patchAlignX = (dir) => onChange(withAlignX(composition, dir))
-  const patchThisLine = (linePatch) => {
-    if (!line) return
-    onChange(withLine(composition, line.id, linePatch), line.id)
+  const patchThisLine = (lineId, linePatch) => {
+    onChange(withLine(composition, lineId, linePatch), lineId)
   }
 
   const afterId = line?.id || lines[lines.length - 1]?.id
@@ -642,37 +533,54 @@ export function CopyPanel({
       <SectionSpine label="Copy Deck" sub="01" />
       <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
       <div className="p-5 space-y-7">
-        <ZoneHeader
-          index="01"
-          title="Copy"
-          icon={<CopyIcon />}
-          meta={
-            <span className="font-mono text-[9px] tracking-[0.12em] text-[#7A7A80] uppercase shrink-0">
-              {charCount} chars · {lines.length} lines
-            </span>
-          }
-        />
-        <div className="space-y-7">
         <div>
-          {kind === 'container' && (
-            <ContainerFields
-              container={container}
-              onPatch={patchContainer}
-              onAlignX={patchAlignX}
-            />
-          )}
-          {kind === 'stack' && stack && (
-            <StackFields stack={stack} onPatch={patchStack} onAlignX={patchAlignX} />
-          )}
-          {kind === 'line' && line && (
-            <LineFields
-              line={line}
-              glyphMax={glyphMax}
-              onPatch={patchThisLine}
-              align={stack?.align}
-            />
-          )}
+          <ZoneHeader
+            index="01"
+            title="Copy"
+            icon={<CopyIcon />}
+            meta={
+              <span className="flex items-center gap-1.5 shrink-0">
+                <span className="font-mono text-[9px] tracking-[0.12em] text-[#7A7A80] uppercase">
+                  {charCount} chars · {lines.length} lines
+                </span>
+                <button
+                  type="button"
+                  title="Add line"
+                  aria-label="Add line"
+                  disabled={!canAdd}
+                  onClick={addLine}
+                  className="w-6 h-6 rounded-[3px] border border-[#43434E] bg-[var(--ctl)] font-mono text-[13px] leading-none text-[#F0F0F2] hover:border-[#E3FF33] hover:text-[#E3FF33] disabled:opacity-40 flex items-center justify-center"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  title="Remove selected line"
+                  aria-label="Remove selected line"
+                  disabled={lines.length <= 1}
+                  onClick={() => delLine(line?.id || lines[lines.length - 1]?.id)}
+                  className="w-6 h-6 rounded-[3px] border border-[#43434E] bg-[var(--ctl)] font-mono text-[13px] leading-none text-[#F0F0F2] hover:border-[#E3FF33] hover:text-[#E3FF33] disabled:opacity-40 flex items-center justify-center"
+                >
+                  −
+                </button>
+              </span>
+            }
+          />
+          <div className="space-y-2">
+            {lines.map((entry, index) => (
+              <StackLineInput
+                key={entry.id}
+                line={entry}
+                index={index}
+                align={stack?.align}
+                selected={kind === 'line' && selection?.id === entry.id}
+                onSelect={onSelect}
+                onPatch={patchThisLine}
+              />
+            ))}
+          </div>
         </div>
+        <div className="space-y-7">
           <ParamSection
             title="Structure"
             defaultOpen
@@ -785,30 +693,10 @@ export function CopyPanel({
                   >
                     ⧉
                   </button>
-                  <button
-                    type="button"
-                    title="Delete line"
-                    disabled={lines.length <= 1}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      delLine(entry.id)
-                    }}
-                    className={rowBtn}
-                  >
-                    ×
-                  </button>
                 </TreeRow>
               )
             })}
           </div>
-          <button
-            type="button"
-            onClick={addLine}
-            disabled={!canAdd}
-            className="w-full h-8 rounded-[4px] border border-dashed border-[#43434E] font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase hover:text-[#F0F0F2] hover:border-[#5E5E69] disabled:opacity-40"
-          >
-            + Add line · {lines.length}/{MAX_COPY_LINES}
-          </button>
           <p className="mt-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
             Click a line here or in the preview; double-click preview text to edit it.
           </p>
