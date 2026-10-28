@@ -47,7 +47,16 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
           )}
         </p>
       </div>
-      <ParamSection title="Join">
+      <ParamSection
+        title="Join"
+        sectionId="safe.join"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {join === JOIN_ALIGN_RECUT ? 'Align & Recut' : 'Trim & Tape'}
+          </span>
+        }
+      >
         <JoinSelect variant="panel" value={join} onChange={onJoin} />
       </ParamSection>
       <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
