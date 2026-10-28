@@ -33,7 +33,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
           <select
             value={paperId}
             onChange={(e) => onChange({ paperId: e.target.value })}
-            className="w-full bg-[#08080A] border border-[#43434E] rounded-[3px] h-9 px-2.5 font-mono text-[12px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 appearance-none shadow-[inset_0_2px_5px_rgba(0,0,0,0.6)]"
+            className="w-full bg-[#08080A] border border-[#43434E] rounded-[3px] h-9 px-2.5 font-tech text-[13px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 appearance-none shadow-[inset_0_2px_5px_rgba(0,0,0,0.6)]"
           >
             {PAPERS.map((paper) => (
               <option key={paper.id} value={paper.id}>
@@ -106,7 +106,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
                   const next = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0))
                   onChange({ margins: { ...margins, [side]: next } })
                 }}
-                className="w-full bg-[#08080A] border border-[#43434E] rounded-[3px] h-9 px-2.5 pr-7 font-mono text-[12px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 shadow-[inset_0_2px_5px_rgba(0,0,0,0.6)]"
+                className="w-full bg-[#08080A] border border-[#43434E] rounded-[3px] h-9 px-2.5 pr-7 font-tech text-[13px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 shadow-[inset_0_2px_5px_rgba(0,0,0,0.6)]"
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[#5A5A60]">
                 &quot;
@@ -119,7 +119,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
         <FieldLabel
           icon={<OverlapIcon />}
           value={
-            <span className="font-mono text-[11px] px-1.5 py-0.5 bg-[#E3FF33] text-black rounded-[3px] font-bold">
+            <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[#E3FF33] text-black rounded-[3px]">
               {overlap.toFixed(2)}"
             </span>
           }

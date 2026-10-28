@@ -45,7 +45,7 @@ export function Output({
               Assembled Length
             </span>
           </div>
-          <div className="font-mono text-[12px] leading-[1.3] text-[#F0F0F2] break-all">
+          <div className="font-tech text-[13px] leading-[1.3] text-[#F0F0F2] break-all">
             {assembledInches > 0 ? formatLength(assembledInches) : '—'}
           </div>
         </div>
@@ -54,13 +54,13 @@ export function Output({
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
             Final Height
           </span>
-          <span className="font-mono text-[11px] text-[#F0F0F2]">{trimH.toFixed(2)}&quot;</span>
+          <span className="font-tech text-[12px] text-[#F0F0F2]">{trimH.toFixed(2)}&quot;</span>
         </div>
         <div className="flex justify-between">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
             Trim / Sheet
           </span>
-          <span className="font-mono text-[11px] text-[#F0F0F2]">
+          <span className="font-tech text-[12px] text-[#F0F0F2]">
             {trimW.toFixed(2)}&quot; × {trimH.toFixed(2)}&quot;
           </span>
         </div>

@@ -224,7 +224,7 @@ function HatchFields({ values, resolved, onPatch, keys }) {
       <div>
         <div className="flex justify-between mb-1">
           <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Hatch angle</span>
-          <span className="font-mono text-[10px] text-[#F0F0F2]">{values.angle}°</span>
+          <span className="font-tech text-[11px] text-[#F0F0F2]">{values.angle}°</span>
         </div>
         <input
           type="range"
@@ -239,7 +239,7 @@ function HatchFields({ values, resolved, onPatch, keys }) {
       <div>
         <div className="flex justify-between mb-1">
           <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Line spacing</span>
-          <span className="font-mono text-[10px] text-[#F0F0F2]">
+          <span className="font-tech text-[11px] text-[#F0F0F2]">
             {values.spacingPct}% · {resolved.spacingIn.toFixed(2)}"
           </span>
         </div>
@@ -259,7 +259,7 @@ function HatchFields({ values, resolved, onPatch, keys }) {
       <div>
         <div className="flex justify-between mb-1">
           <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Line width</span>
-          <span className="font-mono text-[10px] text-[#F0F0F2]">
+          <span className="font-tech text-[11px] text-[#F0F0F2]">
             {values.lineWidthPct}% · {resolved.lineWidthIn.toFixed(2)}"
           </span>
         </div>
@@ -622,7 +622,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
             <div>
               <div className="flex justify-between mb-1">
                 <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Width</span>
-                <span className="font-mono text-[10px] text-[#F0F0F2]">
+                <span className="font-tech text-[11px] text-[#F0F0F2]">
                   {Number(selected.strokeWidthIn).toFixed(2)}"
                 </span>
               </div>
@@ -659,7 +659,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
             <div className="flex justify-between items-center mb-1">
               <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Distance</span>
               <span className="flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-[#F0F0F2]">
+                <span className="font-tech text-[11px] text-[#F0F0F2]">
                   {offset.distance.toFixed(2)}&quot;
                 </span>
                 <button
@@ -689,7 +689,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
           <div>
             <div className="flex justify-between mb-1">
               <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Angle</span>
-              <span className="font-mono text-[10px] text-[#F0F0F2]">
+              <span className="font-tech text-[11px] text-[#F0F0F2]">
                 {Math.round(offset.angle)}° {angleArrow}
               </span>
             </div>
@@ -710,7 +710,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
           <div>
             <div className="flex justify-between mb-1">
               <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Skew</span>
-              <span className="font-mono text-[10px] text-[#F0F0F2]">
+              <span className="font-tech text-[11px] text-[#F0F0F2]">
                 {Math.round(Number(selected.skewXDeg) || 0)}°
               </span>
             </div>

@@ -142,7 +142,7 @@ export default function App() {
                     aria-label="Page size"
                     value={paperId}
                     onChange={(e) => patch({ paperId: e.target.value })}
-                    className="pro-bevel h-6 pl-2 pr-5 rounded-[3px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
+                    className="pro-bevel h-6 pl-2 pr-5 rounded-[3px] bg-[#26262E] border border-[#43434E] text-[9px] font-tech tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
                   >
                     {PAPERS.map((paper) => (
                       <option key={paper.id} value={paper.id}>
@@ -160,7 +160,7 @@ export default function App() {
                     aria-label="Orientation"
                     value={orientation}
                     onChange={(e) => patch({ orientation: e.target.value })}
-                    className="pro-bevel h-6 pl-2 pr-5 rounded-[3px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
+                    className="pro-bevel h-6 pl-2 pr-5 rounded-[3px] bg-[#26262E] border border-[#43434E] text-[9px] font-tech tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
                   >
                     <option value="landscape">Landscape</option>
                     <option value="portrait">Portrait</option>

@@ -151,7 +151,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
       <div>
         <FieldLabel
           value={
-            <span className="font-mono text-[11px] text-[#F0F0F2]">
+            <span className="font-tech text-[12px] text-[#F0F0F2]">
               {linkedPad ? `${pad.top.toFixed(2)}"` : 'mixed'}
             </span>
           }
@@ -242,7 +242,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
           <>
             <div className="flex justify-between mb-1">
               <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Size</span>
-              <span className="font-mono text-[10px] text-[#F0F0F2]">
+              <span className="font-tech text-[11px] text-[#F0F0F2]">
                 {(container.decoration.cornerSize * 100).toFixed(0)}%
               </span>
             </div>
@@ -423,7 +423,7 @@ function LineFields({ line, glyphMax, onPatch, align }) {
         <FieldLabel
           icon={<GlyphHeightIcon />}
           value={
-            <span className="font-mono text-[11px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
+            <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
               {line.glyphHeight.toFixed(1)}"
             </span>
           }
@@ -456,7 +456,7 @@ function LineFields({ line, glyphMax, onPatch, align }) {
         <FieldLabel
           icon={<LetterSpacingIcon />}
           value={
-            <span className="font-mono text-[11px] text-[#F0F0F2]">
+            <span className="font-tech text-[12px] text-[#F0F0F2]">
               {line.letterSpacing > 0 ? '+' : ''}
               {line.letterSpacing.toFixed(2)}em
             </span>

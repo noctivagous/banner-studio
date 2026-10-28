@@ -14,6 +14,14 @@ export default {
           'Consolas',
           'monospace',
         ],
+        tech: [
+          '"Share Tech Mono"',
+          '"JetBrains Mono"',
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'monospace',
+        ],
         sans: [
           'Inter',
           'ui-sans-serif',
