@@ -491,30 +491,22 @@ function LineProperties({ line, glyphMax, onPatch }) {
         defaultOpen={false}
         value={
           <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
-            {(line.place?.mode || 'auto') === 'free' ? 'Freeform' : 'Auto'}
+            {(line.place?.mode || 'snap') === 'free' ? 'Free drag' : 'Snap grid'}
           </span>
         }
       >
         <div className="grid grid-cols-2 gap-1.5">
           {[
-            { mode: 'auto', label: 'Auto', hint: 'Placed by the layout' },
-            { mode: 'free', label: 'Freeform', hint: 'Drag on the canvas' },
+            { mode: 'snap', label: 'Snap grid', hint: 'Drags snap to the grid' },
+            { mode: 'free', label: 'Free drag', hint: 'Drag anywhere' },
           ].map((option) => {
-            const active = (line.place?.mode || 'auto') === option.mode
+            const active = (line.place?.mode || 'snap') === option.mode
             return (
               <button
                 key={option.mode}
                 type="button"
                 title={option.hint}
-                onClick={() =>
-                  onPatch({
-                    place: {
-                      mode: option.mode,
-                      dxIn: option.mode === 'auto' ? 0 : line.place?.dxIn || 0,
-                      dyIn: option.mode === 'auto' ? 0 : line.place?.dyIn || 0,
-                    },
-                  })
-                }
+                onClick={() => onPatch({ place: { ...line.place, mode: option.mode } })}
                 aria-pressed={active}
                 className={`h-11 rounded-[4px] border transition-colors flex flex-col items-center justify-center gap-0.5 ${
                   active
@@ -522,7 +514,7 @@ function LineProperties({ line, glyphMax, onPatch }) {
                     : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E] hover:text-white'
                 }`}
               >
-                <span className="text-[12px] leading-none">{option.mode === 'auto' ? '🔒' : '🔓'}</span>
+                <span className="text-[12px] leading-none">{option.mode === 'snap' ? '🧲' : '🔓'}</span>
                 <span className="font-mono text-[8px] leading-none uppercase tracking-[0.08em]">
                   {option.label}
                 </span>
@@ -530,11 +522,10 @@ function LineProperties({ line, glyphMax, onPatch }) {
             )
           })}
         </div>
-        {(line.place?.mode || 'auto') === 'free' && (
-          <p className="mt-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
-            Drag the ⠿ handle on the canvas, or reset by switching back to Auto.
-          </p>
-        )}
+        <p className="mt-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
+          Drag the ⠿ handle on the canvas. Select the object for align,
+          resize, and rotate handles.
+        </p>
       </ParamSection>
       <GlyphStack line={line} font={font} onPatchLine={onPatch} />
     </div>

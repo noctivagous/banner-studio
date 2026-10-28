@@ -742,17 +742,21 @@ first); independent of Phases 2–5.
   through export/import via the existing composition path. Fit
   calculations use `ignoreFree` so dragging never shrinks type.
 - [x] Canvas: click selects (selection rectangle), second click
-  edits; lock toggle (🔒/🔓) on the selected object; ⠿ drag
-  handle on freeform lines in `Preview.jsx`; Auto lines never
-  draggable. Inspector has a matching Placement control.
+  edits; snap toggle (🧲/🔓), ↔/↕ center-in-frame buttons, ⠿
+  drag handle, ⤡ resize and ⟳ rotate handles on the selected
+  object in `Preview.jsx`. Inspector has a matching Placement
+  control (Snap grid / Free drag).
 - [x] Layout: sheet count and slicing from the union bounding box
-  of auto + freeform objects; `PrintArea.jsx` renders the same
-  measured boxes as preview (no separate offset path).
-- [ ] Grid-snap mode only if it reuses `src/lib/grid.js`
-  snapping with no new snapping code (see §8 D9).
-- [ ] Acceptance: unlock → drag → relock a line; offset survives
-  reload and export/import; preview and print agree — needs a
-  human browser run (no browser in this sandbox).
+  (rotation-aware) of all objects; `PrintArea.jsx` renders the
+  same measured boxes as preview (no separate offset path).
+- [x] Grid snapping reuses `src/lib/grid.js` `snapToGrid` (0.5"
+  step); Auto mode removed, legacy `auto` normalises to `snap`
+  with offsets kept. Rotation is a per-line `rotationDeg`
+  rendered via CSS in the shared composition path.
+- [ ] Acceptance: drag (snapped + free), center, resize, rotate;
+  offsets + rotation survive reload and export/import; preview
+  and print agree — needs a human browser run (no browser in
+  this sandbox).
 
 ---
 

@@ -118,8 +118,10 @@ const FONT_IDS = FONTS.map((font) => font.id)
 export function normalizePlace(value, fallback) {
   const base = isPlainObject(fallback) ? fallback : {}
   const src = isPlainObject(value) ? value : {}
+  // Legacy 'auto' no longer exists: everything is freeform, snapped by default.
+  const mode = asEnum(src.mode ?? base.mode, ['free', 'snap'], 'snap')
   return {
-    mode: asEnum(src.mode, ['auto', 'free'], base.mode || 'auto'),
+    mode,
     dxIn: clamp(src.dxIn, -24, 24, base.dxIn ?? 0),
     dyIn: clamp(src.dyIn, -24, 24, base.dyIn ?? 0),
   }
@@ -138,6 +140,7 @@ export function normalizeLine(value, fallback) {
     transform: asEnum(src.transform, ['asIs', 'uppercase', 'lowercase'], base.transform || 'asIs'),
     layers: normalizeTextLayers(src.layers, base.layers || [{ ...DEFAULT_TEXT_LAYER }]),
     place: normalizePlace(src.place, base.place),
+    rotationDeg: clamp(src.rotationDeg, -180, 180, base.rotationDeg ?? 0),
   }
 }
 
@@ -609,9 +612,8 @@ export function measureComposition(composition, options = {}) {
     ? lineBoxes
     : lineBoxes.map((box) => {
     const place = box.line.place
-    if (place?.mode !== 'free') return box
-    const dx = Number(place.dxIn) || 0
-    const dy = Number(place.dyIn) || 0
+    const dx = Number(place?.dxIn) || 0
+    const dy = Number(place?.dyIn) || 0
     if (!dx && !dy) return box
     return { ...box, x: box.x + dx, y: box.y + dy, baselineY: box.baselineY + dy }
   })
@@ -620,10 +622,15 @@ export function measureComposition(composition, options = {}) {
   let maxX = width
   let maxY = height
   for (const box of offsetBoxes) {
-    minX = Math.min(minX, box.x)
-    minY = Math.min(minY, box.y)
-    maxX = Math.max(maxX, box.x + box.width)
-    maxY = Math.max(maxY, Math.max(box.y + box.height, box.baselineY + box.descentIn))
+    const deg = (Number(box.line.rotationDeg) || 0) * (Math.PI / 180)
+    const cx = box.x + box.width / 2
+    const cy = box.y + box.height / 2
+    const ex = (Math.abs(box.width * Math.cos(deg)) + Math.abs(box.height * Math.sin(deg))) / 2
+    const ey = (Math.abs(box.width * Math.sin(deg)) + Math.abs(box.height * Math.cos(deg))) / 2
+    minX = Math.min(minX, cx - ex)
+    minY = Math.min(minY, cy - ey)
+    maxX = Math.max(maxX, cx + ex)
+    maxY = Math.max(maxY, cy + ey, box.baselineY + box.descentIn)
   }
   const grownBoxes =
     minX < 0 || minY < 0

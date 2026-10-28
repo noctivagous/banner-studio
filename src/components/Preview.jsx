@@ -1,6 +1,8 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { SegmentControl } from './SegmentControl.jsx'
 import {
+  MAX_GLYPH_HEIGHT,
+  MIN_GLYPH_HEIGHT,
   cornerLengthIn,
   cutPolygonCss,
   cutPolygonPoints,
@@ -9,7 +11,13 @@ import {
   lineText,
   withLine,
 } from '../lib/composition.js'
-import { GRID_HALF_IN, GRID_PITCH_IN, gridLinesIn, placeFrameInTrim } from '../lib/grid.js'
+import {
+  GRID_HALF_IN,
+  GRID_PITCH_IN,
+  gridLinesIn,
+  placeFrameInTrim,
+  snapToGrid,
+} from '../lib/grid.js'
 import {
   JOIN_ALIGN_RECUT,
   PREVIEW_CUT_LINE,
@@ -285,30 +293,63 @@ export function BannerComposition({
   const dragRef = useRef(null)
   const justDraggedRef = useRef(false)
 
-  const toggleLock = (event, box) => {
+  const toggleSnap = (event, box) => {
     event.stopPropagation()
     if (typeof onPatchLine !== 'function') return
-    const place = box.line.place || { mode: 'auto', dxIn: 0, dyIn: 0 }
-    const free = place.mode === 'free'
-    onPatchLine(box.id, {
-      place: free ? { mode: 'auto', dxIn: 0, dyIn: 0 } : { ...place, mode: 'free' },
-    })
+    const place = box.line.place || { mode: 'snap', dxIn: 0, dyIn: 0 }
+    const snap = (place.mode || 'snap') !== 'free'
+    onPatchLine(box.id, { place: { ...place, mode: snap ? 'free' : 'snap' } })
   }
 
-  const beginDrag = (event, box) => {
+  const alignCenter = (event, box, axis) => {
+    event.stopPropagation()
+    if (typeof onPatchLine !== 'function') return
+    const place = box.line.place || { mode: 'snap', dxIn: 0, dyIn: 0 }
+    const autoX = box.x - (Number(place.dxIn) || 0)
+    const autoY = box.y - (Number(place.dyIn) || 0)
+    const patch =
+      axis === 'x'
+        ? { dxIn: Math.round(((w - box.width) / 2 - autoX) * 100) / 100 }
+        : { dyIn: Math.round(((h - box.height) / 2 - autoY) * 100) / 100 }
+    onPatchLine(box.id, { place: { ...place, mode: 'snap', ...patch } })
+  }
+
+  const beginDrag = (event, box, kind = 'move') => {
     event.stopPropagation()
     event.preventDefault()
     if (typeof onPatchLine !== 'function') return
     event.currentTarget.setPointerCapture?.(event.pointerId)
-    const place = box.line.place || { mode: 'auto', dxIn: 0, dyIn: 0 }
-    dragRef.current = {
+    const place = box.line.place || { mode: 'snap', dxIn: 0, dyIn: 0 }
+    const baseDx = Number(place.dxIn) || 0
+    const baseDy = Number(place.dyIn) || 0
+    const drag = {
       id: box.id,
+      kind,
       startX: event.clientX,
       startY: event.clientY,
-      baseDx: Number(place.dxIn) || 0,
-      baseDy: Number(place.dyIn) || 0,
+      autoX: box.x - baseDx,
+      autoY: box.y - baseDy,
+      baseDx,
+      baseDy,
+      baseH: Number(box.line.glyphHeight) || MIN_GLYPH_HEIGHT,
+      baseDeg: Number(box.line.rotationDeg) || 0,
+      centerX: 0,
+      centerY: 0,
+      startAng: 0,
+      snap: (place.mode || 'snap') !== 'free',
       moved: false,
     }
+    if (kind === 'rotate') {
+      const node = event.currentTarget.closest('[data-node-id]')
+      const rect = node?.getBoundingClientRect()
+      if (rect) {
+        drag.centerX = rect.left + rect.width / 2
+        drag.centerY = rect.top + rect.height / 2
+      }
+      drag.startAng =
+        (Math.atan2(event.clientY - drag.centerY, event.clientX - drag.centerX) * 180) / Math.PI
+    }
+    dragRef.current = drag
   }
 
   const moveDrag = (event) => {
@@ -319,12 +360,29 @@ export function BannerComposition({
     if (Math.abs(dxPx) + Math.abs(dyPx) > 3) drag.moved = true
     if (!drag.moved) return
     const round2 = (n) => Math.round(n * 100) / 100
+    if (drag.kind === 'resize') {
+      const next = Math.min(
+        MAX_GLYPH_HEIGHT,
+        Math.max(MIN_GLYPH_HEIGHT, Math.round(((drag.baseH + dyPx / scale) / 0.5)) * 0.5),
+      )
+      onPatchLine(drag.id, { glyphHeight: Math.round(next * 100) / 100 })
+      return
+    }
+    if (drag.kind === 'rotate') {
+      const ang = (Math.atan2(event.clientY - drag.centerY, event.clientX - drag.centerX) * 180) / Math.PI
+      const next = drag.baseDeg + (ang - drag.startAng)
+      const wrapped = ((next + 540) % 360) - 180
+      onPatchLine(drag.id, { rotationDeg: Math.round(wrapped / 5) * 5 })
+      return
+    }
+    let dx = drag.baseDx + dxPx / scale
+    let dy = drag.baseDy + dyPx / scale
+    if (drag.snap) {
+      dx = snapToGrid(drag.autoX + dx) - drag.autoX
+      dy = snapToGrid(drag.autoY + dy) - drag.autoY
+    }
     onPatchLine(drag.id, {
-      place: {
-        mode: 'free',
-        dxIn: round2(drag.baseDx + dxPx / scale),
-        dyIn: round2(drag.baseDy + dyPx / scale),
-      },
+      place: { mode: drag.snap ? 'snap' : 'free', dxIn: round2(dx), dyIn: round2(dy) },
     })
   }
 
@@ -428,7 +486,8 @@ export function BannerComposition({
         const boxW = `${box.width * scale}${hatchUnit}`
         const hitW = `${hitWidth * scale}${hatchUnit}`
         const boxH = `${box.height * scale}${hatchUnit}`
-        const free = (box.line.place?.mode || 'auto') === 'free'
+        const snap = (box.line.place?.mode || 'snap') !== 'free'
+        const rotation = Number(box.line.rotationDeg) || 0
         const canLock = interactive && typeof onPatchLine === 'function'
         return (
           <div
@@ -502,62 +561,180 @@ export function BannerComposition({
               >
                 <button
                   type="button"
-                  title={free ? 'Freeform: drag to move (click to lock to layout)' : 'Locked to layout (click to unlock and drag)'}
-                  aria-label={free ? 'Lock line to layout' : 'Unlock line for freeform drag'}
-                  aria-pressed={free}
-                  onClick={(event) => toggleLock(event, box)}
+                  title={snap ? 'Snapping to grid (click for free drag)' : 'Free drag (click to snap to grid)'}
+                  aria-label={snap ? 'Turn off grid snapping' : 'Turn on grid snapping'}
+                  aria-pressed={snap}
+                  onClick={(event) => toggleSnap(event, box)}
                   onPointerDown={(event) => event.stopPropagation()}
                   style={{
                     width: 20,
                     height: 20,
                     borderRadius: 3,
                     border: '1px solid #000',
-                    background: free ? '#E3FF33' : 'rgba(8,8,10,0.85)',
-                    color: free ? '#000' : '#E3FF33',
+                    background: snap ? '#E3FF33' : 'rgba(8,8,10,0.85)',
+                    color: snap ? '#000' : '#E3FF33',
                     fontSize: 12,
                     lineHeight: 1,
                     cursor: 'pointer',
                     padding: 0,
                   }}
                 >
-                  {free ? '🔓' : '🔒'}
+                  {snap ? '🧲' : '🔓'}
                 </button>
-                {free && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    title="Drag to move"
-                    aria-label="Drag line to move"
-                    onPointerDown={(event) => beginDrag(event, box)}
-                    onPointerMove={moveDrag}
-                    onPointerUp={endDrag}
-                    onPointerCancel={endDrag}
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        event.stopPropagation()
-                      }
-                    }}
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 3,
-                      border: '1px solid #000',
-                      background: '#E3FF33',
-                      color: '#000',
-                      fontSize: 12,
-                      lineHeight: '20px',
-                      textAlign: 'center',
-                      cursor: 'grab',
-                      touchAction: 'none',
-                      userSelect: 'none',
-                    }}
-                  >
-                    ⠿
-                  </span>
-                )}
+                <button
+                  type="button"
+                  title="Center horizontally in frame"
+                  aria-label="Center line horizontally in frame"
+                  onClick={(event) => alignCenter(event, box, 'x')}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 3,
+                    border: '1px solid #000',
+                    background: 'rgba(8,8,10,0.85)',
+                    color: '#E3FF33',
+                    fontSize: 12,
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  ↔
+                </button>
+                <button
+                  type="button"
+                  title="Center vertically in frame"
+                  aria-label="Center line vertically in frame"
+                  onClick={(event) => alignCenter(event, box, 'y')}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 3,
+                    border: '1px solid #000',
+                    background: 'rgba(8,8,10,0.85)',
+                    color: '#E3FF33',
+                    fontSize: 12,
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  ↕
+                </button>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  title="Drag to move"
+                  aria-label="Drag line to move"
+                  onPointerDown={(event) => beginDrag(event, box, 'move')}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }
+                  }}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 3,
+                    border: '1px solid #000',
+                    background: '#E3FF33',
+                    color: '#000',
+                    fontSize: 12,
+                    lineHeight: '20px',
+                    textAlign: 'center',
+                    cursor: 'grab',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                  }}
+                >
+                  ⠿
+                </span>
               </div>
+            )}
+            {canLock && selected && !editing && (
+              <>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  title="Drag to resize (glyph height)"
+                  aria-label="Drag to resize line"
+                  onPointerDown={(event) => beginDrag(event, box, 'resize')}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: -7,
+                    bottom: -7,
+                    width: 16,
+                    height: 16,
+                    borderRadius: 3,
+                    border: '1px solid #000',
+                    background: '#E3FF33',
+                    color: '#000',
+                    fontSize: 11,
+                    lineHeight: '16px',
+                    textAlign: 'center',
+                    cursor: 'nwse-resize',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                    zIndex: 10,
+                  }}
+                >
+                  ⤡
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  title="Drag to rotate"
+                  aria-label="Drag to rotate line"
+                  onPointerDown={(event) => beginDrag(event, box, 'rotate')}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    left: -7,
+                    top: -7,
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    border: '1px solid #000',
+                    background: '#E3FF33',
+                    color: '#000',
+                    fontSize: 11,
+                    lineHeight: '16px',
+                    textAlign: 'center',
+                    cursor: 'grab',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                    zIndex: 10,
+                  }}
+                >
+                  ⟳
+                </span>
+              </>
             )}
             {editing ? (
               <LineEditor
@@ -571,13 +748,23 @@ export function BannerComposition({
                 onCancel={() => onEditCancel?.()}
               />
             ) : (
-              <GlyphLine
-                line={box.line}
-                width={boxW}
-                height={boxH}
-                hatchUnit={hatchUnit}
-                scale={scale}
-              />
+              <div
+                aria-hidden="true"
+                style={{
+                  width: boxW,
+                  height: boxH,
+                  transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                  transformOrigin: 'center',
+                }}
+              >
+                <GlyphLine
+                  line={box.line}
+                  width={boxW}
+                  height={boxH}
+                  hatchUnit={hatchUnit}
+                  scale={scale}
+                />
+              </div>
             )}
             {selected && showGuides && !editing && (
               <div
@@ -900,9 +1087,12 @@ export function Preview({
   const labelH = showNumbers ? 28 : 0
   const cardH = rulerH + sheetH + labelH
   const pitchX = stacked ? contentPx : sheetW + sheetGap
-  const pitchY = stacked ? contentHpx : cardH + sheetGap
+  const rowBody = sheetH + labelH
+  // The inch ruler sits above the first row only. Later rows start at the page.
+  const pageTop = (row) =>
+    rulerH + row * (stacked ? contentHpx : rowBody + sheetGap)
   const boardW = cols > 0 ? (cols - 1) * pitchX + sheetW : 0
-  const boardH = rows > 0 ? (rows - 1) * pitchY + cardH : 0
+  const boardH = rows > 0 ? pageTop(rows - 1) + rowBody : 0
 
   const measureScroll = useCallback(() => {
     const el = canvasRef.current
@@ -953,9 +1143,7 @@ export function Preview({
     const spanWIn = stacked ? pageW + (cols - 1) * contentW : cols * pageW
     const spanHIn = stacked ? pageH + (rows - 1) * contentH : rows * pageH
     const extraX = stacked ? 0 : Math.max(0, cols - 1) * sheetGap
-    const extraY = stacked
-      ? rulerH + labelH
-      : rows * (rulerH + labelH) + Math.max(0, rows - 1) * sheetGap
+    const extraY = rulerH + rows * labelH + (stacked ? 0 : Math.max(0, rows - 1) * sheetGap)
     const zW = (availW - extraX) / (spanWIn * PX_PER_INCH)
     const zH = (availH - extraY) / (spanHIn * PX_PER_INCH)
     const next = Math.max(0.05, Math.min(zW, zH))
@@ -1114,27 +1302,29 @@ export function Preview({
                   className="absolute"
                   style={{
                     left: sheet.col * pitchX,
-                    top: sheet.row * pitchY,
+                    top: sheet.row === 0 ? 0 : pageTop(sheet.row),
                     width: sheetW,
-                    height: cardH,
+                    height: sheet.row === 0 ? cardH : rowBody,
                     zIndex: stacked ? sheet.index + 1 : 1,
                   }}
                 >
-                  <div
-                    className="absolute overflow-hidden"
-                    style={{
-                      left: margins.left * px,
-                      top: 0,
-                      width: slicePx,
-                      height: rulerH,
-                    }}
-                  >
-                    <ContentRuler startIn={sheet.originX} widthIn={sliceW} px={px} />
-                  </div>
+                  {sheet.row === 0 && (
+                    <div
+                      className="absolute overflow-hidden"
+                      style={{
+                        left: margins.left * px,
+                        top: 0,
+                        width: slicePx,
+                        height: rulerH,
+                      }}
+                    >
+                      <ContentRuler startIn={sheet.originX} widthIn={sliceW} px={px} />
+                    </div>
+                  )}
                   <div
                     className="absolute left-0 bg-white rounded-[2px] overflow-hidden"
                     style={{
-                      top: rulerH,
+                      top: sheet.row === 0 ? rulerH : 0,
                       width: sheetW,
                       height: sheetH,
                       boxShadow: stacked && (sheet.col > 0 || sheet.row > 0)
@@ -1422,7 +1612,7 @@ export function Preview({
                   {showNumbers && (
                     <div
                       className="absolute left-0 font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase flex items-center gap-2"
-                      style={{ top: rulerH + sheetH + 6 }}
+                      style={{ top: (sheet.row === 0 ? rulerH : 0) + sheetH + 6 }}
                     >
                       <span className="px-1.5 py-0.5 bg-[#26262E] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
                         {tile
@@ -1450,7 +1640,7 @@ export function Preview({
                     badges.push({
                       key: `vx-${sheet.row}-${seam}`,
                       left: cutSheet * pitchX + onSheet - 10,
-                      top: sheet.row * pitchY + rulerH + margins.top * px + sliceHpx / 2 - 10,
+                      top: pageTop(sheet.row) + margins.top * px + sliceHpx / 2 - 10,
                       rotate: 'rotate-[270deg]',
                     })
                   }
@@ -1458,13 +1648,13 @@ export function Preview({
                   if (horizontalSeam) {
                     const seam = duplicateStrip ? sheet.row - 1 : sheet.row
                     const cutSheet = duplicateStrip ? seam + 1 : seam
-                    const onSheet = duplicateStrip
-                      ? rulerH + margins.top * px + cutSlackPx
-                      : rulerH + margins.top * px + contentHpx
+                    const onPage = duplicateStrip
+                      ? margins.top * px + cutSlackPx
+                      : margins.top * px + contentHpx
                     badges.push({
                       key: `hy-${sheet.col}-${seam}`,
                       left: sheet.col * pitchX + margins.left * px + slicePx / 2 - 10,
-                      top: cutSheet * pitchY + onSheet - 10,
+                      top: pageTop(cutSheet) + onPage - 10,
                       rotate: 'rotate-180',
                     })
                   }

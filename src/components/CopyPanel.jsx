@@ -111,7 +111,7 @@ function StackLineInput({ line, index, align, selected, onSelect, onPatch }) {
         }}
       />
       <div className="absolute bottom-1 right-1 px-1 py-px bg-[var(--ctl)] border border-[#43434E] rounded-[3px] font-mono text-[8px] tracking-[0.1em] text-[#7A7A80] uppercase pointer-events-none">
-        {(line.place?.mode || 'auto') === 'free' ? '🔓 ' : ''}{font.label}
+        {(line.place?.mode || 'snap') === 'free' ? '🔓 ' : ''}{font.label}
       </div>
     </div>
   )
