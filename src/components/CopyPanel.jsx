@@ -94,12 +94,24 @@ function ContainerFields({ container, onPatch, onAlignX }) {
         Rectangle hugs the stack. Align cascades to the Y-stack and the lines.
         On sheet places the frame in the trim. Corner size scales with the shorter side.
       </p>
-      <ParamSection title="Shape" sectionId="copy.container.shape" defaultOpen={false}>
+      <ParamSection
+        title="Shape"
+        sectionId="copy.container.shape"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">Rectangle</span>
+        }
+      >
         <div className="h-8 rounded-[4px] border border-[#43434E] bg-[var(--ctl)] font-mono text-[11px] uppercase tracking-[0.08em] text-[#F0F0F2] flex items-center px-2.5">
           Rectangle
         </div>
       </ParamSection>
-      <ParamSection title="Size" sectionId="copy.container.size" defaultOpen={false}>
+      <ParamSection
+        title="Size"
+        sectionId="copy.container.size"
+        defaultOpen={false}
+        value={<span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">Hug</span>}
+      >
         <div
           role="status"
           aria-label="Size: hug content"
@@ -111,7 +123,16 @@ function ContainerFields({ container, onPatch, onAlignX }) {
           </span>
         </div>
       </ParamSection>
-      <ParamSection title="Aspect" sectionId="copy.container.aspect" defaultOpen={false}>
+      <ParamSection
+        title="Aspect"
+        sectionId="copy.container.aspect"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {activeAspect === 'off' ? 'Off' : activeAspect}
+          </span>
+        }
+      >
         <div className="grid grid-cols-5 gap-1">
           <button
             type="button"
@@ -173,7 +194,17 @@ function ContainerFields({ container, onPatch, onAlignX }) {
           />
         </div>
       </ParamSection>
-      <ParamSection icon={<AlignIcon />} title="Align" sectionId="copy.container.align" defaultOpen={false}>
+      <ParamSection
+        icon={<AlignIcon />}
+        title="Align"
+        sectionId="copy.container.align"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {container.layout.alignX} · {container.layout.alignY}
+          </span>
+        }
+      >
         <div className="grid grid-cols-3 gap-1 mb-3">
           {['left', 'center', 'right'].map((dir) => (
             <button
@@ -214,7 +245,18 @@ function ContainerFields({ container, onPatch, onAlignX }) {
           ))}
         </div>
       </ParamSection>
-      <ParamSection title="Corners" sectionId="copy.container.corners" defaultOpen={false}>
+      <ParamSection
+        title="Corners"
+        sectionId="copy.container.corners"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {container.decoration.corner !== 'square'
+              ? `${container.decoration.corner} ${(container.decoration.cornerSize * 100).toFixed(0)}%`
+              : 'Square'}
+          </span>
+        }
+      >
         <div className="grid grid-cols-3 gap-1 mb-2">
           {['square', 'round', 'cut'].map((mode) => (
             <button
@@ -328,7 +370,15 @@ function StackFields({ stack, onPatch, onAlignX }) {
         Alignment lines for the whole Y-stack. Every display line shares this
         left, center, or right edge.
       </p>
-      <ParamSection icon={<AlignIcon />} title="Align" sectionId="copy.stack.align" defaultOpen={false}>
+      <ParamSection
+        icon={<AlignIcon />}
+        title="Align"
+        sectionId="copy.stack.align"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">{stack.align}</span>
+        }
+      >
         <div className="grid grid-cols-3 gap-1">
           {['left', 'center', 'right'].map((dir) => (
             <button
@@ -386,7 +436,15 @@ function LineFields({ line, glyphMax, onPatch, align }) {
   const front = visible[visible.length - 1] ?? line.layers?.[0]
   return (
     <div className="pro-divided">
-      <ParamSection icon={<FontIcon />} title="Font Family" sectionId="copy.line.font" defaultOpen={false}>
+      <ParamSection
+        icon={<FontIcon />}
+        title="Font Family"
+        sectionId="copy.line.font"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">{font.label}</span>
+        }
+      >
         <FontSelect fontId={line.fontId} onChange={onPatch} />
       </ParamSection>
       <div className="relative">
@@ -468,7 +526,17 @@ function LineFields({ line, glyphMax, onPatch, align }) {
           className="w-full"
         />
       </ParamSection>
-      <ParamSection icon={<TransformIcon />} title="Text Transform" sectionId="copy.line.transform" defaultOpen={false}>
+      <ParamSection
+        icon={<TransformIcon />}
+        title="Text Transform"
+        sectionId="copy.line.transform"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {line.transform === 'asIs' ? 'As Is' : line.transform}
+          </span>
+        }
+      >
         <div className="grid grid-cols-3 gap-1.5">
           {['uppercase', 'lowercase', 'asIs'].map((mode) => (
             <button

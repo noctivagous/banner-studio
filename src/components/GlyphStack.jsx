@@ -33,6 +33,25 @@ import { EffectIcon, FillIcon, StrokeIcon } from './icons.jsx'
 
 const ANGLE_ARROWS = ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗']
 
+const EFFECT_OPTIONS = [
+  { id: TEXT_EFFECT_NONE, label: 'None' },
+  { id: TEXT_EFFECT_SHADE, label: 'Shade' },
+  { id: TEXT_EFFECT_KEYLINE, label: 'Keyline' },
+  { id: TEXT_EFFECT_BLOCK_SHADE, label: '3D Block' },
+  { id: TEXT_EFFECT_SIGNAL, label: 'Signal' },
+  { id: TEXT_EFFECT_CAST, label: 'Cast' },
+  { id: TEXT_EFFECT_CUTOUT, label: 'Cutout 3D' },
+  { id: TEXT_EFFECT_OUTLINE_COPY_SHADOW, label: 'Outline + Shadow' },
+  { id: TEXT_EFFECT_HATCH_SHADOW, label: 'Hatch + Shadow' },
+  { id: TEXT_EFFECT_FILL_HATCH_SHADOW, label: 'Fill + Hatch-Shadow 90deg' },
+  { id: TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG, label: 'Fill + Hatch-Shadow 0deg' },
+]
+
+function effectLabel(presetId) {
+  if (presetId === TEXT_EFFECT_CUSTOM) return 'Custom'
+  return EFFECT_OPTIONS.find((option) => option.id === presetId)?.label ?? 'Custom'
+}
+
 function PresetPreview({ presetId, font }) {
   const face = {
     fontFamily: `"${font.family}", Impact, sans-serif`,
@@ -391,7 +410,17 @@ export function GlyphStack({ line, font, onPatchLine }) {
 
   return (
     <div className="pro-divided">
-      <ParamSection icon={<EffectIcon />} title="Glyph stack" sectionId="glyph.layers" defaultOpen={false}>
+      <ParamSection
+        icon={<EffectIcon />}
+        title="Glyph stack"
+        sectionId="glyph.layers"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {stack.length} {stack.length === 1 ? 'copy' : 'copies'}
+          </span>
+        }
+      >
         <p className="mb-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
           Z axis — top = back, bottom = front. Same glyphs, stacked in depth.
         </p>
@@ -517,6 +546,9 @@ export function GlyphStack({ line, font, onPatchLine }) {
         sectionId="glyph.fill-base"
         defaultOpen={false}
         value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">{selected.fill}</span>
+        }
+        value={
           <span className="font-mono text-[10px] tracking-[0.1em] text-[#E3FF33] uppercase">
             Editing · {selected.name}
           </span>
@@ -572,11 +604,18 @@ export function GlyphStack({ line, font, onPatchLine }) {
         sectionId="glyph.fill-overlay"
         defaultOpen={false}
         value={
-          <Toggle
-            on={selected.overlayOn}
-            onToggle={() => setSelected({ overlayOn: !selected.overlayOn })}
-            offKnob="bg-[#7A7A80]"
-          />
+          <span className="flex items-center gap-2 shrink-0">
+            <span className="font-tech text-[12px] text-[#F0F0F2]">
+              {selected.overlayOn
+                ? `${selected.overlayAngle}° · ${selected.overlaySpacingPct}%`
+                : 'Off'}
+            </span>
+            <Toggle
+              on={selected.overlayOn}
+              onToggle={() => setSelected({ overlayOn: !selected.overlayOn })}
+              offKnob="bg-[#7A7A80]"
+            />
+          </span>
         }
       >
         {selected.overlayOn && (
@@ -616,11 +655,16 @@ export function GlyphStack({ line, font, onPatchLine }) {
         sectionId="glyph.stroke"
         defaultOpen={false}
         value={
-          <Toggle
-            on={selected.strokeOn}
-            onToggle={() => setSelected({ strokeOn: !selected.strokeOn })}
-            offKnob="bg-[#7A7A80]"
-          />
+          <span className="flex items-center gap-2 shrink-0">
+            <span className="font-tech text-[12px] text-[#F0F0F2]">
+              {selected.strokeOn ? `${Number(selected.strokeWidthIn).toFixed(2)}"` : 'Off'}
+            </span>
+            <Toggle
+              on={selected.strokeOn}
+              onToggle={() => setSelected({ strokeOn: !selected.strokeOn })}
+              offKnob="bg-[#7A7A80]"
+            />
+          </span>
         }
       >
         {selected.strokeOn && (
@@ -654,7 +698,17 @@ export function GlyphStack({ line, font, onPatchLine }) {
         )}
       </ParamSection>
 
-      <ParamSection icon={<EffectIcon />} title={`Offset · ${selected.name}`} sectionId="glyph.offset" defaultOpen={false}>
+      <ParamSection
+        icon={<EffectIcon />}
+        title={`Offset · ${selected.name}`}
+        sectionId="glyph.offset"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {offset.distance.toFixed(2)}&quot; · {Math.round(offset.angle)}°
+          </span>
+        }
+      >
         <div className="pro-well mb-4 space-y-3 p-3 border rounded-[3px]">
           <p className="mb-0 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
             Position of this copy. The face usually sits at 0.00&quot;; copies behind it
@@ -739,21 +793,18 @@ export function GlyphStack({ line, font, onPatchLine }) {
           </div>
         </div>
       </ParamSection>
-      <ParamSection title="Glyph Effects" sectionId="glyph.effects" defaultOpen={false}>
+      <ParamSection
+        title="Glyph Effects"
+        sectionId="glyph.effects"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {effectLabel(matchedPreset)}
+          </span>
+        }
+      >
         <div className="grid grid-cols-2 gap-1.5">
-          {[
-            { id: TEXT_EFFECT_NONE, label: 'None' },
-            { id: TEXT_EFFECT_SHADE, label: 'Shade' },
-            { id: TEXT_EFFECT_KEYLINE, label: 'Keyline' },
-            { id: TEXT_EFFECT_BLOCK_SHADE, label: '3D Block' },
-            { id: TEXT_EFFECT_SIGNAL, label: 'Signal' },
-            { id: TEXT_EFFECT_CAST, label: 'Cast' },
-            { id: TEXT_EFFECT_CUTOUT, label: 'Cutout 3D' },
-            { id: TEXT_EFFECT_OUTLINE_COPY_SHADOW, label: 'Outline + Shadow' },
-            { id: TEXT_EFFECT_HATCH_SHADOW, label: 'Hatch + Shadow' },
-            { id: TEXT_EFFECT_FILL_HATCH_SHADOW, label: 'Fill + Hatch-Shadow 90deg' },
-            { id: TEXT_EFFECT_FILL_HATCH_SHADOW_0DEG, label: 'Fill + Hatch-Shadow 0deg' },
-          ].map((option) => (
+          {EFFECT_OPTIONS.map((option) => (
             <button
               key={option.id}
               type="button"
