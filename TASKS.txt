@@ -1,3 +1,6 @@
 [ ] - Templates and Wizards
   [  ] design features and task lists for features for the app around
 the need for a template library and wizard library.
+  [  ] Templates and Wizards should be accessible on workspace
+  when it says "Empty Strip".
+
