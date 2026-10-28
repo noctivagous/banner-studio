@@ -1,3 +1,5 @@
+> Status: **completed** — the rebuild shipped (readable `src/`, proper title/fonts/Print button/persistence, fixed print pipeline). This plan is kept as a record of the baseline approach.
+
 ## Goal
 
 Turn the single opaque `Tile-Banner-Studio-Dark.html` artifact (192KB minified bundle, no project around it) into a working web app: a runnable, maintainable project with a dev server, a production build, and the same banner-studio behavior, plus fixes for the issues found during research.

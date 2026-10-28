@@ -208,9 +208,14 @@ export function formatLength(inches) {
 
 export function detectPreset(margins) {
   const close = (a, b) => Math.abs(a - b) < 0.001
-  if (close(margins.top, 0.25) && close(margins.left, 0.25)) return 'laser'
-  if (close(margins.top, 0.5) && close(margins.left, 0.5)) return 'inkjet'
-  if (close(margins.top, 0.125)) return 'minimal'
+  const all = (value) =>
+    close(margins.top, value) &&
+    close(margins.bottom, value) &&
+    close(margins.left, value) &&
+    close(margins.right, value)
+  if (all(0.25)) return 'laser'
+  if (all(0.5)) return 'inkjet'
+  if (all(0.125)) return 'minimal'
   return 'custom'
 }
 

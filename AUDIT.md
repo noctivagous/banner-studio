@@ -497,13 +497,13 @@ Do phases in order; each phase leaves the app shippable.
 
 ### Phase 0 — Quick correctness fixes (S)
 
-- [ ] Delete the duplicate `value` prop on Fill (Base)
+- [x] Delete the duplicate `value` prop on Fill (Base)
   (`GlyphStack.jsx:548`) — build warning gone. (§2.1)
-- [ ] `detectPreset` compares all four margins
+- [x] `detectPreset` compares all four margins
   (`layout.js:200`). (§4.4)
-- [ ] Remove `style={{ paddingTop: 'var(--safe-area-inset-top)' }}`
+- [x] Remove `style={{ paddingTop: 'var(--safe-area-inset-top)' }}`
   (`App.jsx:162`). (§5)
-- [ ] Fix overlap default in
+- [x] Fix overlap default in
   `refs/internal/tiled-print-alignment.md` and mark
   `docs/plans/2026-09-26-banner-studio-working-web-app.md`
   completed. (§5)
@@ -519,7 +519,9 @@ Do phases in order; each phase leaves the app shippable.
 - [x] Attach the Frame/Stack/Line badge to the selected tree row
   instead of below the tree. (§1.2)
 - [ ] Acceptance: fresh-profile walkthrough (§6 P1) passes;
-  `npm run build` clean.
+  `npm run build` clean. (Build passes; the walkthrough needs a
+  browser with cleared `localStorage` — the sandbox here cannot
+  open a dev-server port, so it is pending a human run.)
 
 ### Phase 2 — Seam and control consolidation (P2, P3) (M–L)
 

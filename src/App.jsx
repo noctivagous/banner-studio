@@ -157,10 +157,7 @@ export default function App() {
         id="app-root"
         className="h-full max-h-full overflow-hidden bg-[#08080A] text-[#F0F0F2] flex flex-col selection:bg-[#E3FF33] selection:text-black"
       >
-        <header
-          className="pro-bar h-14 bg-[#141417] flex items-center justify-between px-4 shrink-0 sticky top-0 z-30"
-          style={{ paddingTop: 'var(--safe-area-inset-top)' }}
-        >
+        <header className="pro-bar h-14 bg-[#141417] flex items-center justify-between px-4 shrink-0 sticky top-0 z-30">
           <div className="flex items-center gap-4">
             <div className="flex items-baseline gap-3">
               <span

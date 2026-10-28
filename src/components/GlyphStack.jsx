@@ -546,9 +546,6 @@ export function GlyphStack({ line, font, onPatchLine }) {
         sectionId="glyph.fill-base"
         defaultOpen={false}
         value={
-          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">{selected.fill}</span>
-        }
-        value={
           <span className="font-mono text-[10px] tracking-[0.1em] text-[#E3FF33] uppercase">
             Editing · {selected.name}
           </span>
