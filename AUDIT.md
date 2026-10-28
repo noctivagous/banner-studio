@@ -539,7 +539,9 @@ Do phases in order; each phase leaves the app shippable.
   (`App.jsx`, `PrinterSafe.jsx`).
 - [x] Delete the Output stats card duplication and "Ready to
   print" card; one stats block + one Print (`Output.jsx`).
-- [x] Remove DocumentMenu "Export PDF" (`DocumentMenu.jsx`).
+- [x] Remove DocumentMenu "Export PDF" (`DocumentMenu.jsx`) — later
+  reversed per user request: restored with a "choose Save as PDF"
+  hint, since the app has no real PDF exporter.
 - [ ] Acceptance: §6 P3 grep checks pass (verified: one
   `JoinSelect` in Paper & Margins, one paper select, one
   `PrintButton` in Output; join migration unit checks pass);
