@@ -63,10 +63,10 @@ function TreeRow({ selected, indent = 0, onClick, label, hint, kind = 'line', me
       aria-label={label}
       aria-selected={selected}
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-1.5 py-1.5 rounded-[4px] border cursor-pointer transition-colors ${
+      className={`flex items-center gap-1.5 px-1.5 py-1.5 rounded-[3px] border cursor-pointer transition-colors ${
         selected
           ? 'bg-[var(--ctl)] border-[#E3FF33]'
-          : `${TREE_TINT[kind] || TREE_TINT.line} border-[#43434E] hover:border-[#5E5E69]`
+          : `${TREE_TINT[kind] || TREE_TINT.line} border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-[#5E5E69]`
       }`}
       style={{ marginLeft: indent }}
     >
@@ -549,7 +549,7 @@ export function CopyPanel({
   }
 
   return (
-    <div className="zone-copy w-full xl:w-[340px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#16161E] xl:border-r border-b xl:border-b-0 border-[#43434E] flex flex-row overflow-hidden">
+    <div className="zone-copy w-full xl:w-[340px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#16161E] xl:border-r border-b xl:border-b-0 border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] flex flex-row overflow-hidden">
       <SectionSpine label="Copy Deck" sub="01" />
       <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
       <div className="p-5 space-y-7">

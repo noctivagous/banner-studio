@@ -5,7 +5,7 @@ export function FieldLabel({ children, value, icon }) {
         {icon}
         <span className="font-mono text-[11px] tracking-[0.1em] uppercase">{children}</span>
       </span>
-      <span aria-hidden="true" className="flex-1 h-px bg-[#43434E]/50" />
+      <span aria-hidden="true" className="flex-1 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
       {value}
     </div>
   )

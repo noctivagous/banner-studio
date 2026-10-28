@@ -407,10 +407,10 @@ export function GlyphStack({ line, font, onPatchLine }) {
                 role="option"
                 aria-selected={isSelected}
                 onClick={() => setSelectedId(layer.id)}
-                className={`flex items-center gap-1.5 px-1.5 py-1.5 rounded-[4px] border cursor-pointer transition-colors ${
+                className={`flex items-center gap-1.5 px-1.5 py-1.5 rounded-[3px] border cursor-pointer transition-colors ${
                   isSelected
                     ? 'bg-[var(--ctl)] border-[#E3FF33]'
-                    : 'bg-[#08080A] border-[#43434E] hover:border-[#5E5E69]'
+                    : 'bg-[#0b0b0e] border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-[#5E5E69]'
                 } ${layer.visible === false ? 'opacity-50' : ''}`}
               >
                 <button
@@ -574,7 +574,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
           Fill (Overlay)
         </FieldLabel>
         {selected.overlayOn && (
-          <div className="space-y-3 p-3 bg-[#08080A] border border-[#43434E] rounded-[4px]">
+          <div className="pro-well space-y-3 p-3 border rounded-[3px]">
             <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
               Hatch lines over the base fill, clipped to the glyph.
             </p>
@@ -618,7 +618,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
           Stroke
         </FieldLabel>
         {selected.strokeOn && (
-          <div className="space-y-3 p-3 bg-[#08080A] border border-[#43434E] rounded-[4px]">
+          <div className="pro-well space-y-3 p-3 border rounded-[3px]">
             <div>
               <div className="flex justify-between mb-1">
                 <span className="font-mono text-[10px] text-[#7A7A80] uppercase">Width</span>
@@ -650,7 +650,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
 
       <div>
         <FieldLabel icon={<EffectIcon />}>Offset · {selected.name}</FieldLabel>
-        <div className="mb-4 space-y-3 p-3 bg-[#08080A] border border-[#43434E] rounded-[4px]">
+        <div className="pro-well mb-4 space-y-3 p-3 border rounded-[3px]">
           <p className="mb-0 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
             Position of this copy. The face usually sits at 0.00&quot;; copies behind it
             form the shadow.

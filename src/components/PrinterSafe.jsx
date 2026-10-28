@@ -20,7 +20,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
   return (
     <div>
       <ZoneHeader index="02" title="Printer Safe" icon={<PrinterIcon />} />
-      <div className="bg-[#08080A] border border-[#43434E] rounded-[4px] p-3 mb-4">
+      <div className="pro-well border rounded-[3px] p-3 mb-4">
         <p className="font-mono text-[11px] leading-[1.5] text-[#7A7A80]">
           Printers can&apos;t print to the edge. This tool lays out type{' '}
           <span className="text-[#F0F0F2]">INSIDE</span> your printable area, not to the paper
@@ -33,7 +33,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
           <select
             value={paperId}
             onChange={(e) => onChange({ paperId: e.target.value })}
-            className="w-full bg-[#08080A] border border-[#43434E] rounded-[4px] h-9 px-2.5 font-mono text-[12px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 appearance-none"
+            className="w-full bg-[#08080A] border border-[#43434E] rounded-[3px] h-9 px-2.5 font-mono text-[12px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 appearance-none shadow-[inset_0_2px_5px_rgba(0,0,0,0.6)]"
           >
             {PAPERS.map((paper) => (
               <option key={paper.id} value={paper.id}>
@@ -54,7 +54,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
               key={id}
               type="button"
               onClick={() => onChange({ orientation: id })}
-              className={`h-8 rounded-[4px] border font-mono text-[11px] tracking-[0.08em] uppercase flex items-center justify-center gap-1.5 ${
+              className={`pro-bevel h-8 rounded-[3px] border font-mono text-[11px] tracking-[0.08em] uppercase flex items-center justify-center gap-1.5 ${
                 orientation === id
                   ? 'bg-[#E3FF33] border-[#E3FF33] text-black font-bold'
                   : 'bg-[var(--ctl)] border-[#43434E] text-[#7A7A80] hover:text-[#F0F0F2]'
@@ -72,9 +72,9 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
             key={preset.id}
             type="button"
             onClick={() => onChange({ margins: { ...MARGIN_PRESETS[preset.id] } })}
-            className={`h-[44px] rounded-[4px] border px-3 text-left transition-colors ${
+            className={`pro-bevel h-[44px] rounded-[3px] border px-3 text-left transition-colors ${
               active === preset.id
-                ? 'bg-[#E3FF33] border-[#E3FF33] text-black'
+                ? 'bg-[#E3FF33] border-[#E3FF33] text-black font-bold'
                 : 'bg-[var(--ctl)] border-[#43434E] text-[#7A7A80] hover:border-[#5E5E69] hover:text-[#F0F0F2]'
             }`}
           >
@@ -106,7 +106,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
                   const next = Math.min(1, Math.max(0, parseFloat(e.target.value) || 0))
                   onChange({ margins: { ...margins, [side]: next } })
                 }}
-                className="w-full bg-[#08080A] border border-[#43434E] rounded-[4px] h-9 px-2.5 pr-7 font-mono text-[12px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60"
+                className="w-full bg-[#08080A] border border-[#43434E] rounded-[3px] h-9 px-2.5 pr-7 font-mono text-[12px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 shadow-[inset_0_2px_5px_rgba(0,0,0,0.6)]"
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[#5A5A60]">
                 &quot;

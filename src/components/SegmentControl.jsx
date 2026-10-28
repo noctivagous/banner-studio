@@ -3,7 +3,7 @@ export function SegmentControl({ value, options, onChange, ariaLabel, fill = fal
     <div
       role="group"
       aria-label={ariaLabel}
-      className={`${fill ? 'flex w-full' : 'inline-flex'} h-7 items-center rounded-[4px] border border-[#43434E] bg-[#08080A] p-0.5`}
+      className={`${fill ? 'flex w-full' : 'inline-flex'} h-7 items-center rounded-[3px] border border-black bg-[#050506] p-0.5 shadow-[inset_0_2px_5px_rgba(0,0,0,0.65),0_1px_0_rgba(255,255,255,0.05)]`}
     >
       {options.map((option) => {
         const selected = value === option.value

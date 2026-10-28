@@ -120,7 +120,7 @@ export default function App() {
         className="h-full max-h-full overflow-hidden bg-[#08080A] text-[#F0F0F2] flex flex-col selection:bg-[#E3FF33] selection:text-black"
       >
         <header
-          className="h-14 bg-[#121214] border-b border-[#43434E] flex items-center justify-between px-4 shrink-0 sticky top-0 z-30"
+          className="pro-bar h-14 bg-[#141417] flex items-center justify-between px-4 shrink-0 sticky top-0 z-30"
           style={{ paddingTop: 'var(--safe-area-inset-top)' }}
         >
           <div className="flex items-center gap-4">
@@ -142,7 +142,7 @@ export default function App() {
                     aria-label="Page size"
                     value={paperId}
                     onChange={(e) => patch({ paperId: e.target.value })}
-                    className="h-6 pl-2 pr-5 rounded-[4px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
+                    className="pro-bevel h-6 pl-2 pr-5 rounded-[3px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
                   >
                     {PAPERS.map((paper) => (
                       <option key={paper.id} value={paper.id}>
@@ -160,7 +160,7 @@ export default function App() {
                     aria-label="Orientation"
                     value={orientation}
                     onChange={(e) => patch({ orientation: e.target.value })}
-                    className="h-6 pl-2 pr-5 rounded-[4px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
+                    className="pro-bevel h-6 pl-2 pr-5 rounded-[3px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
                   >
                     <option value="landscape">Landscape</option>
                     <option value="portrait">Portrait</option>
@@ -169,13 +169,13 @@ export default function App() {
                     ▼
                   </span>
                 </label>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-[4px] bg-[#26262E] border border-[#43434E] text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase">
+                <span className="pro-seg inline-flex items-center px-2 py-0.5 rounded-[3px] bg-[#1e1e26] border text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase">
                   {pageW.toFixed(2)}×{pageH.toFixed(2)} — Trim & Tape
                 </span>
               </div>
             </div>
             <div className="hidden lg:flex items-center gap-2 ml-2">
-              <div className="w-px h-4 bg-[#43434E]" />
+              <div className="w-px h-4 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)]" />
               <span className="font-mono text-[10px] tracking-[0.14em] text-[#7A7A80] uppercase">
                 No edge-to-edge • Inside safe area
               </span>
@@ -184,16 +184,16 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 pr-1">
-              <div className="hidden md:flex items-center gap-3 pr-3 border-r border-[#43434E]">
+              <div className="hidden md:flex items-center gap-3 pr-3 border-r border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]">
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
                   {sheetCount} Sheets
                 </span>
-                <span className="w-px h-3 bg-[#43434E]" />
+                <span className="w-px h-3 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)]" />
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#F0F0F2]">
                   {assembledInches > 0 ? formatLength(assembledInches) : '—'}
                 </span>
               </div>
-              <div className="h-8 px-3 bg-[#26262E] border border-[#43434E] rounded-[4px] flex items-center gap-2">
+              <div className="pro-seg h-8 px-3 bg-[#1e1e26] border rounded-[3px] flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#E3FF33] animate-pulse" />
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#F0F0F2] uppercase">
                   {trimW.toFixed(2)}&quot; × {trimH.toFixed(2)}&quot; TRIM
@@ -244,9 +244,9 @@ export default function App() {
             showNumbers={showNumbers}
             showCutMarks={showCutMarks}
           />
-          <div className="w-full xl:w-[320px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#121214] xl:border-l border-t xl:border-t-0 border-[#43434E] overflow-y-auto">
+          <div className="w-full xl:w-[320px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#101014] border-t xl:border-t-0 xl:border-l border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] overflow-y-auto">
             <div className="p-5 space-y-5">
-              <section className="zone-safe flex flex-row rounded-[6px] bg-[#1A1611] border border-[#4A4438]/60 overflow-hidden">
+              <section className="zone-safe pro-group flex flex-row rounded-[3px] bg-[#1A1611] border overflow-hidden">
                 <SectionSpine label="Printer Safe" sub="02" />
                 <div className="flex-1 min-w-0 p-4">
                   <PrinterSafe
@@ -259,13 +259,13 @@ export default function App() {
                 </div>
               </section>
               <div aria-hidden="true" className="flex items-center gap-3 -mx-5">
-                <span className="flex-1 h-px bg-[#43434E]/60" />
+                <span className="flex-1 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
                 <span className="font-mono text-[9px] tracking-[0.2em] text-[#5A5A60] uppercase">
                   Output below
                 </span>
-                <span className="flex-1 h-px bg-[#43434E]/60" />
+                <span className="flex-1 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
               </div>
-              <section className="zone-output flex flex-row rounded-[6px] bg-[#131A0E] border border-[#E3FF33]/25 overflow-hidden">
+              <section className="zone-output pro-group flex flex-row rounded-[3px] bg-[#131A0E] border overflow-hidden">
                 <SectionSpine label="Output" sub="03" />
                 <div className="flex-1 min-w-0 p-4">
                   <Output
@@ -289,7 +289,7 @@ export default function App() {
             </div>
           </div>
         </div>
-        <footer className="h-[10px] shrink-0 bg-[#121214] border-t border-[#43434E]" />
+        <footer className="pro-rail-t h-[10px] shrink-0 bg-[#0c0c0e]" />
       </div>
       <PrintArea
         sheetCount={sheetCount}

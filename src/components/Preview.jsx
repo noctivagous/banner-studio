@@ -796,7 +796,7 @@ export function Preview({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-[#08080A] relative order-first xl:order-none overflow-hidden">
-      <div className="h-[46px] bg-[#121214] border-b border-[#43434E] flex items-center justify-between px-3 shrink-0">
+      <div className="pro-bar h-[46px] bg-[#141417] flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#E3FF33] animate-pulse" />
@@ -813,7 +813,7 @@ export function Preview({
               ]}
             />
           </div>
-          <div className="hidden md:flex items-center gap-2 ml-3 pl-3 border-l border-[#43434E]">
+          <div className="hidden md:flex items-center gap-2 ml-3 pl-3 border-l border-black shadow-[inset_1px_0_0_rgba(255,255,255,0.05)]">
             <span className="font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
               Scale 1&quot; = {PX_PER_INCH * zoom}px
             </span>
@@ -831,7 +831,7 @@ export function Preview({
                 onScaleToFit(false)
                 onZoom(level)
               }}
-              className={`h-7 px-2.5 rounded-[4px] border font-mono text-[11px] tracking-[0.08em] transition-colors ${
+              className={`pro-bevel h-7 px-2.5 rounded-[3px] border font-mono text-[11px] tracking-[0.08em] transition-colors ${
                 !scaleToFit && Math.abs(zoom - level) < 0.001
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                   : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-[#F0F0F2] hover:border-[#5E5E69]'
@@ -840,11 +840,11 @@ export function Preview({
               {level * 100}%
             </button>
           ))}
-          <div className="w-px h-4 bg-[#43434E] mx-1" />
+          <div className="w-px h-4 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)] mx-1" />
           <button
             type="button"
             onClick={() => onScaleToFit(true)}
-            className={`h-7 px-2.5 rounded-[4px] border font-mono text-[11px] tracking-[0.08em] uppercase transition-colors ${
+            className={`pro-bevel h-7 px-2.5 rounded-[3px] border font-mono text-[11px] tracking-[0.08em] uppercase transition-colors ${
               scaleToFit
                 ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                 : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-[#F0F0F2] hover:border-[#5E5E69]'
@@ -858,7 +858,7 @@ export function Preview({
       <div className="flex-1 relative min-h-0 min-w-0">
       <div
         aria-hidden="true"
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 pointer-events-none flex flex-col items-center gap-2 py-3 px-[4px] rounded-r-[4px] bg-[#121214]/90 border border-l-0 border-[#43434E]"
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 pointer-events-none flex flex-col items-center gap-2 py-3 px-[4px] rounded-r-[3px] bg-[#141417]/90 border border-l-0 border-black"
       >
         <span className="w-1 h-1 rounded-full bg-[#E3FF33]" />
         <span
@@ -870,7 +870,7 @@ export function Preview({
       </div>
       <div
         ref={canvasRef}
-        className="absolute inset-0 overflow-auto bg-[#08080A] preview-canvas"
+        className="absolute inset-0 overflow-auto bg-[#050506] preview-canvas shadow-[inset_0_2px_12px_rgba(0,0,0,0.75)]"
         onScroll={measureScroll}
       >
         <div

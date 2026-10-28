@@ -31,14 +31,14 @@ export function Output({
   return (
     <div>
       <ZoneHeader index="03" title="Output" icon={<OutputIcon />} />
-      <div className="bg-[var(--ctl)] border border-[#43434E] rounded-[4px] p-3.5 space-y-2.5">
+      <div className="pro-group bg-[var(--ctl)] border rounded-[3px] p-3.5 space-y-2.5">
         <div className="flex justify-between items-center">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
             # Sheets
           </span>
           <span className="font-mono text-[13px] font-bold text-[#F0F0F2]">{sheetCount}</span>
         </div>
-        <div className="h-px bg-[#43434E]" />
+        <div className="h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
         <div className="space-y-1">
           <div className="flex justify-between">
             <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
@@ -49,7 +49,7 @@ export function Output({
             {assembledInches > 0 ? formatLength(assembledInches) : '—'}
           </div>
         </div>
-        <div className="h-px bg-[#43434E]" />
+        <div className="h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
         <div className="flex justify-between">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
             Final Height
@@ -78,13 +78,13 @@ export function Output({
             <span className="font-mono text-[11px] tracking-[0.08em] text-[#7A7A80] uppercase shrink-0">
               {item.label}
             </span>
-            <span aria-hidden="true" className="flex-1 h-px bg-[#43434E]/50" />
+            <span aria-hidden="true" className="flex-1 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
             <Toggle on={item.value} onToggle={() => onChange({ [item.key]: !item.value })} />
           </div>
         ))}
       </div>
 
-      <div className="mt-5 bg-[#08080A] border border-[#43434E] rounded-[4px] p-3 flex gap-3 items-center">
+      <div className="pro-well mt-5 border rounded-[3px] p-3 flex gap-3 items-center">
         <div className="shrink-0 w-[72px] h-[48px] bg-white rounded-[2px] relative overflow-hidden border border-black/10">
           <div className="absolute inset-[6px] border border-dashed border-[#E3FF33]" />
           <div
@@ -110,7 +110,7 @@ export function Output({
         </div>
       </div>
 
-      <div className="mt-5 w-full rounded-[4px] border border-[#43434E] bg-[#08080A] p-3">
+      <div className="pro-group mt-5 w-full rounded-[3px] border bg-[#08080A] p-3">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
             Ready to print
@@ -119,7 +119,7 @@ export function Output({
             {sheetCount} sheets • {assembledInches > 0 ? formatLength(assembledInches) : '—'}
           </span>
         </div>
-        <div className="mt-2 h-px bg-[#43434E]" />
+        <div className="mt-2 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
         <PrintButton
           fullWidth
           disabled={sheetCount === 0}
