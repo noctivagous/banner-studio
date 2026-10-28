@@ -33,7 +33,7 @@ export function Output({
       <ZoneHeader index="03" title="Output" icon={<OutputIcon />} />
       <div className="pro-group bg-[var(--ctl)] border rounded-[3px] p-3.5 space-y-2.5">
         <div className="flex justify-between items-center">
-          <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
+          <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
             # Sheets
           </span>
           <span className="font-mono text-[13px] font-bold text-[#F0F0F2]">{sheetCount}</span>
@@ -41,7 +41,7 @@ export function Output({
         <div className="h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
         <div className="space-y-1">
           <div className="flex justify-between">
-            <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
+            <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
               Assembled Length
             </span>
           </div>
@@ -51,13 +51,13 @@ export function Output({
         </div>
         <div className="h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
         <div className="flex justify-between">
-          <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
+          <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
             Final Height
           </span>
           <span className="font-mono text-[11px] text-[#F0F0F2]">{trimH.toFixed(2)}&quot;</span>
         </div>
         <div className="flex justify-between">
-          <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
+          <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
             Trim / Sheet
           </span>
           <span className="font-mono text-[11px] text-[#F0F0F2]">
@@ -65,10 +65,10 @@ export function Output({
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
+          <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
             Content / Sheet
           </span>
-          <span className="font-mono text-[11px] text-[#7A7A80]">{contentW.toFixed(2)}&quot; wide</span>
+          <span className="font-mono text-[11px] text-[#A8A8B0]">{contentW.toFixed(2)}&quot; wide</span>
         </div>
       </div>
 
@@ -110,7 +110,7 @@ export function Output({
         </div>
       </div>
 
-      <div className="pro-group mt-5 w-full rounded-[3px] border bg-[#08080A] p-3">
+      <div className="pro-group mt-5 w-full rounded-[3px] border bg-[#1d2510] p-3">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
             Ready to print

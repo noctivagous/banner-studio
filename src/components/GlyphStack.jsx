@@ -410,7 +410,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
                 className={`flex items-center gap-1.5 px-1.5 py-1.5 rounded-[3px] border cursor-pointer transition-colors ${
                   isSelected
                     ? 'bg-[var(--ctl)] border-[#E3FF33]'
-                    : 'bg-[#0b0b0e] border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-[#5E5E69]'
+                    : 'bg-[#2a2a35] border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] hover:border-[#5E5E69]'
                 } ${layer.visible === false ? 'opacity-50' : ''}`}
               >
                 <button

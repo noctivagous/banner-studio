@@ -32,19 +32,24 @@ body {
   --well-shade: rgba(0, 0, 0, 0.45);
 }
 
+/* Alternating container/control direction per zone so controls always
+   lift off their container and zones read differently from each other:
+   Copy = light gray controls on dark graphite,
+   Safe = dark espresso controls on lighter warm tan (inverted),
+   Output = light moss controls on dark olive. */
 .zone-copy {
-  --ctl: #2b2b3a;
-  --panel: #16161e;
+  --ctl: #373743;
+  --panel: #14141c;
 }
 
 .zone-safe {
-  --ctl: #3a2d1d;
-  --panel: #1a1611;
+  --ctl: #15100a;
+  --panel: #2d2314;
 }
 
 .zone-output {
-  --ctl: #2a3316;
-  --panel: #131a0e;
+  --ctl: #35431d;
+  --panel: #111a0b;
 }
 
 /* ---- Pro surface system (DAW / NLE / Adobe CS cast) ---- */

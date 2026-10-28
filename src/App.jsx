@@ -169,7 +169,7 @@ export default function App() {
                     ▼
                   </span>
                 </label>
-                <span className="pro-seg inline-flex items-center px-2 py-0.5 rounded-[3px] bg-[#1e1e26] border text-[9px] font-mono tracking-[0.12em] text-[#7A7A80] uppercase">
+                <span className="pro-seg inline-flex items-center px-2 py-0.5 rounded-[3px] bg-[#2b2b35] border text-[9px] font-mono tracking-[0.12em] text-[#9A9AA2] uppercase">
                   {pageW.toFixed(2)}×{pageH.toFixed(2)} — Trim & Tape
                 </span>
               </div>
@@ -193,7 +193,7 @@ export default function App() {
                   {assembledInches > 0 ? formatLength(assembledInches) : '—'}
                 </span>
               </div>
-              <div className="pro-seg h-8 px-3 bg-[#1e1e26] border rounded-[3px] flex items-center gap-2">
+              <div className="pro-seg h-8 px-3 bg-[#2b2b35] border rounded-[3px] flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#E3FF33] animate-pulse" />
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#F0F0F2] uppercase">
                   {trimW.toFixed(2)}&quot; × {trimH.toFixed(2)}&quot; TRIM
@@ -246,7 +246,7 @@ export default function App() {
           />
           <div className="w-full xl:w-[320px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#101014] border-t xl:border-t-0 xl:border-l border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] overflow-y-auto">
             <div className="p-5 space-y-5">
-              <section className="zone-safe pro-group flex flex-row rounded-[3px] bg-[#1A1611] border overflow-hidden">
+              <section className="zone-safe pro-group flex flex-row rounded-[3px] bg-[#2d2314] border overflow-hidden">
                 <SectionSpine label="Printer Safe" sub="02" />
                 <div className="flex-1 min-w-0 p-4">
                   <PrinterSafe
@@ -265,7 +265,7 @@ export default function App() {
                 </span>
                 <span className="flex-1 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
               </div>
-              <section className="zone-output pro-group flex flex-row rounded-[3px] bg-[#131A0E] border overflow-hidden">
+              <section className="zone-output pro-group flex flex-row rounded-[3px] bg-[#111a0b] border overflow-hidden">
                 <SectionSpine label="Output" sub="03" />
                 <div className="flex-1 min-w-0 p-4">
                   <Output

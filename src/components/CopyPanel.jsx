@@ -51,9 +51,9 @@ const rowBtn =
   'w-6 h-6 rounded-[3px] border border-transparent text-[#7A7A80] hover:text-white hover:border-[#43434E] disabled:opacity-25 disabled:hover:text-[#7A7A80] disabled:hover:border-transparent font-mono text-[11px] leading-none flex items-center justify-center'
 
 const TREE_TINT = {
-  container: 'bg-[#23232E]',
-  stack: 'bg-[#1A1A22]',
-  line: 'bg-[#0F0F15]',
+  container: 'bg-[#2e2e3a]',
+  stack: 'bg-[#26262f]',
+  line: 'bg-[#1e1e27]',
 }
 
 function TreeRow({ selected, indent = 0, onClick, label, hint, kind = 'line', media, children }) {
@@ -549,7 +549,7 @@ export function CopyPanel({
   }
 
   return (
-    <div className="zone-copy w-full xl:w-[340px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#16161E] xl:border-r border-b xl:border-b-0 border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] flex flex-row overflow-hidden">
+    <div className="zone-copy w-full xl:w-[340px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#14141c] xl:border-r border-b xl:border-b-0 border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] flex flex-row overflow-hidden">
       <SectionSpine label="Copy Deck" sub="01" />
       <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
       <div className="p-5 space-y-7">
