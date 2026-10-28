@@ -18,6 +18,27 @@ How do the sheets join? What do I press to print?* — without opening
 most of the interface first. The fixes are mostly deletion and
 renaming, not new features.
 
+Everything removed from the UI so far, and its current status:
+
+  Still gone (Phase 1)
+  • The outer zone accordions around Copy, Printer Safe, and Output — collapsing now has one level, on the individual sections.
+  • The detached Frame/Stack/Line badge below the composition tree — it moved onto the selected tree row itself.
+
+  Still gone (Phase 2)
+  • Header paper-size and orientation dropdowns — paper lives only in Paper & Margins now.
+  • The header Join chip — Join lives only in Paper & Margins, with the new three options (Overlap & tape / Edge to edge / Align & Recut).
+  • The "Ready to print" card in Output (its duplicate sheets/size readout) plus the "Default is type only" footer line — one stats block plus the Print button
+    remain.
+  • The "Tape overlap" checkbox in the print marks menu — it was a layout choice masquerading as a print mark; the Join control owns it now.
+
+  Removed, then restored at your request
+  • The header Print button — back, left of the … menu.
+  • Export PDF in the document menu — back, with a "choose Save as PDF" hint.
+
+  Renamed rather than removed: "Printer Safe" → "Paper & Margins", "Overlap for Tape/Marks" → one "Overlap" label, and the old "Trim & Tape" label became the
+  three explicit join options. Old saved settings and files with the previous join values still open correctly through the migration.
+  
+  
 ---
 
 ## 1. Why the UI is not straightforward
@@ -316,6 +337,29 @@ Proposals are ordered by user impact, not by ease. §7 turns them
 into checkable task lists; §8 lists the decisions only the product
 owner can make.
 
+### Agreed design direction (frames P1 and P9)
+
+Banners here have few, big elements (rarely more than ~10), so
+position, styling, and alignment are best controlled in panels —
+but the app must scale toward direct manipulation. The agreed
+shape is:
+
+- **Left sidebar ("Copy") = the stack.** Each item in the stack is
+  an editable preview: editing text there changes the preview
+  canvas live. There are **+ / − buttons** to add and remove lines.
+- **Right sidebar = the inspector.** All property accordions move
+  out of the left panel into a new right-sidebar section showing
+  the currently selected stack item.
+- **Perimeter quick controls.** Each stack item exposes its most
+  common controls around its edges (size, font) plus a **…**
+  button for Glyph Effects and other hidden options; the full
+  properties of the selected item live in the right inspector.
+- **Unlockable canvas objects.** The user can unlock objects on
+  the sheets/canvas and drag them. Each object has a placement
+  mode: **Auto** (placed by the layout engine, today's behavior),
+  **Freeform** (dragged anywhere), and optionally **Grid-snap**
+  (dragged, snapping to the 1" grid).
+
 ### Design principles for all proposals
 
 1. **One concept, one name, one home.** Every concept (paper, join,
@@ -332,22 +376,45 @@ owner can make.
    (overlap floor, fitted glyph height), it says so at the control.
 5. **Schema follows UI.** Stored fields with no reader are removed
    in the same change that removes their last theoretical writer.
+6. **Structure lives in the sidebar, position lives on the
+   canvas.** Panels own what things are and how they look; the
+   canvas owns where freeform things are. Neither duplicates the
+   other.
 
-### P1 — Open happy path (§1.1, §1.2)
+### P1 — Stack in the left, inspector in the right (§1.1, §1.2)
 
-**Proposal:** Reorder the left panel into task order and default it
-open: (1) line text input, (2) Font, (3) Glyph Height, (4) line
-list. Composition tree moves below the line editor as "Structure"
-for multi-line work. Remove the outer zone accordion so collapse
-has one level. Expert sections (Glyph stack, Fill/Stroke/Offset,
-Frame decoration, Stack) keep persisted collapse.
+**Proposal (shipped as a first step):** the left panel was
+reordered into task order with the core sections default-open and
+the tree renamed "Structure" (see §7, Phase 1). The agreed
+end-state goes further:
 
-- Files: `src/components/CopyPanel.jsx`, `GlyphStack.jsx`,
-  `PrinterSafe.jsx`, `src/hooks/usePersistedSections.js`.
-- Not doing: no new panels, no wizard (see §8, D3).
-- Works when: a first-time user with a cleared `localStorage` can
-  type a line, change its font and height, and see sheet count
-  change without clicking any disclosure triangle.
+- **Left = Copy stack.** The "Structure" tree becomes the whole
+  left panel: a vertical stack where each item is an editable
+  preview of its line (today's text input, font-styled). Each
+  item carries perimeter quick controls — glyph size and font —
+  plus a **…** button opening Glyph Effects and the other hidden
+  options for that line. **+ / − buttons** add and remove lines
+  (replacing the single "+ Add line" bar; per-row ▲▼⧉× move to
+  the … menu or stay as hover controls, see §8 D8).
+- **Right = inspector.** All property accordions (Font, Glyph
+  Height, Letter Spacing, Transform, Glyph stack and its
+  Fill/Overlay/Stroke/Offset/Effects sections, Frame, Stack)
+  move out of the left panel into a new right-sidebar section
+  that always shows the currently selected stack item. The
+  right sidebar then reads top to bottom: Inspector, Paper &
+  Margins, Output.
+- Selection stays single-source: clicking a stack item, its
+  canvas rendering, or its tree row selects the same node, and
+  the inspector follows.
+
+- Files: `src/components/CopyPanel.jsx` (becomes the stack),
+  new `src/components/Inspector.jsx` (moved accordions),
+  `GlyphStack.jsx`, `src/App.jsx` (right-column layout).
+- Not doing: no canvas dragging here (see P9); no wizard
+  (see §8, D3).
+- Works when: the left panel contains no property accordions;
+  selecting any of up to 10 lines shows its full properties on
+  the right; + / − add and remove lines.
 
 ### P2 — One seam model (§1.3)
 
@@ -488,6 +555,50 @@ labels). Rotated spine text is removed with P4.
 - Works when: at 390×844 every control reachable on desktop is
   reachable, and no help paragraph is set below 12px.
 
+### P9 — Unlockable canvas objects: Auto, Freeform, Grid-snap
+
+**Proposal:** Each placeable object (display lines first; the
+frame later if §8 D7 says so) gains a placement mode stored on
+the object, defaulting to **Auto**:
+
+- **Auto** — today's behavior: the layout engine positions the
+  object (stack alignment, frame hug, sheet slicing). Nothing the
+  user can do on the canvas affects it; dragging is disabled.
+- **Freeform** — the object is unlocked on the canvas and
+  draggable with pointer input. Its offset (`dxIn`, `dyIn` in
+  trim inches, relative to its Auto position) is stored in the
+  composition, so it survives reload, export/import, and print.
+  Sheet count and slicing are recomputed from the union bounding
+  box of auto and freeform objects.
+- **Grid-snap** (optional third mode) — like Freeform, but drag
+  positions snap to the existing 1" baseline grid
+  (`src/lib/grid.js`), reusing the Grid align mode's snapping
+  rather than inventing a second grid.
+
+Concretely this needs: per-line `place: { mode, dxIn, dyIn }`
+in `src/lib/composition.js` (normalised, default Auto/0/0);
+pointer-drag handling on the unlocked canvas nodes in
+`Preview.jsx` (`BannerComposition` line boxes) with a visible
+locked/unlocked affordance per stack item (lock icon next to
+the … button, see P1); drag state kept out of the persisted
+composition until pointer-up commits one `withLine` patch. The
+print path (`PrintArea.jsx`) renders freeform offsets unchanged
+— it already translates the whole composition, so offsets ride
+along for free.
+
+- Files: `src/lib/composition.js` (placement field +
+  normaliser), `Preview.jsx` (drag + affordance),
+  `CopyPanel.jsx` (lock toggle + mode switch), `PrintArea.jsx`
+  (verification only), `document.js` (field round-trips via
+  composition normalisation).
+- Not doing: no rotation, scaling, or multi-select (one dragged
+  object at a time); no freeform frame in the first cut (§8 D7);
+  Grid-snap ships only if it falls out of the existing grid
+  helpers with no new snapping code (§8 D9).
+- Works when: a line can be unlocked, dragged on the canvas, and
+  re-locked; the offset persists across reload and export/import;
+  print output matches the preview; Auto lines never move.
+
 ---
 
 ## 7. Task lists
@@ -522,6 +633,26 @@ Do phases in order; each phase leaves the app shippable.
   `npm run build` clean. (Build passes; the walkthrough needs a
   browser with cleared `localStorage` — the sandbox here cannot
   open a dev-server port, so it is pending a human run.)
+
+### Phase 1b — Stack + inspector split (P1 end-state) (L)
+
+Supersedes the Phase 1 layout: the left panel becomes the Copy
+stack, the right sidebar gains the inspector.
+
+- [ ] New `Inspector.jsx`: move Font, Glyph Height, Letter
+  Spacing, Transform, Glyph stack (+ Fill/Overlay/Stroke/Offset/
+  Effects), Frame, and Stack accordions out of `CopyPanel.jsx`;
+  inspector renders the selected node (line/stack/frame) and
+  follows selection from stack, canvas, or tree.
+- [ ] `CopyPanel.jsx` becomes the stack: each line an editable,
+  font-styled preview with perimeter size + font controls, a …
+  button for Glyph Effects and hidden options, and + / − buttons
+  replacing the "+ Add line" bar (see §8 D8 for ▲▼⧉× placement).
+- [ ] Right column order: Inspector, Paper & Margins, Output
+  (`App.jsx`).
+- [ ] Acceptance: left panel has zero property accordions; 10
+  lines each select cleanly with full properties on the right;
+  + / − add and remove lines; `npm run build` clean.
 
 ### Phase 2 — Seam and control consolidation (P2, P3) (M–L)
 
@@ -596,6 +727,25 @@ Do phases in order; each phase leaves the app shippable.
 - [ ] Vertical banner mode as a designed feature, replacing the
   removed Vert button.
 
+### Phase 7 — Freeform canvas drag (P9) (L)
+
+Depends on Phase 1b (stack selection + inspector must exist
+first); independent of Phases 2–5.
+
+- [ ] Data model: per-line `place: { mode, dxIn, dyIn }` in
+  `composition.js`, normalised (default Auto/0/0), round-tripping
+  through export/import via the existing composition path.
+- [ ] Canvas: lock/unlock affordance per stack item; pointer drag
+  on unlocked line boxes in `Preview.jsx`, committing one
+  `withLine` patch on pointer-up; Auto lines never draggable.
+- [ ] Layout: sheet count and slicing from the union bounding box
+  of auto + freeform objects; verify `PrintArea.jsx` renders
+  offsets identically to preview (save PDFs first).
+- [ ] Grid-snap mode only if it reuses `src/lib/grid.js`
+  snapping with no new snapping code (see §8 D9).
+- [ ] Acceptance: unlock → drag → relock a line; offset survives
+  reload and export/import; preview and print agree.
+
 ---
 
 ## 8. Decisions needed before starting
@@ -607,7 +757,13 @@ Do phases in order; each phase leaves the app shippable.
 | D3 | First-run shape (P1) | Open panels in place vs. a first-run wizard | Open panels — a wizard is Phase 6 scope (`TASKS.txt` templates work) |
 | D4 | Header on small screens (P8) | Keep title + Print only vs. condensed control row | Title + Print; controls live in Paper & Margins |
 | D5 | Frame Shape/Size (P6) | Delete readouts vs. implement real alternatives | Delete — no alternative is designed; a fake control is worse than none |
+| D6 | Stack-item chrome (P1) | Per-row ▲▼⧉× stay visible vs. move into the … menu | … menu — rows stay compact at 10 lines; keep hover-reveal only if it needs no new code |
+| D7 | Freeform scope (P9) | Lines only vs. lines + frame | Lines only first — frame dragging changes sheet math and deserves its own task |
+| D8 | + / − placement (P1) | One + / − pair for the whole stack vs. per-item − | Whole-stack + / − pair plus per-item … menu — simplest that stays usable at 10 lines |
+| D9 | Grid-snap (P9) | Ship three modes vs. Auto + Freeform only | Three modes only if snapping falls out of `src/lib/grid.js`; otherwise defer Grid-snap |
 
 No engine (layout, measurement, print) changes are proposed in
-any phase. Phases 0–1 are user-visible within a day; Phases 2–5
-shrink the surface every future change must cross-check.
+any phase except P9's placement offsets, which ride the existing
+translate-and-slice pipeline. Phases 0–1 are user-visible within
+a day; Phases 2–5 shrink the surface every future change must
+cross-check; Phase 1b reuses everything Phase 1 built.
