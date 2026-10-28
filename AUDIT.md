@@ -510,13 +510,13 @@ Do phases in order; each phase leaves the app shippable.
 
 ### Phase 1 — Open the happy path (P1, P8 partial) (M)
 
-- [ ] Default open: line editor, Font, Glyph Height, Paper,
+- [x] Default open: line editor, Font, Glyph Height, Paper,
   Overlap; remove the outer zone accordions (`CopyPanel.jsx`,
   `PrinterSafe.jsx`, `Output.jsx`, `App.jsx`).
-- [ ] Move composition tree below the line editor, titled
+- [x] Move composition tree below the line editor, titled
   "Structure"; add the hint "Click a line here or in the preview;
   double-click preview text to edit it." (§1.2)
-- [ ] Attach the Frame/Stack/Line badge to the selected tree row
+- [x] Attach the Frame/Stack/Line badge to the selected tree row
   instead of below the tree. (§1.2)
 - [ ] Acceptance: fresh-profile walkthrough (§6 P1) passes;
   `npm run build` clean.

@@ -38,10 +38,7 @@ export function Output({
 
   return (
     <div>
-      <ParamSection
-        sectionId="zone.output"
-        header={<ZoneHeader index="03" title="Output" icon={<OutputIcon />} />}
-      >
+      <ZoneHeader index="03" title="Output" icon={<OutputIcon />} />
       <div className="pro-group bg-[var(--ctl)] border rounded-[3px] p-3.5 space-y-2.5">
         <div className="flex justify-between items-center">
           <span className="font-mono text-[10px] tracking-[0.12em] text-[#A8A8B0] uppercase">
@@ -181,7 +178,6 @@ export function Output({
           Default is type only • {pageLabel} • @page margins 0
         </div>
       </div>
-      </ParamSection>
     </div>
   )
 }

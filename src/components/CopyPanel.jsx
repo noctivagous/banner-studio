@@ -58,7 +58,7 @@ const TREE_TINT = {
   line: 'bg-[#1e1e27]',
 }
 
-function TreeRow({ selected, indent = 0, onClick, label, hint, kind = 'line', media, children }) {
+function TreeRow({ selected, indent = 0, onClick, label, hint, kind = 'line', media, badge, children }) {
   return (
     <div
       role="option"
@@ -76,6 +76,14 @@ function TreeRow({ selected, indent = 0, onClick, label, hint, kind = 'line', me
       <span className="flex-1 min-w-0 font-mono text-[11px] tracking-[0.04em] text-[#F0F0F2] truncate uppercase">
         {label}
       </span>
+      {selected && badge && (
+        <span
+          data-inspector-kind={kind}
+          className="px-1.5 py-0.5 rounded-[3px] bg-[#E3FF33] text-black font-mono text-[8px] font-bold tracking-[0.1em] uppercase shrink-0"
+        >
+          {badge}
+        </span>
+      )}
       {hint && (
         <span className="font-mono text-[9px] text-[#7A7A80] uppercase shrink-0">{hint}</span>
       )}
@@ -438,17 +446,6 @@ function LineFields({ line, glyphMax, onPatch, align }) {
   const front = visible[visible.length - 1] ?? line.layers?.[0]
   return (
     <div className="pro-divided">
-      <ParamSection
-        icon={<FontIcon />}
-        title="Font Family"
-        sectionId="copy.line.font"
-        defaultOpen={false}
-        value={
-          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">{font.label}</span>
-        }
-      >
-        <FontSelect fontId={line.fontId} onChange={onPatch} />
-      </ParamSection>
       <div className="relative">
         <input
           value={line.copy}
@@ -474,10 +471,19 @@ function LineFields({ line, glyphMax, onPatch, align }) {
         </div>
       </div>
       <ParamSection
+        icon={<FontIcon />}
+        title="Font Family"
+        defaultOpen
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">{font.label}</span>
+        }
+      >
+        <FontSelect fontId={line.fontId} onChange={onPatch} />
+      </ParamSection>
+      <ParamSection
         icon={<GlyphHeightIcon />}
         title="Glyph Height"
-        sectionId="copy.line.glyph-height"
-        defaultOpen={false}
+        defaultOpen
         value={
           <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
             {line.glyphHeight.toFixed(1)}"
@@ -621,26 +627,40 @@ export function CopyPanel({
       <SectionSpine label="Copy Deck" sub="01" />
       <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
       <div className="p-5 space-y-7">
-        <ParamSection
-          sectionId="zone.copy"
-          header={
-            <ZoneHeader
-              index="01"
-              title="Copy"
-              icon={<CopyIcon />}
-              meta={
-                <span className="font-mono text-[9px] tracking-[0.12em] text-[#7A7A80] uppercase shrink-0">
-                  {charCount} chars · {lines.length} lines
-                </span>
-              }
-            />
+        <ZoneHeader
+          index="01"
+          title="Copy"
+          icon={<CopyIcon />}
+          meta={
+            <span className="font-mono text-[9px] tracking-[0.12em] text-[#7A7A80] uppercase shrink-0">
+              {charCount} chars · {lines.length} lines
+            </span>
           }
-        >
+        />
         <div className="space-y-7">
+        <div>
+          {kind === 'container' && (
+            <ContainerFields
+              container={container}
+              onPatch={patchContainer}
+              onAlignX={patchAlignX}
+            />
+          )}
+          {kind === 'stack' && stack && (
+            <StackFields stack={stack} onPatch={patchStack} onAlignX={patchAlignX} />
+          )}
+          {kind === 'line' && line && (
+            <LineFields
+              line={line}
+              glyphMax={glyphMax}
+              onPatch={patchThisLine}
+              align={stack?.align}
+            />
+          )}
+        </div>
           <ParamSection
-            title="Composition"
-            sectionId="copy.composition"
-            defaultOpen={false}
+            title="Structure"
+            defaultOpen
             value={
               <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
                 {lines.length} {lines.length === 1 ? 'line' : 'lines'} ·{' '}
@@ -660,12 +680,13 @@ export function CopyPanel({
               ]}
             />
           </div>
-          <div role="tree" aria-label="Composition" className="space-y-1 mb-2">
+          <div role="tree" aria-label="Structure" className="space-y-1 mb-2">
             <TreeRow
               selected={kind === 'container'}
               onClick={() => onSelect({ kind: 'container', id: container.id })}
               label={container.name}
               hint="rect"
+              badge="Frame"
               kind="container"
               media={
                 <span
@@ -681,6 +702,7 @@ export function CopyPanel({
                 onClick={() => onSelect({ kind: 'stack', id: stack.id })}
                 label="Stack"
                 hint={stack.align}
+                badge="Stack"
                 kind="stack"
                 media={
                   <span aria-hidden="true" className="text-[11px] leading-none text-[#7A7A80] shrink-0 w-4 text-center">
@@ -700,6 +722,7 @@ export function CopyPanel({
                   onClick={() => onSelect({ kind: 'line', id: entry.id })}
                   label={preview}
                   hint={font.label}
+                  badge="Line"
                   kind="line"
                   media={
                     <span
@@ -771,40 +794,12 @@ export function CopyPanel({
           >
             + Add line · {lines.length}/{MAX_COPY_LINES}
           </button>
+          <p className="mt-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
+            Click a line here or in the preview; double-click preview text to edit it.
+          </p>
           </ParamSection>
 
-        <div>
-          <div className="mb-3">
-            <span
-              data-inspector-kind={kind}
-              className="inline-flex items-center px-2 py-1 rounded-[4px] bg-[var(--ctl)] border border-[#43434E] font-mono text-[10px] tracking-[0.1em] text-[#F0F0F2] uppercase"
-            >
-              {kind === 'container' && 'Frame'}
-              {kind === 'stack' && 'Y-stack'}
-              {kind === 'line' && 'Display line'}
-            </span>
-          </div>
-          {kind === 'container' && (
-            <ContainerFields
-              container={container}
-              onPatch={patchContainer}
-              onAlignX={patchAlignX}
-            />
-          )}
-          {kind === 'stack' && stack && (
-            <StackFields stack={stack} onPatch={patchStack} onAlignX={patchAlignX} />
-          )}
-          {kind === 'line' && line && (
-            <LineFields
-              line={line}
-              glyphMax={glyphMax}
-              onPatch={patchThisLine}
-              align={stack?.align}
-            />
-          )}
         </div>
-        </div>
-      </ParamSection>
       </div>
       <div className="mt-auto p-5 pt-4 border-t border-[#43434E] bg-black/30">
         <p className="font-mono text-[10px] leading-[1.5] tracking-[0.02em] text-[#5A5A60]">

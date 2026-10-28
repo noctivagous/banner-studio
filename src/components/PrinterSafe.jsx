@@ -29,10 +29,7 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
 
   return (
     <div>
-      <ParamSection
-        sectionId="zone.safe"
-        header={<ZoneHeader index="02" title="Printer Safe" icon={<PrinterIcon />} />}
-      >
+      <ZoneHeader index="02" title="Printer Safe" icon={<PrinterIcon />} />
       <div className="pro-well border rounded-[3px] p-3 mb-4">
         <p className="font-mono text-[11px] leading-[1.5] text-[#7A7A80]">
           {alignRecut ? (
@@ -66,8 +63,7 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
       <ParamSection
         icon={<PrinterIcon />}
         title="Paper"
-        sectionId="safe.paper"
-        defaultOpen={false}
+        defaultOpen
         value={
           <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
             {paperLabel} · {orientationLabel}
@@ -190,8 +186,7 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
       <ParamSection
         icon={<OverlapIcon />}
         title={alignRecut ? 'Overlap for Marks' : 'Overlap for Tape'}
-        sectionId="safe.overlap"
-        defaultOpen={false}
+        defaultOpen
         value={
           <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[#E3FF33] text-black rounded-[3px]">
             {overlap.toFixed(2)}"
@@ -210,7 +205,6 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
             label: `${step.toFixed(2)}"`,
           }))}
         />
-      </ParamSection>
       </ParamSection>
     </div>
   )
