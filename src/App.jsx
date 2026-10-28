@@ -3,6 +3,7 @@ import { AssembleGuide } from './components/AssembleGuide.jsx'
 import { BannerModeControl } from './components/BannerModeControl.jsx'
 import { CopyPanel } from './components/CopyPanel.jsx'
 import { DocumentMenu } from './components/DocumentMenu.jsx'
+import { PrintButton } from './components/PrintButton.jsx'
 import { SectionSpine } from './components/SectionChrome.jsx'
 import { Output } from './components/Output.jsx'
 import { Preview } from './components/Preview.jsx'
@@ -223,6 +224,13 @@ export default function App() {
                   {trimW.toFixed(2)}&quot; × {trimH.toFixed(2)}&quot; TRIM
                 </span>
               </div>
+              <PrintButton
+                disabled={sheetCount === 0}
+                onPrint={print}
+                join={join}
+                marks={{ printTrim, printNumbers, printCutMarks }}
+                onChange={patch}
+              />
               <DocumentMenu settings={settings} onImport={patch} />
             </div>
           </div>

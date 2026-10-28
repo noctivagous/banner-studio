@@ -536,7 +536,9 @@ Do phases in order; each phase leaves the app shippable.
   `setJoin` bumps overlap (`App.jsx`).
 - [x] Delete header paper/orientation selects and header
   PrintButton; rename Printer Safe → Paper & Margins
-  (`App.jsx`, `PrinterSafe.jsx`).
+  (`App.jsx`, `PrinterSafe.jsx`). Header PrintButton later
+  restored per user request — print-when-ready lives in the
+  header and in Output, sharing one marks state.
 - [x] Delete the Output stats card duplication and "Ready to
   print" card; one stats block + one Print (`Output.jsx`).
 - [x] Remove DocumentMenu "Export PDF" (`DocumentMenu.jsx`) — later
