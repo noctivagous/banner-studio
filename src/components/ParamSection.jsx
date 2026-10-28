@@ -1,11 +1,11 @@
-import { useState } from 'react'
 import { FieldLabel } from './FieldLabel.jsx'
+import { useSectionOpen } from '../hooks/usePersistedSections.js'
 
 /* Pro disclosure section: accordion triangle + label header with a
-   collapsible body. Each section owns its open state; default open
-   preserves the current fully-expanded layout. */
-export function ParamSection({ icon, title, value, defaultOpen = true, children }) {
-  const [open, setOpen] = useState(defaultOpen)
+   collapsible body. With a sectionId the open state persists across
+   reloads; otherwise it lives for the session. */
+export function ParamSection({ icon, title, value, defaultOpen = true, sectionId, children }) {
+  const [open, setOpen] = useSectionOpen(sectionId, defaultOpen)
   const label = typeof title === 'string' ? title : 'section'
   return (
     <div>

@@ -94,12 +94,12 @@ function ContainerFields({ container, onPatch, onAlignX }) {
         Rectangle hugs the stack. Align cascades to the Y-stack and the lines.
         On sheet places the frame in the trim. Corner size scales with the shorter side.
       </p>
-      <ParamSection title="Shape">
+      <ParamSection title="Shape" sectionId="copy.container.shape" defaultOpen={false}>
         <div className="h-8 rounded-[4px] border border-[#43434E] bg-[var(--ctl)] font-mono text-[11px] uppercase tracking-[0.08em] text-[#F0F0F2] flex items-center px-2.5">
           Rectangle
         </div>
       </ParamSection>
-      <ParamSection title="Size">
+      <ParamSection title="Size" sectionId="copy.container.size" defaultOpen={false}>
         <div
           role="status"
           aria-label="Size: hug content"
@@ -111,7 +111,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
           </span>
         </div>
       </ParamSection>
-      <ParamSection title="Aspect">
+      <ParamSection title="Aspect" sectionId="copy.container.aspect" defaultOpen={false}>
         <div className="grid grid-cols-5 gap-1">
           <button
             type="button"
@@ -148,6 +148,8 @@ function ContainerFields({ container, onPatch, onAlignX }) {
       </ParamSection>
       <ParamSection
         title="Padding"
+        sectionId="copy.container.padding"
+        defaultOpen={false}
         value={
           <span className="font-tech text-[12px] text-[#F0F0F2]">
             {linkedPad ? `${pad.top.toFixed(2)}"` : 'mixed'}
@@ -171,7 +173,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
           />
         </div>
       </ParamSection>
-      <ParamSection icon={<AlignIcon />} title="Align">
+      <ParamSection icon={<AlignIcon />} title="Align" sectionId="copy.container.align" defaultOpen={false}>
         <div className="grid grid-cols-3 gap-1 mb-3">
           {['left', 'center', 'right'].map((dir) => (
             <button
@@ -212,7 +214,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
           ))}
         </div>
       </ParamSection>
-      <ParamSection title="Corners">
+      <ParamSection title="Corners" sectionId="copy.container.corners" defaultOpen={false}>
         <div className="grid grid-cols-3 gap-1 mb-2">
           {['square', 'round', 'cut'].map((mode) => (
             <button
@@ -257,6 +259,8 @@ function ContainerFields({ container, onPatch, onAlignX }) {
       <ParamSection
         icon={<CopyIcon />}
         title="Fill"
+        sectionId="copy.container.fill"
+        defaultOpen={false}
         value={
           <Toggle
             on={container.fillOn}
@@ -279,6 +283,8 @@ function ContainerFields({ container, onPatch, onAlignX }) {
       <ParamSection
         icon={<StrokeIcon />}
         title="Stroke"
+        sectionId="copy.container.stroke"
+        defaultOpen={false}
         value={
           <Toggle
             on={container.strokeOn}
@@ -322,7 +328,7 @@ function StackFields({ stack, onPatch, onAlignX }) {
         Alignment lines for the whole Y-stack. Every display line shares this
         left, center, or right edge.
       </p>
-      <ParamSection icon={<AlignIcon />} title="Align">
+      <ParamSection icon={<AlignIcon />} title="Align" sectionId="copy.stack.align" defaultOpen={false}>
         <div className="grid grid-cols-3 gap-1">
           {['left', 'center', 'right'].map((dir) => (
             <button
@@ -350,6 +356,8 @@ function StackFields({ stack, onPatch, onAlignX }) {
       <ParamSection
         icon={<LineHeightIcon />}
         title="Gap"
+        sectionId="copy.stack.gap"
+        defaultOpen={false}
         value={
           <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
             {stack.gapIn.toFixed(2)}"
@@ -378,7 +386,7 @@ function LineFields({ line, glyphMax, onPatch, align }) {
   const front = visible[visible.length - 1] ?? line.layers?.[0]
   return (
     <div className="pro-divided">
-      <ParamSection icon={<FontIcon />} title="Font Family">
+      <ParamSection icon={<FontIcon />} title="Font Family" sectionId="copy.line.font" defaultOpen={false}>
         <FontSelect fontId={line.fontId} onChange={onPatch} />
       </ParamSection>
       <div className="relative">
@@ -408,6 +416,8 @@ function LineFields({ line, glyphMax, onPatch, align }) {
       <ParamSection
         icon={<GlyphHeightIcon />}
         title="Glyph Height"
+        sectionId="copy.line.glyph-height"
+        defaultOpen={false}
         value={
           <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
             {line.glyphHeight.toFixed(1)}"
@@ -439,6 +449,8 @@ function LineFields({ line, glyphMax, onPatch, align }) {
       <ParamSection
         icon={<LetterSpacingIcon />}
         title="Letter Spacing"
+        sectionId="copy.line.letter-spacing"
+        defaultOpen={false}
         value={
           <span className="font-tech text-[12px] text-[#F0F0F2]">
             {line.letterSpacing > 0 ? '+' : ''}
@@ -456,7 +468,7 @@ function LineFields({ line, glyphMax, onPatch, align }) {
           className="w-full"
         />
       </ParamSection>
-      <ParamSection icon={<TransformIcon />} title="Text Transform">
+      <ParamSection icon={<TransformIcon />} title="Text Transform" sectionId="copy.line.transform" defaultOpen={false}>
         <div className="grid grid-cols-3 gap-1.5">
           {['uppercase', 'lowercase', 'asIs'].map((mode) => (
             <button

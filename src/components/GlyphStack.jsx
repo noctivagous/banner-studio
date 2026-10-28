@@ -391,7 +391,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
 
   return (
     <div className="pro-divided">
-      <ParamSection icon={<EffectIcon />} title="Glyph stack">
+      <ParamSection icon={<EffectIcon />} title="Glyph stack" sectionId="glyph.layers" defaultOpen={false}>
         <p className="mb-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
           Z axis — top = back, bottom = front. Same glyphs, stacked in depth.
         </p>
@@ -514,6 +514,8 @@ export function GlyphStack({ line, font, onPatchLine }) {
       <ParamSection
         icon={<FillIcon />}
         title="Fill (Base)"
+        sectionId="glyph.fill-base"
+        defaultOpen={false}
         value={
           <span className="font-mono text-[10px] tracking-[0.1em] text-[#E3FF33] uppercase">
             Editing · {selected.name}
@@ -567,6 +569,8 @@ export function GlyphStack({ line, font, onPatchLine }) {
       <ParamSection
         icon={<FillIcon />}
         title="Fill (Overlay)"
+        sectionId="glyph.fill-overlay"
+        defaultOpen={false}
         value={
           <Toggle
             on={selected.overlayOn}
@@ -609,6 +613,8 @@ export function GlyphStack({ line, font, onPatchLine }) {
       <ParamSection
         icon={<StrokeIcon />}
         title="Stroke"
+        sectionId="glyph.stroke"
+        defaultOpen={false}
         value={
           <Toggle
             on={selected.strokeOn}
@@ -648,7 +654,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
         )}
       </ParamSection>
 
-      <ParamSection icon={<EffectIcon />} title={`Offset · ${selected.name}`}>
+      <ParamSection icon={<EffectIcon />} title={`Offset · ${selected.name}`} sectionId="glyph.offset" defaultOpen={false}>
         <div className="pro-well mb-4 space-y-3 p-3 border rounded-[3px]">
           <p className="mb-0 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
             Position of this copy. The face usually sits at 0.00&quot;; copies behind it
@@ -733,7 +739,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
           </div>
         </div>
       </ParamSection>
-      <ParamSection title="Glyph Effects">
+      <ParamSection title="Glyph Effects" sectionId="glyph.effects" defaultOpen={false}>
         <div className="grid grid-cols-2 gap-1.5">
           {[
             { id: TEXT_EFFECT_NONE, label: 'None' },
