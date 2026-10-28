@@ -440,10 +440,23 @@ function StackFields({ stack, onPatch, onAlignX }) {
   )
 }
 
+function editorInkIsLight(hex) {
+  if (typeof hex !== 'string') return true
+  const match = hex.trim().match(/^#([0-9a-fA-F]{6})$/)
+  if (!match) return true
+  const value = parseInt(match[1], 16)
+  const r = (value >> 16) & 0xff
+  const g = (value >> 8) & 0xff
+  const b = value & 0xff
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.55
+}
+
 function LineFields({ line, glyphMax, onPatch, align }) {
   const font = fontOf(line)
   const visible = (line.layers || []).filter((layer) => layer.visible !== false)
   const front = visible[visible.length - 1] ?? line.layers?.[0]
+  const ink = front?.overlayOn ? '#F0F0F2' : front?.fill || '#FFFFFF'
+  const paper = editorInkIsLight(ink) ? '#08080A' : '#FFFFFF'
   return (
     <div className="pro-divided">
       <div className="relative">
@@ -452,12 +465,14 @@ function LineFields({ line, glyphMax, onPatch, align }) {
           onChange={(e) => onPatch({ copy: e.target.value.replace(/\n/g, ' ') })}
           placeholder="TYPE THIS LINE"
           spellCheck={false}
-          className="w-full bg-[#08080A] border border-[#43434E] rounded-[4px] p-4 text-[28px] leading-[0.9] tracking-[-0.01em] text-white placeholder:text-[#5A5A60] focus:outline-none focus:border-[#E3FF33]/60 min-h-[72px]"
+          className="w-full border border-[#43434E] rounded-[4px] p-4 text-[28px] leading-[0.9] tracking-[-0.01em] placeholder:text-[#5A5A60] focus:outline-none focus:border-[#E3FF33]/60 min-h-[72px]"
           style={{
             fontFamily: `"${font.family}", Impact, sans-serif`,
             fontWeight: font.weight,
             textAlign: align || 'center',
-            color: front?.overlayOn ? undefined : front?.fill,
+            backgroundColor: paper,
+            color: ink,
+            caretColor: ink,
             ...(front?.strokeOn
               ? {
                   WebkitTextStroke: `1px ${front.strokeColor}`,
