@@ -47,7 +47,7 @@ export function overlapCutSlack(overlap, duplicate) {
 }
 
 // How many sheets cover `span` along one axis.
-// Tape overlap duplicates `overlap` inches, so the first sheet holds `trim`
+// An overlap join duplicates `overlap` inches, so the first sheet holds `trim`
 // and every further sheet advances by `advance` (trim minus overlap).
 export function axisCount(span, trim, advance, duplicate, overlap) {
   if (!(span > 0) || !(advance > 0)) return 0
@@ -112,7 +112,25 @@ export function horizontalCutInches({ row, rows, duplicate, overlap, marginTop, 
 // line runs through crosses in the margin. After the sheets are taped, the
 // red line is the cut through both sheets.
 export const JOIN_TRIM_TAPE = 'trim-tape'
+export const JOIN_OVERLAP_TAPE = 'overlap-tape'
+export const JOIN_EDGE = 'edge-to-edge'
 export const JOIN_ALIGN_RECUT = 'align-recut'
+
+// Legacy `trim-tape` meant "duplicate when Tape overlap is on, butt joint
+// when it is off". Map it onto the explicit three-option join model.
+export function normalizeJoin(value, printOverlap = true) {
+  if (
+    value === JOIN_OVERLAP_TAPE ||
+    value === JOIN_EDGE ||
+    value === JOIN_ALIGN_RECUT
+  ) {
+    return value
+  }
+  if (value === JOIN_TRIM_TAPE) {
+    return printOverlap === false ? JOIN_EDGE : JOIN_OVERLAP_TAPE
+  }
+  return JOIN_OVERLAP_TAPE
+}
 export const ASSEMBLY_ALIGN_RECUT = 'align-recut'
 export const ALIGN_RECUT_MIN_OVERLAP = 0.35
 export const ALIGN_RECUT_STUB = 0.1
@@ -122,8 +140,8 @@ export const RECUT_COLOR = '#E10600'
 export const ALIGN_CROSS_MAX = 0.16
 const ALIGN_CROSS_MIN_MARGIN = 0.08
 
-export function joinDuplicates(join, printOverlap) {
-  return join === JOIN_ALIGN_RECUT || Boolean(printOverlap)
+export function joinDuplicates(join) {
+  return join === JOIN_ALIGN_RECUT || join === JOIN_OVERLAP_TAPE
 }
 
 // Distances from the outer edge of the overlap band, in inches.

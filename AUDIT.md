@@ -525,23 +525,27 @@ Do phases in order; each phase leaves the app shippable.
 
 ### Phase 2 — Seam and control consolidation (P2, P3) (M–L)
 
-- [ ] Replace `JoinSelect` options with Overlap & tape /
+- [x] Replace `JoinSelect` options with Overlap & tape /
   Edge to edge / Align & Recut; move `printOverlap` semantics
   into the join choice (`App.jsx`, `JoinMarks.jsx`).
-- [ ] Keep one Overlap control under Join, one label ("Overlap").
-- [ ] Remove "Tape overlap" from the print marks menu; add reason
+- [x] Keep one Overlap control under Join, one label ("Overlap").
+- [x] Remove "Tape overlap" from the print marks menu; add reason
   text for marks disabled under Align & Recut (`PrintButton.jsx`,
   `Output.jsx`).
-- [ ] Show "Raised to 0.35″ — minimum for the marks" when
+- [x] Show "Raised to 0.35″ — minimum for the marks" when
   `setJoin` bumps overlap (`App.jsx`).
-- [ ] Delete header paper/orientation selects and header
+- [x] Delete header paper/orientation selects and header
   PrintButton; rename Printer Safe → Paper & Margins
   (`App.jsx`, `PrinterSafe.jsx`).
-- [ ] Delete the Output stats card duplication and "Ready to
+- [x] Delete the Output stats card duplication and "Ready to
   print" card; one stats block + one Print (`Output.jsx`).
-- [ ] Remove DocumentMenu "Export PDF" (`DocumentMenu.jsx`).
-- [ ] Acceptance: §6 P3 grep checks pass; print output for the
-  three join modes is byte-identical to before (save PDFs first).
+- [x] Remove DocumentMenu "Export PDF" (`DocumentMenu.jsx`).
+- [ ] Acceptance: §6 P3 grep checks pass (verified: one
+  `JoinSelect` in Paper & Margins, one paper select, one
+  `PrintButton` in Output; join migration unit checks pass);
+  print output for the three join modes is byte-identical to
+  before — PDF comparison still needs a human print run (no
+  browser in this sandbox).
 
 ### Phase 3 — Text deletion pass (P5) (S–M)
 

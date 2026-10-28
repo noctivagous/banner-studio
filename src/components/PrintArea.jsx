@@ -26,8 +26,7 @@ export function PrintArea({
   trimH,
   composition,
   measured,
-  printOverlap,
-  join = 'trim-tape',
+  join = 'overlap-tape',
   overlap,
   printTrim,
   printNumbers,
@@ -35,7 +34,7 @@ export function PrintArea({
 }) {
   const sheetCount = sheets.length
   const alignRecut = join === JOIN_ALIGN_RECUT
-  const duplicateStrip = joinDuplicates(join, printOverlap) && overlap > 0
+  const duplicateStrip = joinDuplicates(join) && overlap > 0
   const windowW = duplicateStrip ? trimW : contentW
   const windowH = tile && !duplicateStrip ? contentH : trimH
   const frameBoxH = windowH
@@ -115,7 +114,7 @@ export function PrintArea({
             verticalCutInches({
               col: sheet.col,
               cols,
-              duplicate: printOverlap,
+              duplicate: duplicateStrip,
               overlap,
               marginLeft: margins.left,
               contentW,
@@ -136,7 +135,7 @@ export function PrintArea({
             horizontalCutInches({
               row: sheet.row,
               rows,
-              duplicate: printOverlap,
+              duplicate: duplicateStrip,
               overlap,
               marginTop: margins.top,
               contentH,

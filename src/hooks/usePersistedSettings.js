@@ -6,7 +6,7 @@ import {
   normalizeComposition,
 } from '../lib/composition.js'
 import { normalizeBannerMode } from '../lib/document.js'
-import { JOIN_ALIGN_RECUT, JOIN_TRIM_TAPE } from '../lib/layout.js'
+import { JOIN_OVERLAP_TAPE, normalizeJoin } from '../lib/layout.js'
 
 export const STORAGE_KEY = 'tile-banner-studio'
 
@@ -19,14 +19,13 @@ export const DEFAULT_SETTINGS = {
   contentKind: 'text',
   margins: { top: 0.25, bottom: 0.25, left: 0.25, right: 0.25 },
   overlap: 0.5,
-  join: JOIN_TRIM_TAPE,
+  join: JOIN_OVERLAP_TAPE,
   showTrim: true,
   showSafe: true,
   showTape: true,
   showNumbers: true,
   showCutMarks: false,
   printTrim: true,
-  printOverlap: true,
   printNumbers: false,
   printCutMarks: false,
   zoom: 1,
@@ -53,6 +52,7 @@ function load() {
       transform: _transform,
       layers: _layers,
       align: _align,
+      printOverlap: _printOverlap,
       ...rest
     } = parsed
     return {
@@ -61,7 +61,7 @@ function load() {
       composition,
       bannerMode: normalizeBannerMode(parsed.bannerMode ?? rest.bannerMode),
       margins: { ...DEFAULT_SETTINGS.margins, ...(parsed.margins || {}) },
-      join: rest.join === JOIN_ALIGN_RECUT ? JOIN_ALIGN_RECUT : JOIN_TRIM_TAPE,
+      join: normalizeJoin(rest.join, _printOverlap),
       extensions:
         parsed.extensions && typeof parsed.extensions === 'object' && !Array.isArray(parsed.extensions)
           ? parsed.extensions

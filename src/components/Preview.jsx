@@ -716,8 +716,7 @@ export function Preview({
   selection,
   onSelect,
   onChange,
-  printOverlap,
-  join = 'trim-tape',
+  join = 'overlap-tape',
   showTrim,
   showSafe,
   showTape,
@@ -730,14 +729,14 @@ export function Preview({
   const contentPx = contentW * px
   const contentHpx = contentH * px
   const alignRecut = join === JOIN_ALIGN_RECUT
-  const duplicateStrip = joinDuplicates(join, printOverlap) && overlap > 0
+  const duplicateStrip = joinDuplicates(join) && overlap > 0
   const sliceW = duplicateStrip ? trimW : contentW
   const sliceH = tile && !duplicateStrip ? contentH : trimH
   const slicePx = sliceW * px
   const sliceHpx = sliceH * px
   const frameBoxH = sliceH
   const frameBoxW = coveredSpan(cols, trimW, contentW, duplicateStrip) || sliceW
-  const cutSlackPx = overlapCutSlack(overlap, printOverlap && !alignRecut) * px
+  const cutSlackPx = overlapCutSlack(overlap, duplicateStrip && !alignRecut) * px
   const canvasRef = useRef(null)
   const padRef = useRef(null)
   const rowRef = useRef(null)
@@ -841,7 +840,7 @@ export function Preview({
     ro.observe(el)
     if (rowRef.current) ro.observe(rowRef.current)
     return () => ro.disconnect()
-  }, [measureScroll, sheetCount, cols, rows, zoom, pageW, pageH, showNumbers, arrangement, printOverlap, join])
+  }, [measureScroll, sheetCount, cols, rows, zoom, pageW, pageH, showNumbers, arrangement, join])
 
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-[#08080A] relative order-first xl:order-none overflow-hidden">
@@ -1202,7 +1201,7 @@ export function Preview({
                       verticalCutInches({
                         col: sheet.col,
                         cols,
-                        duplicate: printOverlap,
+                        duplicate: duplicateStrip,
                         overlap,
                         marginLeft: margins.left,
                         contentW,
@@ -1223,7 +1222,7 @@ export function Preview({
                       horizontalCutInches({
                         row: sheet.row,
                         rows,
-                        duplicate: printOverlap,
+                        duplicate: duplicateStrip,
                         overlap,
                         marginTop: margins.top,
                         contentH,
@@ -1295,11 +1294,11 @@ export function Preview({
               {showTrim && !alignRecut &&
                 sheets.flatMap((sheet) => {
                   const badges = []
-                  const verticalSeam = printOverlap ? sheet.col > 0 : sheet.col < cols - 1
+                  const verticalSeam = duplicateStrip ? sheet.col > 0 : sheet.col < cols - 1
                   if (verticalSeam) {
-                    const seam = printOverlap ? sheet.col - 1 : sheet.col
-                    const cutSheet = printOverlap ? seam + 1 : seam
-                    const onSheet = printOverlap
+                    const seam = duplicateStrip ? sheet.col - 1 : sheet.col
+                    const cutSheet = duplicateStrip ? seam + 1 : seam
+                    const onSheet = duplicateStrip
                       ? margins.left * px + cutSlackPx
                       : margins.left * px + contentPx
                     badges.push({
@@ -1309,11 +1308,11 @@ export function Preview({
                       rotate: 'rotate-[270deg]',
                     })
                   }
-                  const horizontalSeam = tile && (printOverlap ? sheet.row > 0 : sheet.row < rows - 1)
+                  const horizontalSeam = tile && (duplicateStrip ? sheet.row > 0 : sheet.row < rows - 1)
                   if (horizontalSeam) {
-                    const seam = printOverlap ? sheet.row - 1 : sheet.row
-                    const cutSheet = printOverlap ? seam + 1 : seam
-                    const onSheet = printOverlap
+                    const seam = duplicateStrip ? sheet.row - 1 : sheet.row
+                    const cutSheet = duplicateStrip ? seam + 1 : seam
+                    const onSheet = duplicateStrip
                       ? rulerH + margins.top * px + cutSlackPx
                       : rulerH + margins.top * px + contentHpx
                     badges.push({
@@ -1328,7 +1327,7 @@ export function Preview({
                       key={badge.key}
                       className="absolute z-30 w-5 h-5 rounded-full bg-[#E3FF33] flex items-center justify-center text-[10px] text-black shadow pointer-events-none"
                       style={{ left: badge.left, top: badge.top }}
-                      title={printOverlap ? 'Cut the top sheet inside the overlap' : 'Cut this edge'}
+                      title={duplicateStrip ? 'Cut the top sheet inside the overlap' : 'Cut this edge'}
                     >
                       <span className={`inline-block ${badge.rotate} scale-[1.2]`}>✂</span>
                     </div>

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
 const MARKS = [
-  { key: 'printOverlap', label: 'Tape overlap' },
   { key: 'printTrim', label: 'Scissor edge guide' },
   { key: 'printNumbers', label: 'Sheet numbers' },
   { key: 'printCutMarks', label: 'Cut marks' },
@@ -52,7 +51,7 @@ export function PrintButton({
   const height = fullWidth ? 'h-9' : 'h-8'
   const alignRecut = join === 'align-recut'
   const markCount = MARKS.filter((mark) => {
-    if (alignRecut && (mark.key === 'printOverlap' || mark.key === 'printTrim')) return false
+    if (alignRecut && mark.key === 'printTrim') return false
     return marks[mark.key]
   }).length
 
@@ -88,7 +87,7 @@ export function PrintButton({
             Printed marks
           </div>
           {MARKS.map((mark) => {
-            const locked = alignRecut && (mark.key === 'printOverlap' || mark.key === 'printTrim')
+            const locked = alignRecut && mark.key === 'printTrim'
             return (
               <label
                 key={mark.key}
@@ -96,8 +95,15 @@ export function PrintButton({
                   locked ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[#26262E] cursor-pointer'
                 }`}
               >
-                <span className="font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase">
-                  {mark.label}
+                <span className="flex flex-col">
+                  <span className="font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase">
+                    {mark.label}
+                  </span>
+                  {locked && (
+                    <span className="font-mono text-[9px] tracking-[0.04em] text-[#9A9AA2] normal-case">
+                      Replaced by the align/recut lines
+                    </span>
+                  )}
                 </span>
                 <input
                   type="checkbox"

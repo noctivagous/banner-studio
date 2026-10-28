@@ -6,8 +6,9 @@ import {
   ALIGN_RECUT_MIN_OVERLAP,
   FONTS,
   JOIN_ALIGN_RECUT,
-  JOIN_TRIM_TAPE,
+  JOIN_OVERLAP_TAPE,
   glyphMaxInches,
+  normalizeJoin,
   normalizeTextLayers,
 } from './layout.js'
 import { PAPERS, sheetSize } from './paper.js'
@@ -38,7 +39,6 @@ const VIEW_KEYS = [
   'showNumbers',
   'showCutMarks',
   'printTrim',
-  'printOverlap',
   'printNumbers',
   'printCutMarks',
   'zoom',
@@ -98,14 +98,13 @@ export function exportDocument(settings) {
     view: {
       margins: { ...settings.margins },
       overlap: settings.overlap,
-      join: settings.join,
+      join: normalizeJoin(settings.join, settings.printOverlap),
       showTrim: settings.showTrim,
       showSafe: settings.showSafe,
       showTape: settings.showTape,
       showNumbers: settings.showNumbers,
       showCutMarks: settings.showCutMarks,
       printTrim: settings.printTrim,
-      printOverlap: settings.printOverlap,
       printNumbers: settings.printNumbers,
       printCutMarks: settings.printCutMarks,
       zoom: settings.zoom,
@@ -219,20 +218,18 @@ export function importDocument(raw, defaults) {
     margins,
     overlap: (() => {
       const amount = clamp(viewSplit.known.overlap, 0, 0.5, defaults.overlap)
-      const join = asEnum(
-        viewSplit.known.join,
-        [JOIN_TRIM_TAPE, JOIN_ALIGN_RECUT],
-        defaults.join || JOIN_TRIM_TAPE,
+      const join = normalizeJoin(
+        viewSplit.known.join ?? defaults.join ?? JOIN_OVERLAP_TAPE,
+        viewSplit.unknown.printOverlap,
       )
       if (join === JOIN_ALIGN_RECUT && amount < ALIGN_RECUT_MIN_OVERLAP) {
         return ALIGN_RECUT_MIN_OVERLAP
       }
       return amount
     })(),
-    join: asEnum(
-      viewSplit.known.join,
-      [JOIN_TRIM_TAPE, JOIN_ALIGN_RECUT],
-      defaults.join || JOIN_TRIM_TAPE,
+    join: normalizeJoin(
+      viewSplit.known.join ?? defaults.join ?? JOIN_OVERLAP_TAPE,
+      viewSplit.unknown.printOverlap,
     ),
     showTrim: asBool(viewSplit.known.showTrim, defaults.showTrim),
     showSafe: asBool(viewSplit.known.showSafe, defaults.showSafe),
@@ -240,7 +237,6 @@ export function importDocument(raw, defaults) {
     showNumbers: asBool(viewSplit.known.showNumbers, defaults.showNumbers),
     showCutMarks: asBool(viewSplit.known.showCutMarks, defaults.showCutMarks),
     printTrim: asBool(viewSplit.known.printTrim, defaults.printTrim),
-    printOverlap: asBool(viewSplit.known.printOverlap, defaults.printOverlap),
     printNumbers: asBool(viewSplit.known.printNumbers, defaults.printNumbers),
     printCutMarks: asBool(viewSplit.known.printCutMarks, defaults.printCutMarks),
     zoom,

@@ -151,32 +151,16 @@ export function Output({
         </div>
       </div>
 
-      <div className="pro-group mt-5 w-full rounded-[3px] border bg-[#1d2510] p-3">
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
-            Ready to print
-          </span>
-          <span className="font-mono text-[10px] tracking-[0.08em] text-[#E3FF33] uppercase">
-            {sheetCount} sheets •{' '}
-            {assembledInches > 0
-              ? tile
-                ? `${formatLength(assembledInches)} × ${formatLength(assembledHeight)}`
-                : formatLength(assembledInches)
-              : '—'}
-          </span>
-        </div>
-        <div className="mt-2 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
-        <PrintButton
-          fullWidth
-          disabled={sheetCount === 0}
-          onPrint={onPrint}
-          join={join}
-          marks={printMarks}
-          onChange={onChange}
-        />
-        <div className="mt-2 font-mono text-[9px] leading-[1.4] tracking-[0.06em] text-[#5A5A60] uppercase">
-          Default is type only • {pageLabel} • @page margins 0
-        </div>
+      <PrintButton
+        fullWidth
+        disabled={sheetCount === 0}
+        onPrint={onPrint}
+        join={join}
+        marks={printMarks}
+        onChange={onChange}
+      />
+      <div className="mt-2 font-mono text-[9px] leading-[1.4] tracking-[0.06em] text-[#5A5A60] uppercase">
+        {sheetCount} sheets • {pageLabel} • @page margins 0
       </div>
     </div>
   )

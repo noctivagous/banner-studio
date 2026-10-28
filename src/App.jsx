@@ -3,13 +3,11 @@ import { AssembleGuide } from './components/AssembleGuide.jsx'
 import { BannerModeControl } from './components/BannerModeControl.jsx'
 import { CopyPanel } from './components/CopyPanel.jsx'
 import { DocumentMenu } from './components/DocumentMenu.jsx'
-import { PrintButton } from './components/PrintButton.jsx'
 import { SectionSpine } from './components/SectionChrome.jsx'
 import { Output } from './components/Output.jsx'
 import { Preview } from './components/Preview.jsx'
 import { PrintArea } from './components/PrintArea.jsx'
 import { PrinterSafe } from './components/PrinterSafe.jsx'
-import { JoinSelect } from './components/JoinMarks.jsx'
 import { usePersistedSettings } from './hooks/usePersistedSettings.js'
 import {
   fitCompositionToTrim,
@@ -20,13 +18,14 @@ import {
 import {
   ALIGN_RECUT_MIN_OVERLAP,
   JOIN_ALIGN_RECUT,
+  JOIN_OVERLAP_TAPE,
   assembledSpan,
   axisCount,
   buildSheets,
   formatLength,
   joinDuplicates,
 } from './lib/layout.js'
-import { PAPERS, sheetSize } from './lib/paper.js'
+import { sheetSize } from './lib/paper.js'
 
 export default function App() {
   const [settings, patch] = usePersistedSettings()
@@ -44,7 +43,6 @@ export default function App() {
     showNumbers,
     showCutMarks,
     printTrim,
-    printOverlap,
     printNumbers,
     printCutMarks,
     zoom,
@@ -109,13 +107,16 @@ export default function App() {
 
   const textWidthIn = measured?.width ?? 0
   const textHeightIn = measured?.height ?? 0
-  const duplicate = joinDuplicates(join, printOverlap) && overlap > 0
+  const duplicate = joinDuplicates(join) && overlap > 0
+  const [joinBump, setJoinBump] = useState(false)
   const setJoin = (next) => {
     patch((prev) => {
       if (next === prev.join) return prev
       if (next === JOIN_ALIGN_RECUT && prev.overlap < ALIGN_RECUT_MIN_OVERLAP) {
+        setJoinBump(true)
         return { ...prev, join: next, overlap: ALIGN_RECUT_MIN_OVERLAP }
       }
+      setJoinBump(false)
       return { ...prev, join: next }
     })
   }
@@ -183,43 +184,8 @@ export default function App() {
                     })
                   }
                 />
-                <label className="relative">
-                  <span className="sr-only">Page size</span>
-                  <select
-                    aria-label="Page size"
-                    value={paperId}
-                    onChange={(e) => patch({ paperId: e.target.value })}
-                    className="pro-bevel h-6 pl-2 pr-5 rounded-[3px] bg-[#26262E] border border-[#43434E] text-[9px] font-tech tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
-                  >
-                    {PAPERS.map((paper) => (
-                      <option key={paper.id} value={paper.id}>
-                        {paper.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-[8px] text-[#7A7A80]">
-                    ▼
-                  </span>
-                </label>
-                <label className="relative">
-                  <span className="sr-only">Orientation</span>
-                  <select
-                    aria-label="Orientation"
-                    value={orientation}
-                    onChange={(e) => patch({ orientation: e.target.value })}
-                    className="pro-bevel h-6 pl-2 pr-5 rounded-[3px] bg-[#26262E] border border-[#43434E] text-[9px] font-tech tracking-[0.12em] text-[#7A7A80] uppercase appearance-none focus:outline-none focus:border-[#E3FF33]/60"
-                  >
-                    <option value="landscape">Landscape</option>
-                    <option value="portrait">Portrait</option>
-                  </select>
-                  <span className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-[8px] text-[#7A7A80]">
-                    ▼
-                  </span>
-                </label>
                 <span className="pro-seg inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] bg-[#2b2b35] border text-[9px] font-mono tracking-[0.12em] text-[#9A9AA2] uppercase">
                   {pageW.toFixed(2)}×{pageH.toFixed(2)}
-                  <span aria-hidden="true">—</span>
-                  <JoinSelect value={join} onChange={setJoin} />
                 </span>
               </div>
             </div>
@@ -230,7 +196,7 @@ export default function App() {
               </span>
               <AssembleGuide
                 join={join}
-                asymmetric={printOverlap}
+                asymmetric={join === JOIN_OVERLAP_TAPE}
                 overlap={overlap}
                 multiRow={tile && rows > 1}
               />
@@ -257,13 +223,6 @@ export default function App() {
                   {trimW.toFixed(2)}&quot; × {trimH.toFixed(2)}&quot; TRIM
                 </span>
               </div>
-              <PrintButton
-                disabled={sheetCount === 0}
-                onPrint={print}
-                join={join}
-                marks={{ printOverlap, printTrim, printNumbers, printCutMarks }}
-                onChange={patch}
-              />
               <DocumentMenu settings={settings} onImport={patch} />
             </div>
           </div>
@@ -302,7 +261,6 @@ export default function App() {
             selection={selection}
             onSelect={setSelection}
             onChange={setComposition}
-            printOverlap={printOverlap}
             join={join}
             showTrim={showTrim}
             showSafe={showSafe}
@@ -313,16 +271,22 @@ export default function App() {
           <div className="w-full xl:w-[320px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#101014] border-t xl:border-t-0 xl:border-l border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] overflow-y-auto">
             <div className="p-5 space-y-5">
               <section className="zone-safe pro-group flex flex-row rounded-[3px] bg-[#2d2314] border overflow-hidden">
-                <SectionSpine label="Printer Safe" sub="02" />
+                <SectionSpine label="Paper & Margins" sub="02" />
                 <div className="flex-1 min-w-0 p-4">
                   <PrinterSafe
                     margins={margins}
                     overlap={overlap}
                     join={join}
                     onJoin={setJoin}
+                    joinBump={joinBump}
                     paperId={paperId}
                     orientation={orientation}
-                    onChange={patch}
+                    onChange={(partial) => {
+                      if (partial && typeof partial === 'object' && 'overlap' in partial) {
+                        setJoinBump(false)
+                      }
+                      patch(partial)
+                    }}
                   />
                 </div>
               </section>
@@ -355,7 +319,7 @@ export default function App() {
                 onChange={patch}
                 onPrint={print}
                 join={join}
-                printMarks={{ printOverlap, printTrim, printNumbers, printCutMarks }}
+                printMarks={{ printTrim, printNumbers, printCutMarks }}
                 pageLabel={pageLabel}
               />
                 </div>
@@ -379,7 +343,6 @@ export default function App() {
         trimH={trimH}
         composition={normalized}
         measured={measured}
-        printOverlap={printOverlap}
         join={join}
         overlap={overlap}
         printTrim={printTrim}

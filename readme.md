@@ -6,7 +6,7 @@ Dark pro banner lab for a trim-with-scissors, tape-overlap or tape-edge-to-edge 
 
 Choose paper (Letter, Legal, A4) and orientation. Type is laid out only inside the printable area, then sliced across sheets with `translateX` so letters line up after you trim on the scissor guide and tape the overlap.
 
-**Tape overlap is on by default.** In the code this is asymmetric trim (`ASSEMBLY_ASYMMETRIC_TRIM` in `src/lib/layout.js`): the same join PDF Press and Acrobat-style tiling describe. The Print menu’s first item, **Tape overlap**, is checked, and **Overlap for Tape** is a four-step control: **0.15"**, **0.25"**, **0.35"**, and **0.50"**. New banners start at **0.50"**. Each sheet prints that extra strip of the next slice, so the same distance of type appears on the right of one page and the left of the next. Cut only the following sheet, on the scissor line 0.05" inside that strip, and lay it over the earlier sheet’s uncut flap. **How to assemble** in the header explains this. Uncheck Tape overlap to switch to an edge-to-edge butt joint (`ASSEMBLY_EDGE_TO_EDGE`): both sides of the seam are cut, the tape strip is blank, and the header explanation changes to match.
+**Overlap & tape is the default join.** In the code this is asymmetric trim (`ASSEMBLY_ASYMMETRIC_TRIM` in `src/lib/layout.js`): the same join PDF Press and Acrobat-style tiling describe. The Join control in Paper & Margins offers **Overlap & tape**, **Edge to edge**, and **Align & Recut**, with **Overlap** as a four-step control: **0.15"**, **0.25"**, **0.35"**, and **0.50"**. New banners start at **0.50"**. Each sheet prints that extra strip of the next slice, so the same distance of type appears on the right of one page and the left of the next. Cut only the following sheet, on the scissor line 0.05" inside that strip, and lay it over the earlier sheet’s uncut flap. **How to assemble** in the header explains this. Switch to **Edge to edge** for a butt joint (`ASSEMBLY_EDGE_TO_EDGE`): both sides of the seam are cut, the tape strip is blank, and the header explanation changes to match.
 
 The original single-file artifact is preserved at `reference/Tile-Banner-Studio-Dark.orig.html`.
 
@@ -43,8 +43,8 @@ npx vercel --prod dist
 ## How the layout works
 
 - Printable area (trim) = sheet width − left − right by sheet height − top − bottom
-- Advance per sheet (`contentWidth`) = trim width − tape overlap (default 0.50")
-- With Tape overlap on, each sheet clips `trimWidth` of type and advances by `contentWidth`, so the overlap strip is duplicated; with it off, the window is `contentWidth` and the tape strip is blank
+- Advance per sheet (`contentWidth`) = trim width − overlap (default 0.50")
+- With an Overlap & tape join, each sheet clips `trimWidth` of type and advances by `contentWidth`, so the overlap strip is duplicated; with Edge to edge, the window is `contentWidth` and the tape strip is blank
 - Canvas `measureText` of the banner strip → sheet count (`ceil((textWidth − overlap) / contentWidth)` when overlap copy is on)
 - Assembled length = `sheets × trimWidth − (sheets − 1) × overlap`
 - Tile: 2D uses that count on both axes. The frame is not forced onto one sheet; each line can grow up to 24" after the other lines, gap, and padding. Leaving Tile mode fits the frame back onto one sheet
@@ -52,13 +52,13 @@ npx vercel --prod dist
 
 ## GUI
 
-**Header:** layout mode sits left of page size. **1D Horiz.** is the single-row strip. **Tile: 2D** slices the same composition into a grid of sheets, rows as well as columns, with the same tape overlap on both axes. **1D Vert** is visible but not available yet. Page size and orientation still pick the sheet.
+**Header:** layout mode sits left of page size. **1D Horiz.** is the single-row strip. **Tile: 2D** slices the same composition into a grid of sheets, rows as well as columns, with the same overlap on both axes. **1D Vert** is visible but not available yet. Page size and orientation still pick the sheet.
 
 **Left — 01 / Copy:** composition tree (frame → Y-stack → display lines). Auto mode cascades left/center/right from the frame through the stack to the lines; Grid mode overlays a 1" snap grid and sits each line’s alphabetic baseline on the baseline grid. On sheet places the frame top/center/bottom in the trim. Each line has its own copy, font, glyph height, tracking, transform, and glyph stack (Z copies). The frame is a hugging rectangle with optional aspect lock, padding, round or cut corners, and fill/stroke. Documents are schema v2 (`composition`); v1 files still open.
 
 **Center — Preview:** inch/foot ruler, sheet cards at 90px per inch with zoom 25/50/75/100%, always-on 1" baseline grid (0.5" halves), optional 1" square overlay in Grid mode, dotted safe area, lime trim, yellow tape zone, sheet numbers. Print omits the grid.
 
-**Right — 02 / Printer Safe & 03 / Output:** paper and orientation, margin presets, overlap 0.15 / 0.25 / 0.35 / 0.50" (default 0.50"), stats, display toggles, assembly diagram, **Print** (Tape overlap and Scissor edge guide on by default).
+**Right — 02 / Paper & Margins & 03 / Output:** join (Overlap & tape, Edge to edge, Align & Recut), paper and orientation, margin presets, overlap 0.15 / 0.25 / 0.35 / 0.50" (default 0.50"), stats, display toggles, assembly diagram, **Print** (Scissor edge guide on by default).
 
 Settings (copy, type, margins, overlap, toggles) persist in `localStorage` and restore on reload.
 

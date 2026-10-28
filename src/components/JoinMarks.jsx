@@ -1,25 +1,30 @@
 import {
   ALIGN_COLOR,
   JOIN_ALIGN_RECUT,
-  JOIN_TRIM_TAPE,
+  JOIN_EDGE,
+  JOIN_OVERLAP_TAPE,
   RECUT_COLOR,
   alignRecutOffset,
   crossArm,
 } from '../lib/layout.js'
 
 const JOIN_OPTIONS = [
-  { value: JOIN_TRIM_TAPE, label: 'Trim & Tape' },
+  { value: JOIN_OVERLAP_TAPE, label: 'Overlap & tape' },
+  { value: JOIN_EDGE, label: 'Edge to edge' },
   { value: JOIN_ALIGN_RECUT, label: 'Align & Recut' },
 ]
 
 export function JoinSelect({ value, onChange, variant = 'header' }) {
   const header = variant === 'header'
+  const current = JOIN_OPTIONS.some((option) => option.value === value)
+    ? value
+    : JOIN_OVERLAP_TAPE
   return (
     <label className={`relative ${header ? '' : 'block'}`}>
       <span className="sr-only">Join</span>
       <select
         aria-label="Join"
-        value={value === JOIN_ALIGN_RECUT ? JOIN_ALIGN_RECUT : JOIN_TRIM_TAPE}
+        value={current}
         onChange={(event) => onChange(event.target.value)}
         className={
           header

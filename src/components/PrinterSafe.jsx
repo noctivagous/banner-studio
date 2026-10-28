@@ -1,4 +1,10 @@
-import { ALIGN_RECUT_MIN_OVERLAP, JOIN_ALIGN_RECUT, MARGIN_PRESETS, detectPreset } from '../lib/layout.js'
+import {
+  ALIGN_RECUT_MIN_OVERLAP,
+  JOIN_ALIGN_RECUT,
+  JOIN_EDGE,
+  MARGIN_PRESETS,
+  detectPreset,
+} from '../lib/layout.js'
 import { JoinSelect } from './JoinMarks.jsx'
 import { PAPERS } from '../lib/paper.js'
 import { FieldLabel } from './FieldLabel.jsx'
@@ -16,7 +22,7 @@ const PRESET_BUTTONS = [
   { id: 'custom', label: 'Custom', sub: 'Edit' },
 ]
 
-export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, paperId, orientation, onChange }) {
+export function PrinterSafe({ margins, overlap, join = 'overlap-tape', onJoin, joinBump = false, paperId, orientation, onChange }) {
   const active = detectPreset(margins)
   const alignRecut = join === JOIN_ALIGN_RECUT
   const paperLabel = PAPERS.find((paper) => paper.id === paperId)?.label ?? paperId
@@ -29,7 +35,7 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
 
   return (
     <div>
-      <ZoneHeader index="02" title="Printer Safe" icon={<PrinterIcon />} />
+      <ZoneHeader index="02" title="Paper & Margins" icon={<PrinterIcon />} />
       <div className="pro-well border rounded-[3px] p-3 mb-4">
         <p className="font-mono text-[11px] leading-[1.5] text-[#7A7A80]">
           {alignRecut ? (
@@ -53,11 +59,20 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
         defaultOpen={false}
         value={
           <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
-            {join === JOIN_ALIGN_RECUT ? 'Align & Recut' : 'Trim & Tape'}
+            {join === JOIN_ALIGN_RECUT
+              ? 'Align & Recut'
+              : join === JOIN_EDGE
+                ? 'Edge to edge'
+                : 'Overlap & tape'}
           </span>
         }
       >
         <JoinSelect variant="panel" value={join} onChange={onJoin} />
+        {joinBump && alignRecut && (
+          <p className="mt-2 font-mono text-[10px] leading-[1.5] text-[#E3FF33]">
+            Raised to {ALIGN_RECUT_MIN_OVERLAP.toFixed(2)}&Prime; — minimum for the marks.
+          </p>
+        )}
       </ParamSection>
       <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
       <ParamSection
@@ -185,7 +200,7 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
       <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
       <ParamSection
         icon={<OverlapIcon />}
-        title={alignRecut ? 'Overlap for Marks' : 'Overlap for Tape'}
+        title="Overlap"
         defaultOpen
         value={
           <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[#E3FF33] text-black rounded-[3px]">
@@ -195,7 +210,7 @@ export function PrinterSafe({ margins, overlap, join = 'trim-tape', onJoin, pape
       >
         <SegmentControl
           fill
-          ariaLabel={alignRecut ? 'Overlap for marks' : 'Overlap for tape'}
+          ariaLabel="Overlap"
           value={overlap.toFixed(2)}
           onChange={(next) => onChange({ overlap: Number(next) })}
           options={OVERLAP_STEPS.filter(
