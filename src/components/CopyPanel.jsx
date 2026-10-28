@@ -87,7 +87,10 @@ function StackLineInput({ line, index, align, selected, onSelect, onPatch }) {
       <input
         value={line.copy}
         onFocus={() => onSelect({ kind: 'line', id: line.id })}
-        onChange={(e) => onPatch(line.id, { copy: e.target.value.replace(/\n/g, ' ') })}
+        onChange={(e) => {
+          onSelect({ kind: 'line', id: line.id })
+          onPatch(line.id, { copy: e.target.value.replace(/\n/g, ' ') })
+        }}
         placeholder={`LINE ${index + 1}`}
         spellCheck={false}
         aria-label={lineText(line) || `Line ${index + 1}`}
