@@ -127,10 +127,12 @@ body {
 }
 
 /* Divided parameter stack: replaces space-y rhythm with an etched rule
-   between each stacked control group. First child stays attached. */
+   between each stacked control group. Rules bleed full container width
+   (stacks live in p-5 content) so groups read as stacked sections.
+   First child stays attached. */
 .pro-divided > * + * {
-  margin-top: 1rem;
-  padding-top: 1rem;
+  margin: 1rem -1.25rem 0;
+  padding: 1rem 1.25rem 0;
   border-top: 1px solid #000;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 }

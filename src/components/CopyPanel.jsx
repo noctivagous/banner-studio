@@ -33,6 +33,7 @@ import {
 } from './FrameMini.jsx'
 import { FontSelect } from './FontSelect.jsx'
 import { CustomColorWell, GlyphStack } from './GlyphStack.jsx'
+import { ParamSection } from './ParamSection.jsx'
 import { SectionSpine, ZoneHeader } from './SectionChrome.jsx'
 import { SegmentControl } from './SegmentControl.jsx'
 import { Toggle } from './Toggle.jsx'
@@ -93,14 +94,12 @@ function ContainerFields({ container, onPatch, onAlignX }) {
         Rectangle hugs the stack. Align cascades to the Y-stack and the lines.
         On sheet places the frame in the trim. Corner size scales with the shorter side.
       </p>
-      <div>
-        <FieldLabel>Shape</FieldLabel>
+      <ParamSection title="Shape">
         <div className="h-8 rounded-[4px] border border-[#43434E] bg-[var(--ctl)] font-mono text-[11px] uppercase tracking-[0.08em] text-[#F0F0F2] flex items-center px-2.5">
           Rectangle
         </div>
-      </div>
-      <div>
-        <FieldLabel>Size</FieldLabel>
+      </ParamSection>
+      <ParamSection title="Size">
         <div
           role="status"
           aria-label="Size: hug content"
@@ -111,9 +110,8 @@ function ContainerFields({ container, onPatch, onAlignX }) {
             Hug content
           </span>
         </div>
-      </div>
-      <div>
-        <FieldLabel>Aspect</FieldLabel>
+      </ParamSection>
+      <ParamSection title="Aspect">
         <div className="grid grid-cols-5 gap-1">
           <button
             type="button"
@@ -147,17 +145,15 @@ function ContainerFields({ container, onPatch, onAlignX }) {
             </button>
           ))}
         </div>
-      </div>
-      <div>
-        <FieldLabel
-          value={
-            <span className="font-tech text-[12px] text-[#F0F0F2]">
-              {linkedPad ? `${pad.top.toFixed(2)}"` : 'mixed'}
-            </span>
-          }
-        >
-          Padding
-        </FieldLabel>
+      </ParamSection>
+      <ParamSection
+        title="Padding"
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2]">
+            {linkedPad ? `${pad.top.toFixed(2)}"` : 'mixed'}
+          </span>
+        }
+      >
         <div className="flex items-center gap-3">
           <PaddingMini value={Math.max(pad.top, pad.right, pad.bottom, pad.left)} />
           <input
@@ -174,9 +170,8 @@ function ContainerFields({ container, onPatch, onAlignX }) {
             aria-label="Padding inches"
           />
         </div>
-      </div>
-      <div>
-        <FieldLabel icon={<AlignIcon />}>Align</FieldLabel>
+      </ParamSection>
+      <ParamSection icon={<AlignIcon />} title="Align">
         <div className="grid grid-cols-3 gap-1 mb-3">
           {['left', 'center', 'right'].map((dir) => (
             <button
@@ -216,9 +211,8 @@ function ContainerFields({ container, onPatch, onAlignX }) {
             </button>
           ))}
         </div>
-      </div>
-      <div>
-        <FieldLabel>Corners</FieldLabel>
+      </ParamSection>
+      <ParamSection title="Corners">
         <div className="grid grid-cols-3 gap-1 mb-2">
           {['square', 'round', 'cut'].map((mode) => (
             <button
@@ -259,20 +253,18 @@ function ContainerFields({ container, onPatch, onAlignX }) {
             />
           </>
         )}
-      </div>
-      <div>
-        <FieldLabel
-          icon={<CopyIcon />}
-          value={
-            <Toggle
-              on={container.fillOn}
-              onToggle={() => onPatch({ fillOn: !container.fillOn })}
-              offKnob="bg-[#7A7A80]"
-            />
-          }
-        >
-          Fill
-        </FieldLabel>
+      </ParamSection>
+      <ParamSection
+        icon={<CopyIcon />}
+        title="Fill"
+        value={
+          <Toggle
+            on={container.fillOn}
+            onToggle={() => onPatch({ fillOn: !container.fillOn })}
+            offKnob="bg-[#7A7A80]"
+          />
+        }
+      >
         {container.fillOn && (
           <div className="flex items-center gap-2">
             <CustomColorWell
@@ -283,20 +275,18 @@ function ContainerFields({ container, onPatch, onAlignX }) {
             <span className="font-mono text-[10px] text-[#7A7A80] uppercase">{container.fill}</span>
           </div>
         )}
-      </div>
-      <div>
-        <FieldLabel
-          icon={<StrokeIcon />}
-          value={
-            <Toggle
-              on={container.strokeOn}
-              onToggle={() => onPatch({ strokeOn: !container.strokeOn })}
-              offKnob="bg-[#7A7A80]"
-            />
-          }
-        >
-          Stroke
-        </FieldLabel>
+      </ParamSection>
+      <ParamSection
+        icon={<StrokeIcon />}
+        title="Stroke"
+        value={
+          <Toggle
+            on={container.strokeOn}
+            onToggle={() => onPatch({ strokeOn: !container.strokeOn })}
+            offKnob="bg-[#7A7A80]"
+          />
+        }
+      >
         {container.strokeOn && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -320,7 +310,7 @@ function ContainerFields({ container, onPatch, onAlignX }) {
             />
           </div>
         )}
-      </div>
+      </ParamSection>
     </div>
   )
 }
@@ -332,8 +322,7 @@ function StackFields({ stack, onPatch, onAlignX }) {
         Alignment lines for the whole Y-stack. Every display line shares this
         left, center, or right edge.
       </p>
-      <div>
-        <FieldLabel icon={<AlignIcon />}>Align</FieldLabel>
+      <ParamSection icon={<AlignIcon />} title="Align">
         <div className="grid grid-cols-3 gap-1">
           {['left', 'center', 'right'].map((dir) => (
             <button
@@ -357,18 +346,16 @@ function StackFields({ stack, onPatch, onAlignX }) {
             </button>
           ))}
         </div>
-      </div>
-      <div>
-        <FieldLabel
-          icon={<LineHeightIcon />}
-          value={
-            <span className="font-mono text-[11px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
-              {stack.gapIn.toFixed(2)}"
-            </span>
-          }
-        >
-          Gap
-        </FieldLabel>
+      </ParamSection>
+      <ParamSection
+        icon={<LineHeightIcon />}
+        title="Gap"
+        value={
+          <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
+            {stack.gapIn.toFixed(2)}"
+          </span>
+        }
+      >
         <input
           type="range"
           min={0}
@@ -380,7 +367,7 @@ function StackFields({ stack, onPatch, onAlignX }) {
           }
           className="w-full"
         />
-      </div>
+      </ParamSection>
     </div>
   )
 }
@@ -391,10 +378,9 @@ function LineFields({ line, glyphMax, onPatch, align }) {
   const front = visible[visible.length - 1] ?? line.layers?.[0]
   return (
     <div className="pro-divided">
-      <div>
-        <FieldLabel icon={<FontIcon />}>Font Family</FieldLabel>
+      <ParamSection icon={<FontIcon />} title="Font Family">
         <FontSelect fontId={line.fontId} onChange={onPatch} />
-      </div>
+      </ParamSection>
       <div className="relative">
         <input
           value={line.copy}
@@ -419,17 +405,15 @@ function LineFields({ line, glyphMax, onPatch, align }) {
           Line
         </div>
       </div>
-      <div>
-        <FieldLabel
-          icon={<GlyphHeightIcon />}
-          value={
-            <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
-              {line.glyphHeight.toFixed(1)}"
-            </span>
-          }
-        >
-          Glyph Height
-        </FieldLabel>
+      <ParamSection
+        icon={<GlyphHeightIcon />}
+        title="Glyph Height"
+        value={
+          <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
+            {line.glyphHeight.toFixed(1)}"
+          </span>
+        }
+      >
         <input
           type="range"
           min={MIN_GLYPH_HEIGHT}
@@ -451,19 +435,17 @@ function LineFields({ line, glyphMax, onPatch, align }) {
           <span className="font-mono text-[8px] text-[#7A7A80]">{MIN_GLYPH_HEIGHT}"</span>
           <span className="font-mono text-[8px] text-[#7A7A80]">{glyphMax.toFixed(1)}" max</span>
         </div>
-      </div>
-      <div>
-        <FieldLabel
-          icon={<LetterSpacingIcon />}
-          value={
-            <span className="font-tech text-[12px] text-[#F0F0F2]">
-              {line.letterSpacing > 0 ? '+' : ''}
-              {line.letterSpacing.toFixed(2)}em
-            </span>
-          }
-        >
-          Letter Spacing
-        </FieldLabel>
+      </ParamSection>
+      <ParamSection
+        icon={<LetterSpacingIcon />}
+        title="Letter Spacing"
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2]">
+            {line.letterSpacing > 0 ? '+' : ''}
+            {line.letterSpacing.toFixed(2)}em
+          </span>
+        }
+      >
         <input
           type="range"
           min={-0.05}
@@ -473,9 +455,8 @@ function LineFields({ line, glyphMax, onPatch, align }) {
           onChange={(e) => onPatch({ letterSpacing: parseFloat(e.target.value) })}
           className="w-full"
         />
-      </div>
-      <div>
-        <FieldLabel icon={<TransformIcon />}>Text Transform</FieldLabel>
+      </ParamSection>
+      <ParamSection icon={<TransformIcon />} title="Text Transform">
         <div className="grid grid-cols-3 gap-1.5">
           {['uppercase', 'lowercase', 'asIs'].map((mode) => (
             <button
@@ -492,7 +473,7 @@ function LineFields({ line, glyphMax, onPatch, align }) {
             </button>
           ))}
         </div>
-      </div>
+      </ParamSection>
       <GlyphStack line={line} font={font} onPatchLine={onPatch} />
     </div>
   )

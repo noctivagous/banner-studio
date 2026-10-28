@@ -1,6 +1,7 @@
 import { MARGIN_PRESETS, detectPreset } from '../lib/layout.js'
 import { PAPERS } from '../lib/paper.js'
 import { FieldLabel } from './FieldLabel.jsx'
+import { ParamSection } from './ParamSection.jsx'
 import { ZoneHeader } from './SectionChrome.jsx'
 import { SegmentControl } from './SegmentControl.jsx'
 import { LandscapeIcon, MarginIcon, OverlapIcon, PortraitIcon, PrinterIcon } from './icons.jsx'
@@ -27,8 +28,8 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
           edge. You trim on the dashed line and tape sheets edge-to-edge.
         </p>
       </div>
-      <div className="space-y-2">
-        <FieldLabel icon={<PrinterIcon />}>Paper</FieldLabel>
+      <ParamSection icon={<PrinterIcon />} title="Paper">
+        <div className="space-y-2">
         <div className="relative">
           <select
             value={paperId}
@@ -65,9 +66,11 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
             </button>
           ))}
         </div>
-      </div>
-      <div aria-hidden="true" className="pro-divider my-4" />
-      <div className="grid grid-cols-2 gap-1.5">
+        </div>
+      </ParamSection>
+      <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
+      <ParamSection title="Preset">
+        <div className="grid grid-cols-2 gap-1.5">
         {PRESET_BUTTONS.map((preset) => (
           <button
             key={preset.id}
@@ -91,9 +94,11 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
             </div>
           </button>
         ))}
-      </div>
-      <div aria-hidden="true" className="pro-divider my-4" />
-      <div className="grid grid-cols-2 gap-2.5">
+        </div>
+      </ParamSection>
+      <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
+      <ParamSection title="Margins">
+        <div className="grid grid-cols-2 gap-2.5">
         {['top', 'bottom', 'left', 'right'].map((side) => (
           <div key={side} className="space-y-1.5">
             <FieldLabel icon={<MarginIcon direction={side} />}>{side}</FieldLabel>
@@ -116,19 +121,18 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
             </div>
           </div>
         ))}
-      </div>
-      <div aria-hidden="true" className="pro-divider my-4" />
-      <div>
-        <FieldLabel
-          icon={<OverlapIcon />}
-          value={
-            <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[#E3FF33] text-black rounded-[3px]">
-              {overlap.toFixed(2)}"
-            </span>
-          }
-        >
-          Overlap for Tape
-        </FieldLabel>
+        </div>
+      </ParamSection>
+      <div aria-hidden="true" className="pro-divider my-4 -mx-4" />
+      <ParamSection
+        icon={<OverlapIcon />}
+        title="Overlap for Tape"
+        value={
+          <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[#E3FF33] text-black rounded-[3px]">
+            {overlap.toFixed(2)}"
+          </span>
+        }
+      >
         <SegmentControl
           fill
           ariaLabel="Overlap for tape"
@@ -139,7 +143,7 @@ export function PrinterSafe({ margins, overlap, paperId, orientation, onChange }
             label: `${step.toFixed(2)}"`,
           }))}
         />
-      </div>
+      </ParamSection>
     </div>
   )
 }

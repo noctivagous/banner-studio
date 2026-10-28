@@ -27,6 +27,7 @@ import {
   resolveShadowOffsetIn,
 } from '../lib/layout.js'
 import { FieldLabel } from './FieldLabel.jsx'
+import { ParamSection } from './ParamSection.jsx'
 import { Toggle } from './Toggle.jsx'
 import { EffectIcon, FillIcon, StrokeIcon } from './icons.jsx'
 
@@ -390,8 +391,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
 
   return (
     <div className="pro-divided">
-      <div>
-        <FieldLabel icon={<EffectIcon />}>Glyph stack</FieldLabel>
+      <ParamSection icon={<EffectIcon />} title="Glyph stack">
         <p className="mb-2 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
           Z axis — top = back, bottom = front. Same glyphs, stacked in depth.
         </p>
@@ -509,14 +509,18 @@ export function GlyphStack({ line, font, onPatchLine }) {
         >
           + Add glyph copy · {stack.length}/{MAX_TEXT_LAYERS}
         </button>
-      </div>
+      </ParamSection>
 
-      <div className="font-mono text-[10px] tracking-[0.1em] text-[#E3FF33] uppercase">
-        Editing · {selected.name}
-      </div>
-      <div className="grid grid-cols-2 gap-3">
+      <ParamSection
+        icon={<FillIcon />}
+        title="Fill (Base)"
+        value={
+          <span className="font-mono text-[10px] tracking-[0.1em] text-[#E3FF33] uppercase">
+            Editing · {selected.name}
+          </span>
+        }
+      >
         <div>
-          <FieldLabel icon={<FillIcon />}>Fill (Base)</FieldLabel>
           <div className="flex items-center gap-2">
             <CustomColorWell
               value={selected.fill}
@@ -558,21 +562,19 @@ export function GlyphStack({ line, font, onPatchLine }) {
             {selected.fill}
           </div>
         </div>
-      </div>
+      </ParamSection>
 
-      <div>
-        <FieldLabel
-          icon={<FillIcon />}
-          value={
-            <Toggle
-              on={selected.overlayOn}
-              onToggle={() => setSelected({ overlayOn: !selected.overlayOn })}
-              offKnob="bg-[#7A7A80]"
-            />
-          }
-        >
-          Fill (Overlay)
-        </FieldLabel>
+      <ParamSection
+        icon={<FillIcon />}
+        title="Fill (Overlay)"
+        value={
+          <Toggle
+            on={selected.overlayOn}
+            onToggle={() => setSelected({ overlayOn: !selected.overlayOn })}
+            offKnob="bg-[#7A7A80]"
+          />
+        }
+      >
         {selected.overlayOn && (
           <div className="pro-well space-y-3 p-3 border rounded-[3px]">
             <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
@@ -602,21 +604,19 @@ export function GlyphStack({ line, font, onPatchLine }) {
             />
           </div>
         )}
-      </div>
+      </ParamSection>
 
-      <div>
-        <FieldLabel
-          icon={<StrokeIcon />}
-          value={
-            <Toggle
-              on={selected.strokeOn}
-              onToggle={() => setSelected({ strokeOn: !selected.strokeOn })}
-              offKnob="bg-[#7A7A80]"
-            />
-          }
-        >
-          Stroke
-        </FieldLabel>
+      <ParamSection
+        icon={<StrokeIcon />}
+        title="Stroke"
+        value={
+          <Toggle
+            on={selected.strokeOn}
+            onToggle={() => setSelected({ strokeOn: !selected.strokeOn })}
+            offKnob="bg-[#7A7A80]"
+          />
+        }
+      >
         {selected.strokeOn && (
           <div className="pro-well space-y-3 p-3 border rounded-[3px]">
             <div>
@@ -646,10 +646,9 @@ export function GlyphStack({ line, font, onPatchLine }) {
             </div>
           </div>
         )}
-      </div>
+      </ParamSection>
 
-      <div>
-        <FieldLabel icon={<EffectIcon />}>Offset · {selected.name}</FieldLabel>
+      <ParamSection icon={<EffectIcon />} title={`Offset · ${selected.name}`}>
         <div className="pro-well mb-4 space-y-3 p-3 border rounded-[3px]">
           <p className="mb-0 font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
             Position of this copy. The face usually sits at 0.00&quot;; copies behind it
@@ -733,9 +732,8 @@ export function GlyphStack({ line, font, onPatchLine }) {
             dx {offset.dx.toFixed(2)}&quot; · dy {offset.dy.toFixed(2)}&quot;
           </div>
         </div>
-        <div className="mb-2 font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
-          Glyph Effects
-        </div>
+      </ParamSection>
+      <ParamSection title="Glyph Effects">
         <div className="grid grid-cols-2 gap-1.5">
           {[
             { id: TEXT_EFFECT_NONE, label: 'None' },
@@ -793,7 +791,7 @@ export function GlyphStack({ line, font, onPatchLine }) {
           fill, black hatch at 90°, black stroke, and a solid black copy behind.
           Fill + Hatch-Shadow uses black fill with a hatch copy behind at 90° or 0°.
         </p>
-      </div>
+      </ParamSection>
     </div>
   )
 }
