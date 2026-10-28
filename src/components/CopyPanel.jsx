@@ -92,8 +92,9 @@ function ContainerFields({ container, onPatch, onAlignX }) {
   return (
     <div className="pro-divided">
       <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
-        Rectangle hugs the stack. Align cascades to the Y-stack and the lines.
-        On sheet places the frame in the trim. Corner size scales with the shorter side.
+        Rectangle hugs the stack. Left, center, and right place that stack across
+        the sheets, and line the copy up to the same edge. On sheet places the
+        frame in the trim height. Corner size scales with the shorter side.
       </p>
       <ParamSection
         title="Shape"

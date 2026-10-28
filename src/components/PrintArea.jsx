@@ -4,6 +4,7 @@ import {
   CUT_LINE_BLEND,
   CUT_LINE_BLEND_H,
   JOIN_ALIGN_RECUT,
+  coveredSpan,
   horizontalCutInches,
   joinDuplicates,
   verticalCutInches,
@@ -38,6 +39,7 @@ export function PrintArea({
   const windowW = duplicateStrip ? trimW : contentW
   const windowH = tile && !duplicateStrip ? contentH : trimH
   const frameBoxH = windowH
+  const frameBoxW = coveredSpan(cols, trimW, contentW, duplicateStrip) || windowW
 
   return (
     <div id="print-area">
@@ -85,6 +87,15 @@ export function PrintArea({
                         composition.container.layout.alignY,
                         measured.height,
                         frameBoxH,
+                        composition.alignMode,
+                      )}in`
+                    : 0,
+                paddingLeft:
+                  measured && measured.width > 0
+                    ? `${placeFrameInTrim(
+                        composition.container.layout.alignX,
+                        measured.width,
+                        frameBoxW,
                         composition.alignMode,
                       )}in`
                     : 0,

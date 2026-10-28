@@ -16,10 +16,10 @@ export function snapToGrid(value, origin = 0, step = GRID_HALF_IN) {
   return origin + Math.round((n - origin) / step) * step
 }
 
-export function frameOffsetInTrim(alignY, frameH, trimH) {
-  const extra = Math.max(0, (Number(trimH) || 0) - (Number(frameH) || 0))
-  if (alignY === 'top') return 0
-  if (alignY === 'bottom') return extra
+export function frameOffsetInTrim(align, frame, span) {
+  const extra = Math.max(0, (Number(span) || 0) - (Number(frame) || 0))
+  if (align === 'top' || align === 'left') return 0
+  if (align === 'bottom' || align === 'right') return extra
   return extra / 2
 }
 

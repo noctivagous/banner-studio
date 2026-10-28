@@ -15,6 +15,7 @@ import {
   PREVIEW_CUT_LINE,
   PREVIEW_CUT_LINE_H,
   PX_PER_INCH,
+  coveredSpan,
   hatchStyle,
   horizontalCutInches,
   joinDuplicates,
@@ -735,6 +736,7 @@ export function Preview({
   const slicePx = sliceW * px
   const sliceHpx = sliceH * px
   const frameBoxH = sliceH
+  const frameBoxW = coveredSpan(cols, trimW, contentW, duplicateStrip) || sliceW
   const cutSlackPx = overlapCutSlack(overlap, printOverlap && !alignRecut) * px
   const canvasRef = useRef(null)
   const padRef = useRef(null)
@@ -1079,6 +1081,15 @@ export function Preview({
                                   composition.container.layout.alignY,
                                   measured.height,
                                   frameBoxH,
+                                  composition.alignMode,
+                                ) * px
+                              : 0,
+                          paddingLeft:
+                            measured && measured.width > 0
+                              ? placeFrameInTrim(
+                                  composition.container.layout.alignX,
+                                  measured.width,
+                                  frameBoxW,
                                   composition.alignMode,
                                 ) * px
                               : 0,

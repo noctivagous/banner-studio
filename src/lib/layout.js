@@ -63,6 +63,15 @@ export function assembledSpan(count, trim, overlap) {
   return count * trim - Math.max(0, count - 1) * overlap
 }
 
+// Width or height of the sheet grid in banner inches. Duplicate tape keeps
+// a full trim window on every sheet and advances by `advance`. A butt joint
+// advances and windows by `advance`.
+export function coveredSpan(count, trim, advance, duplicate) {
+  if (!(count > 0)) return 0
+  if (duplicate) return trim + Math.max(0, count - 1) * advance
+  return count * advance
+}
+
 export function buildSheets(cols, rows, contentW, contentH) {
   const sheets = []
   const safeCols = Math.max(0, cols)

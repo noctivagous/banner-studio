@@ -9,6 +9,6 @@ the need for a template library and wizard library.
   [ ] images (raster, vector)
 
 
-[ ] - use m-w model to audit the code base for
+[x] - use m-w model to audit the code base for
 coherence, user-friendliness, redundant text, unused or unimplemented
-aspects, and leftovers from the web artifact.
+aspects, and leftovers from the web artifact. -> AUDIT.md
