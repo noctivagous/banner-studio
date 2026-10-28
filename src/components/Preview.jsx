@@ -262,6 +262,8 @@ export function BannerComposition({
   onSelect,
   onChangeLine,
   onPatchLine,
+  onLivePatch,
+  onLiveCommit,
   editingLineId,
   onEditStart,
   onEditEnd,
@@ -354,7 +356,8 @@ export function BannerComposition({
 
   const moveDrag = (event) => {
     const drag = dragRef.current
-    if (!drag || typeof onPatchLine !== 'function') return
+    const applyPatch = onLivePatch ?? onPatchLine
+    if (!drag || typeof applyPatch !== 'function') return
     const dxPx = event.clientX - drag.startX
     const dyPx = event.clientY - drag.startY
     if (Math.abs(dxPx) + Math.abs(dyPx) > 3) drag.moved = true
@@ -365,14 +368,14 @@ export function BannerComposition({
         MAX_GLYPH_HEIGHT,
         Math.max(MIN_GLYPH_HEIGHT, Math.round(((drag.baseH + dyPx / scale) / 0.5)) * 0.5),
       )
-      onPatchLine(drag.id, { glyphHeight: Math.round(next * 100) / 100 })
+      applyPatch(drag.id, { glyphHeight: Math.round(next * 100) / 100 })
       return
     }
     if (drag.kind === 'rotate') {
       const ang = (Math.atan2(event.clientY - drag.centerY, event.clientX - drag.centerX) * 180) / Math.PI
       const next = drag.baseDeg + (ang - drag.startAng)
       const wrapped = ((next + 540) % 360) - 180
-      onPatchLine(drag.id, { rotationDeg: Math.round(wrapped / 5) * 5 })
+      applyPatch(drag.id, { rotationDeg: Math.round(wrapped / 5) * 5 })
       return
     }
     let dx = drag.baseDx + dxPx / scale
@@ -381,7 +384,7 @@ export function BannerComposition({
       dx = snapToGrid(drag.autoX + dx) - drag.autoX
       dy = snapToGrid(drag.autoY + dy) - drag.autoY
     }
-    onPatchLine(drag.id, {
+    applyPatch(drag.id, {
       place: { mode: drag.snap ? 'snap' : 'free', dxIn: round2(dx), dyIn: round2(dy) },
     })
   }
@@ -392,6 +395,7 @@ export function BannerComposition({
     if (drag?.moved) {
       event.stopPropagation()
       justDraggedRef.current = true
+      onLiveCommit?.(drag.id)
     }
   }
 
@@ -1045,6 +1049,8 @@ export function Preview({
   selection,
   onSelect,
   onChange,
+  onLivePatch,
+  onLiveCommit,
   join = 'overlap-tape',
   showTrim,
   showSafe,
@@ -1443,6 +1449,13 @@ export function Preview({
                               if (!onChange) return
                               onChange(withLine(composition, lineId, patch), lineId)
                             }}
+                            onLivePatch={
+                              onLivePatch
+                                ? (lineId, patch) =>
+                                    onLivePatch(withLine(composition, lineId, patch))
+                                : undefined
+                            }
+                            onLiveCommit={onLiveCommit}
                             editingLineId={editing?.hostId === sheet.index ? editing.lineId : null}
                             onEditStart={(lineId) => {
                               const line = findLine(composition, lineId)

@@ -64,7 +64,7 @@ export default function App() {
     return { kind: 'line', id: stack?.lines?.[0]?.id }
   })
 
-  const [measured, setMeasured] = useState(null)
+  const [fontsVersion, setFontsVersion] = useState(0)
 
   const setComposition = useCallback(
     (next, preferLineId) => {
@@ -82,6 +82,32 @@ export default function App() {
     [patch, trimH],
   )
 
+  // Pointer-drag updates bypass auto-fit so the fitter never fights the
+  // pointer mid-gesture (rotate/resize change the measured height, which the
+  // fitter would immediately shrink back, oscillating every frame). The drag
+  // commit below re-applies the fit once on pointer-up.
+  const patchCompositionLive = useCallback(
+    (next) => {
+      patch((prev) => {
+        const incoming = typeof next === 'function' ? next(prev.composition) : next
+        return { ...prev, composition: normalizeComposition(incoming) }
+      })
+    },
+    [patch],
+  )
+
+  const commitComposition = useCallback(
+    (preferLineId) => {
+      patch((prev) => {
+        if (prev.bannerMode === 'tile') return prev
+        const fitted = fitCompositionToTrim(prev.composition, trimH, preferLineId)
+        if (fitted === prev.composition) return prev
+        return { ...prev, composition: fitted }
+      })
+    },
+    [patch, trimH],
+  )
+
   useEffect(() => {
     patch((prev) => {
       if (prev.bannerMode === 'tile') return prev
@@ -91,6 +117,10 @@ export default function App() {
     })
   }, [trimH, patch])
 
+  // Measure synchronously so the preview never renders one frame with stale
+  // geometry during a drag (the old async effect resolved after paint, making
+  // every pointermove flicker). fonts.ready only bumps a version key to
+  // re-measure once webfonts arrive.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -99,13 +129,18 @@ export default function App() {
       } catch {
         /* fonts.ready is optional */
       }
-      if (cancelled) return
-      setMeasured(measureComposition(normalized, tile ? {} : { maxHeight: trimH }))
+      if (!cancelled) setFontsVersion((v) => v + 1)
     })()
     return () => {
       cancelled = true
     }
-  }, [normalized, trimH, tile])
+  }, [])
+
+  const measured = useMemo(
+    () => measureComposition(normalized, tile ? {} : { maxHeight: trimH }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [normalized, trimH, tile, fontsVersion],
+  )
 
   const textWidthIn = measured?.width ?? 0
   const textHeightIn = measured?.height ?? 0
@@ -270,6 +305,8 @@ export default function App() {
             selection={selection}
             onSelect={setSelection}
             onChange={setComposition}
+            onLivePatch={patchCompositionLive}
+            onLiveCommit={commitComposition}
             join={join}
             showTrim={showTrim}
             showSafe={showSafe}
