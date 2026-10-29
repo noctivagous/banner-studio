@@ -24,6 +24,24 @@ export function CopyIcon() {
   )
 }
 
+export function LockIcon({ size = 12 }) {
+  return (
+    <Base size={size}>
+      <rect x="2.6" y="5.4" width="6.8" height="5.2" rx="0.9" />
+      <path d="M4.2 5.4V4.1a1.8 1.8 0 0 1 3.6 0V5.4" />
+    </Base>
+  )
+}
+
+export function UnlockIcon({ size = 12 }) {
+  return (
+    <Base size={size}>
+      <rect x="2.6" y="5.4" width="6.8" height="5.2" rx="0.9" />
+      <path d="M4.2 5.4V4.1a1.8 1.8 0 0 1 3.6 0" />
+    </Base>
+  )
+}
+
 export function FontIcon() {
   return (
     <Base>

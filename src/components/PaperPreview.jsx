@@ -1,10 +1,11 @@
 // PaperPreview: paper.js canvas renderer for the banner preview.
 //
 // Resting geometry matches the DOM BannerComposition: line boxes sit on the
-// measured baseline, rotate around the box center, and keep axis-aligned
-// selection chrome. A gesture does not rebuild the scene. The dragged items
-// keep their matrices and follow the pointer; the document updates on a frame
-// and the scene is redrawn from measurement when the pointer goes up.
+// measured baseline and rotate around the box center. Selection chrome is the
+// text's oriented box, so the rectangle and handles turn with the glyphs. A
+// gesture does not rebuild the scene. The dragged items keep their matrices
+// and follow the pointer; the document updates on a frame and the scene is
+// redrawn from measurement when the pointer goes up.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import paper from 'paper'
@@ -16,7 +17,10 @@ import {
   cutPolygonPoints,
   findLine,
   fontOf,
+  isIdSelected,
   lineText,
+  nextSelection,
+  selectedLineIds,
 } from '../lib/composition.js'
 import {
   GRID_HALF_IN,
@@ -42,12 +46,41 @@ import { getEngineFont } from '../lib/typeEngine.js'
 
 const LIME = '#E3FF33'
 const INK = '#111111'
+const SELECT_BLUE = '#0D2B6B'
+const SELECT_HALO = '#FFFFFF'
 const BUTTONS = new Set(['snap', 'center-x', 'center-y'])
 
 function color(scope, value, alpha = 1) {
   const next = new scope.Color(value)
   next.alpha = alpha
   return next
+}
+
+function paintSelectionStroke(scope, path) {
+  path.strokeColor = color(scope, SELECT_BLUE)
+  path.strokeWidth = 2
+  path.strokeJoin = 'round'
+  path.strokeCap = 'round'
+  path.shadowColor = color(scope, '#000000', 0.55)
+  path.shadowBlur = 6
+  path.shadowOffset = new scope.Point(1, 2)
+  path.data = { role: 'decor' }
+  return path
+}
+
+function addSelectionHalo(scope, path) {
+  const halo = path.clone()
+  halo.strokeColor = color(scope, SELECT_HALO)
+  halo.strokeWidth = (path.strokeWidth || 2) + 2
+  halo.strokeJoin = path.strokeJoin
+  halo.strokeCap = path.strokeCap
+  halo.fillColor = null
+  halo.shadowColor = null
+  halo.shadowBlur = 0
+  halo.shadowOffset = new scope.Point(0, 0)
+  halo.data = { role: 'decor' }
+  halo.insertBelow(path)
+  return halo
 }
 
 function rowTop(row, rulerH, stride) {
@@ -343,7 +376,7 @@ function drawRuler(scope, x, y, originIn, widthIn, px) {
   return group
 }
 
-function drawLine(scope, box, px, frameX, frameY, selected, editing, sheetIndex) {
+function drawLine(scope, box, px, frameX, frameY, selected, editing, sheetIndex, showHandles = true) {
   const line = box.line
   const font = fontOf(line)
   const text = lineText(line) || '\u00a0'
@@ -427,9 +460,8 @@ function drawLine(scope, box, px, frameX, frameY, selected, editing, sheetIndex)
     topLeft,
     body,
   }
-  const rotation = Number(line.rotationDeg) || 0
-  if (rotation) spin.rotate(rotation, center)
 
+  const frame = selectionFrame(scope, body, left, top, width, height, px)
   const chrome = new scope.Group()
   chrome.applyMatrix = false
   chrome.data = {
@@ -439,30 +471,66 @@ function drawLine(scope, box, px, frameX, frameY, selected, editing, sheetIndex)
     center,
     topLeft,
   }
-  const hit = new scope.Path.Rectangle(
-    new scope.Rectangle(left, top, Math.max(width, px), height),
-  )
+  const hit = new scope.Path.Rectangle(frame)
   hit.fillColor = color(scope, '#000000', 0.001)
   hit.data = { role: 'handle', handle: 'move', lineId: box.id, sheetIndex, center, topLeft }
   chrome.addChild(hit)
   if (selected && !editing) {
-    const outline = new scope.Path.Rectangle(new scope.Rectangle(left - 2, top - 2, Math.max(width, px) + 4, height + 4))
-    outline.strokeColor = color(scope, LIME)
-    outline.strokeWidth = 2
-    outline.data = { role: 'decor' }
+    const outline = new scope.Path.Rectangle(frame.expand(4, 4))
+    paintSelectionStroke(scope, outline)
     chrome.addChild(outline)
-    const baseY = baseline
-    const guide = new scope.Path.Line(new scope.Point(left, baseY), new scope.Point(left + width, baseY))
-    guide.strokeColor = color(scope, LIME)
+    addSelectionHalo(scope, outline)
+    const guide = new scope.Path.Line(new scope.Point(frame.left, baseline), new scope.Point(frame.right, baseline))
+    paintSelectionStroke(scope, guide)
     guide.strokeWidth = 1
-    guide.data = { role: 'decor' }
+    guide.shadowBlur = 4
     chrome.addChild(guide)
-    addHandles(scope, chrome, box, left, top, Math.max(width, px), height, center, topLeft, sheetIndex)
+    addSelectionHalo(scope, guide)
+    if (showHandles) addHandles(scope, chrome, box, frame, center, topLeft, sheetIndex)
+  }
+  const rotation = Number(line.rotationDeg) || 0
+  if (rotation) {
+    spin.rotate(rotation, center)
+    chrome.rotate(rotation, center)
   }
   return { spin, chrome }
 }
 
-function addHandles(scope, chrome, box, left, top, width, height, center, topLeft, sheetIndex) {
+function selectionFrame(scope, body, left, top, width, height, px) {
+  const fallback = new scope.Rectangle(left, top, Math.max(width, px), Math.max(height, px))
+  if (!body?.children.length) return fallback
+  const bounds = body.bounds
+  if (!(bounds.width > 1) || !(bounds.height > 1)) return fallback
+  return bounds
+}
+
+function drawFrameResizeHandle(scope, frameX, frameY, frameW, frameH) {
+  const size = 16
+  const viewW = scope.view.viewSize.width
+  const viewH = scope.view.viewSize.height
+  const x = Math.max(1, Math.min(frameX + frameW + 4, viewW - size - 1))
+  const y = Math.max(1, Math.min(frameY + frameH + 4, viewH - size - 1))
+  const origin = new scope.Point(frameX, frameY)
+  const tag = { role: 'handle', handle: 'frame-resize', origin }
+  const pad = new scope.Path.Rectangle(
+    new scope.Rectangle(x, y, size, size),
+    new scope.Size(3, 3),
+  )
+  pad.fillColor = color(scope, LIME)
+  pad.strokeColor = color(scope, '#000000')
+  pad.strokeWidth = 1
+  pad.data = tag
+  const mark = new scope.PointText(new scope.Point(x + 8, y + 12))
+  mark.content = '⤡'
+  mark.justification = 'center'
+  mark.fontSize = 11
+  mark.fillColor = color(scope, '#000000')
+  mark.data = tag
+  scope.project.activeLayer.addChild(pad)
+  scope.project.activeLayer.addChild(mark)
+}
+
+function addHandles(scope, chrome, box, frame, center, topLeft, sheetIndex) {
   const snap = (box.line.place?.mode || 'snap') !== 'free'
   const buttons = [
     { handle: 'snap', label: snap ? '🧲' : '🔓', fill: snap ? LIME : '#141417', ink: snap ? '#000000' : LIME },
@@ -470,8 +538,8 @@ function addHandles(scope, chrome, box, left, top, width, height, center, topLef
     { handle: 'center-y', label: '↕', fill: '#141417', ink: LIME },
   ]
   buttons.forEach((button, index) => {
-    const x = left + width - (buttons.length - index) * 22 - 1
-    const y = top + 1
+    const x = frame.right - (buttons.length - index) * 22 - 1
+    const y = frame.top + 1
     const pad = new scope.Path.Rectangle(new scope.Rectangle(x, y, 20, 20), new scope.Size(3, 3))
     pad.fillColor = color(scope, button.fill)
     pad.strokeColor = color(scope, '#000000')
@@ -487,7 +555,7 @@ function addHandles(scope, chrome, box, left, top, width, height, center, topLef
     chrome.addChild(label)
   })
   const resize = new scope.Path.Rectangle(
-    new scope.Rectangle(left + width - 8, top + height - 8, 16, 16),
+    new scope.Rectangle(frame.right - 8, frame.bottom - 8, 16, 16),
     new scope.Size(3, 3),
   )
   resize.fillColor = color(scope, LIME)
@@ -495,7 +563,7 @@ function addHandles(scope, chrome, box, left, top, width, height, center, topLef
   resize.strokeWidth = 1
   resize.data = { role: 'handle', handle: 'resize', lineId: box.id, sheetIndex, center, topLeft }
   chrome.addChild(resize)
-  const rotate = new scope.Path.Circle(new scope.Point(left, top), 8)
+  const rotate = new scope.Path.Circle(frame.topLeft, 8)
   rotate.fillColor = color(scope, LIME)
   rotate.strokeColor = color(scope, '#000000')
   rotate.strokeWidth = 1
@@ -704,7 +772,7 @@ function drawScene(scope, ctx) {
         stackHit.data = { role: 'stack', stackId: stack.id }
         comp.addChild(stackHit)
       }
-      const guidesOn = selection?.kind === 'stack' || selection?.kind === 'line'
+      const guidesOn = isIdSelected(selection, stack?.id) || selectedLineIds(selection).length > 0
       if (guidesOn && stack && measured.stackBox) {
         const box = measured.stackBox
         for (const edge of ['left', 'center', 'right']) {
@@ -720,12 +788,12 @@ function drawScene(scope, ctx) {
           comp.addChild(guide)
         }
       }
-      if (selection?.kind === 'container' && selection?.id === container.id) {
+      if (isIdSelected(selection, container.id)) {
         const outline = makeFramePath(scope, container, frameX, frameY, frameW, frameH, px)
-        outline.strokeColor = color(scope, LIME)
-        outline.strokeWidth = 1
-        outline.data = { role: 'decor' }
+        paintSelectionStroke(scope, outline)
+        outline.strokeWidth = 2
         comp.addChild(outline)
+        addSelectionHalo(scope, outline)
       }
 
       const chromes = []
@@ -736,9 +804,10 @@ function drawScene(scope, ctx) {
           px,
           frameX,
           frameY,
-          selection?.id === box.id,
+          isIdSelected(selection, box.id),
           editingLineId === box.id,
           sheet.index,
+          selection?.id === box.id,
         )
         comp.addChild(parts.spin)
         chromes.push(parts.chrome)
@@ -874,6 +943,13 @@ function drawScene(scope, ctx) {
       }
     })
   }
+  if (measured && measured.width > 0 && sheets[0]) {
+    const sheet0 = sheets[0]
+    const page = pageBoardOrigin(sheet0, pitchX, rulerH, stride)
+    const frameX = page.x + margins.left * px + pad.x * px - sheet0.originX * px
+    const frameY = page.y + margins.top * px + pad.y * px - sheet0.originY * px
+    drawFrameResizeHandle(scope, frameX, frameY, measured.width * px, measured.height * px)
+  }
   scope.view.update()
 }
 
@@ -1001,6 +1077,10 @@ function applyGesture(drag, point, shift) {
     for (const part of drag.parts) {
       part.spin.matrix = part.spinMatrix.clone()
       if (delta) part.spin.rotate(delta, part.center)
+      if (part.chrome && part.chromeMatrix) {
+        part.chrome.matrix = part.chromeMatrix.clone()
+        if (delta) part.chrome.rotate(delta, part.center)
+      }
     }
     return { rotationDeg: next }
   }
@@ -1116,8 +1196,10 @@ export function PaperPreview(props) {
     measured,
     selection,
     onSelect,
+    onObjectContextMenu,
     onPatchLine,
     onLivePatch,
+    onLivePatchFrame,
     onLiveCommit,
     join = 'overlap-tape',
     showTrim = true,
@@ -1154,12 +1236,21 @@ export function PaperPreview(props) {
     measured,
     selection,
     onSelect,
+    onObjectContextMenu,
     onPatchLine,
     onLivePatch,
+    onLivePatchFrame,
     onLiveCommit,
     onEditStart,
     editing,
     px,
+    tile,
+    trimW,
+    trimH,
+    contentW,
+    contentH,
+    overlap,
+    duplicateStrip: joinDuplicates(join) && overlap > 0,
   }
 
   const duplicateStrip = joinDuplicates(join) && overlap > 0
@@ -1186,29 +1277,37 @@ export function PaperPreview(props) {
       return hit ? tagged(hit.item) : null
     }
 
-    const schedulePatch = (id, patch) => {
-      pendingRef.current.patch = { id, patch }
+    const flushPending = (next) => {
+      if (!next) return
+      const s = stateRef.current
+      if (next.kind === 'frame') {
+        s.onLivePatchFrame?.(next.widthIn, next.heightIn)
+        return
+      }
+      const apply = s.onLivePatch ?? s.onPatchLine
+      apply?.(next.id, next.patch)
+    }
+
+    const queuePatch = (next) => {
+      pendingRef.current.patch = next
       if (pendingRef.current.raf) return
       pendingRef.current.raf = requestAnimationFrame(() => {
         pendingRef.current.raf = 0
-        const next = pendingRef.current.patch
+        const queued = pendingRef.current.patch
         pendingRef.current.patch = null
-        if (!next) return
-        const s = stateRef.current
-        const apply = s.onLivePatch ?? s.onPatchLine
-        apply?.(next.id, next.patch)
+        flushPending(queued)
       })
     }
+
+    const schedulePatch = (id, patch) => queuePatch({ kind: 'line', id, patch })
+    const scheduleFrame = (widthIn, heightIn) => queuePatch({ kind: 'frame', widthIn, heightIn })
 
     const flushPatch = () => {
       if (pendingRef.current.raf) cancelAnimationFrame(pendingRef.current.raf)
       pendingRef.current.raf = 0
       const next = pendingRef.current.patch
       pendingRef.current.patch = null
-      if (!next) return
-      const s = stateRef.current
-      const apply = s.onLivePatch ?? s.onPatchLine
-      apply?.(next.id, next.patch)
+      flushPending(next)
     }
 
     const runButton = (kind, lineId) => {
@@ -1229,23 +1328,38 @@ export function PaperPreview(props) {
       s.onPatchLine(lineId, { place: { ...place, mode: 'snap', ...patch } })
     }
 
-    const finish = () => {
+    const selectTarget = (target, additive) => {
+      const s = stateRef.current
+      s.onSelect?.(nextSelection(s.selection, target, additive))
+    }
+
+    const finish = (event) => {
       const drag = dragRef.current
       if (!drag) return
       dragRef.current = null
       const s = stateRef.current
+      const shift = Boolean(event?.modifiers?.shift)
       canvas.style.cursor = 'default'
       if (drag.kind === 'empty' || drag.kind === 'frame') {
-        s.onSelect?.({ kind: 'container', id: s.composition.container.id })
+        if (!shift) selectTarget({ kind: 'container', id: s.composition.container.id }, false)
+        return
+      }
+      if (drag.kind === 'frame-resize') {
+        if (drag.moved) {
+          flushPatch()
+          s.onLiveCommit?.()
+          setSceneTick((tick) => tick + 1)
+        }
+        selectTarget({ kind: 'container', id: s.composition.container.id }, shift)
         return
       }
       if (drag.kind === 'stack') {
-        s.onSelect?.({ kind: 'stack', id: drag.stackId })
+        selectTarget({ kind: 'stack', id: drag.stackId }, shift)
         return
       }
       if (!drag.id) return
       if (BUTTONS.has(drag.kind)) {
-        s.onSelect?.({ kind: 'line', id: drag.id })
+        selectTarget({ kind: 'line', id: drag.id }, shift)
         runButton(drag.kind, drag.id)
         return
       }
@@ -1256,15 +1370,17 @@ export function PaperPreview(props) {
         return
       }
       if (drag.pendingEdit) {
-        s.onSelect?.({ kind: 'line', id: drag.id })
+        selectTarget({ kind: 'line', id: drag.id }, false)
         s.onEditStart?.(drag.id, drag.sheetIndex ?? 0)
         return
       }
-      s.onSelect?.({ kind: 'line', id: drag.id })
+      selectTarget({ kind: 'line', id: drag.id }, shift)
       lastClickRef.current = { time: performance.now(), id: drag.id }
     }
 
     tool.onMouseDown = (event) => {
+      const button = event.event?.button
+      if (button === 1 || button === 2) return
       const s = stateRef.current
       if (s.editing) return
       const node = pick(event.point)
@@ -1280,10 +1396,26 @@ export function PaperPreview(props) {
         dragRef.current = { kind: 'stack', stackId: node.data.stackId }
         return
       }
-      const lineId = node.data.lineId
       const handle = node.data.role === 'handle' ? node.data.handle : 'move'
+      if (handle === 'frame-resize') {
+        const origin = node.data.origin
+        dragRef.current = {
+          id: s.composition.container.id,
+          kind: 'frame-resize',
+          origin,
+          hugHeight: s.measured?.contentHeight ?? s.measured?.height ?? 0,
+          startX: event.point.x,
+          startY: event.point.y,
+          px: s.px,
+          moved: false,
+        }
+        selectTarget({ kind: 'container', id: s.composition.container.id }, Boolean(event.modifiers?.shift))
+        return
+      }
+      const lineId = node.data.lineId
       const now = performance.now()
       const pendingEdit = handle === 'move'
+        && !event.modifiers?.shift
         && lastClickRef.current.id === lineId
         && now - lastClickRef.current.time < 350
       if (pendingEdit) lastClickRef.current = { time: 0, id: null }
@@ -1320,13 +1452,26 @@ export function PaperPreview(props) {
       if (!drag?.id || BUTTONS.has(drag.kind)) return
       const dxPx = event.point.x - drag.startX
       const dyPx = event.point.y - drag.startY
+      if (drag.kind === 'frame-resize') {
+        if (!drag.moved) {
+          if (Math.abs(dxPx) + Math.abs(dyPx) <= 3) return
+          drag.moved = true
+          canvas.style.cursor = 'nwse-resize'
+        }
+        const s = stateRef.current
+        const origin = drag.origin
+        const widthIn = (event.point.x - origin.x) / drag.px
+        const heightIn = (event.point.y - origin.y) / drag.px
+        scheduleFrame(widthIn, heightIn)
+        return
+      }
       if (!drag.moved) {
         if (Math.abs(dxPx) + Math.abs(dyPx) <= 3) return
         drag.moved = true
         drag.pendingEdit = false
         drag.parts = captureParts(scope, drag.id)
         if (!drag.parts.length) return
-        stateRef.current.onSelect?.({ kind: 'line', id: drag.id })
+        selectTarget({ kind: 'line', id: drag.id }, false)
         canvas.style.cursor = 'grabbing'
       }
       if (!drag.parts?.length) return
@@ -1334,12 +1479,12 @@ export function PaperPreview(props) {
       schedulePatch(drag.id, patch)
     }
 
-    tool.onMouseUp = () => finish()
+    tool.onMouseUp = (event) => finish(event)
     tool.onMouseMove = (event) => {
       if (dragRef.current?.moved) return
       const node = pick(event.point)
       const handle = node?.data?.role === 'handle' ? node.data.handle : node?.data?.lineId ? 'move' : null
-      const cursor = handle === 'resize'
+      const cursor = handle === 'resize' || handle === 'frame-resize'
         ? 'nwse-resize'
         : handle === 'rotate'
           ? 'grab'
@@ -1351,10 +1496,31 @@ export function PaperPreview(props) {
       canvas.style.cursor = cursor
     }
 
-    const onWindowUp = () => finish()
+    const onWindowUp = (event) => finish({ modifiers: { shift: Boolean(event.shiftKey) } })
+    const onContextMenu = (event) => {
+      event.preventDefault()
+      const s = stateRef.current
+      if (!s.onObjectContextMenu) return
+      const rect = canvas.getBoundingClientRect()
+      const point = scope.view.viewToProject(
+        new scope.Point(event.clientX - rect.left, event.clientY - rect.top),
+      )
+      const node = pick(point)
+      let target = { kind: 'container', id: s.composition.container.id }
+      if (node?.data?.role === 'stack') target = { kind: 'stack', id: node.data.stackId }
+      else if (node?.data?.lineId) target = { kind: 'line', id: node.data.lineId }
+      s.onObjectContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        target,
+        shift: event.shiftKey,
+      })
+    }
     window.addEventListener('mouseup', onWindowUp)
+    canvas.addEventListener('contextmenu', onContextMenu)
     return () => {
       window.removeEventListener('mouseup', onWindowUp)
+      canvas.removeEventListener('contextmenu', onContextMenu)
       tool.remove()
       scope.remove()
       scopeRef.current = null
@@ -1365,7 +1531,7 @@ export function PaperPreview(props) {
     const canvas = canvasRef.current
     const scope = scopeRef.current
     if (!canvas || !scope || boardW <= 0 || boardH <= 0) return
-    if (dragRef.current?.moved) return
+    if (dragRef.current?.moved && dragRef.current.kind !== 'frame-resize') return
     scope.activate()
     scope.view.viewSize = new scope.Size(Math.max(1, boardW), Math.max(1, boardH))
     drawScene(scope, {
@@ -1473,6 +1639,7 @@ export function PaperPreview(props) {
       <canvas
         ref={canvasRef}
         aria-label="Banner preview"
+        onContextMenu={(event) => event.preventDefault()}
         style={{ width: boardW, height: boardH, display: 'block', touchAction: 'none' }}
       />
       {editBox && (

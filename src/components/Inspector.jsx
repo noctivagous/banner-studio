@@ -2,6 +2,7 @@ import {
   MIN_GLYPH_HEIGHT,
   findNode,
   fontOf,
+  selectedLineIds,
   getStack,
   glyphMaxForLine,
   glyphMaxForTileLine,
@@ -18,7 +19,6 @@ import {
   AspectMini,
   CornerMini,
   FreeformMini,
-  HugMini,
   PaddingMini,
   SheetMini,
 } from './FrameMini.jsx'
@@ -47,9 +47,10 @@ export function ContainerFields({ container, onPatch, onAlignX }) {
   return (
     <div className="pro-divided">
       <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
-        Rectangle hugs the stack. Left, center, and right place that stack across
-        the sheets, and line the copy up to the same edge. On sheet places the
-        frame in the trim height. Corner size scales with the shorter side.
+        The frame always matches the printable sheet grid. Drag the canvas
+        corner handle or use the page controls to add and remove sheets. Type
+        that leaves the bounds is clipped. Left, center, and right place the
+        stack across the sheets. Corner size scales with the shorter side.
       </p>
       <ParamSection
         title="Shape"
@@ -67,16 +68,16 @@ export function ContainerFields({ container, onPatch, onAlignX }) {
         title="Size"
         sectionId="copy.container.size"
         defaultOpen={false}
-        value={<span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">Hug</span>}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {`${Number(container.size.width || 0).toFixed(2)}" × ${Number(container.size.height || 0).toFixed(2)}"`}
+          </span>
+        }
       >
-        <div
-          role="status"
-          aria-label="Size: hug content"
-          className="h-[52px] rounded-[4px] border border-[#E3FF33] bg-[#E3FF33] text-black font-bold flex flex-col items-center justify-center gap-1"
-        >
-          <HugMini />
-          <span className="font-mono text-[9px] uppercase tracking-[0.08em] leading-none">
-            Hug content
+        <div className="h-[52px] rounded-[4px] border border-[#43434E] bg-[var(--ctl)] flex flex-col items-center justify-center gap-1">
+          <SheetMini />
+          <span className="font-mono text-[9px] uppercase tracking-[0.08em] leading-none text-[#F0F0F2]">
+            {`${Number(container.size.width || 0).toFixed(1)}" × ${Number(container.size.height || 0).toFixed(1)}" printable`}
           </span>
         </div>
       </ParamSection>
@@ -539,7 +540,8 @@ export function Inspector({ composition, selection, printableHeight, tile = fals
   const stack = getStack(composition)
   const selected = findNode(composition, selection?.id)
   const kind = selected?.kind || 'line'
-  const line = kind === 'line' ? selected.node : null
+  const line = kind === 'line' ? selected?.node : null
+  const lineCount = selectedLineIds(selection).length
   const glyphMax = line
     ? tile
       ? glyphMaxForTileLine(composition, line.id)
@@ -562,7 +564,7 @@ export function Inspector({ composition, selection, printableHeight, tile = fals
         icon={<FontIcon />}
         meta={
           <span className="inline-flex items-center px-2 py-1 rounded-[4px] bg-[var(--ctl)] border border-[#43434E] font-mono text-[10px] tracking-[0.1em] text-[#F0F0F2] uppercase shrink-0">
-            {KIND_LABEL[kind] || 'Line'}
+            {lineCount > 1 ? `${lineCount} Lines` : KIND_LABEL[kind] || 'Line'}
           </span>
         }
       />

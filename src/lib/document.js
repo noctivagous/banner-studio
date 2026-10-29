@@ -45,7 +45,7 @@ const VIEW_KEYS = [
   'scaleToFit',
 ]
 
-const LAYOUT_KEYS = ['paperId', 'orientation', 'rows', 'bannerMode']
+const LAYOUT_KEYS = ['paperId', 'orientation', 'cols', 'rows', 'bannerMode']
 
 export function normalizeBannerMode(value) {
   return value === 'tile' ? 'tile' : 'horiz'
@@ -88,6 +88,7 @@ export function exportDocument(settings) {
     layout: {
       paperId: settings.paperId,
       orientation: settings.orientation,
+      cols: settings.cols,
       rows: settings.rows,
       bannerMode: normalizeBannerMode(settings.bannerMode),
     },
@@ -147,7 +148,9 @@ export function importDocument(raw, defaults) {
   const viewSplit = splitKnown(parsed.view, VIEW_KEYS)
 
   const rowsIn = layoutSplit.known.rows
-  const rows = Number.isInteger(rowsIn) && rowsIn >= 1 ? rowsIn : 1
+  const rows = Number.isInteger(rowsIn) && rowsIn >= 1 ? rowsIn : undefined
+  const colsIn = layoutSplit.known.cols
+  const cols = Number.isInteger(colsIn) && colsIn >= 1 ? colsIn : undefined
 
   const paperId = asEnum(
     layoutSplit.known.paperId,
@@ -211,6 +214,7 @@ export function importDocument(raw, defaults) {
     ...defaults,
     paperId,
     orientation,
+    cols,
     rows,
     bannerMode: normalizeBannerMode(layoutSplit.known.bannerMode),
     contentKind: 'text',

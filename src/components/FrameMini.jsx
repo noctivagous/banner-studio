@@ -44,7 +44,7 @@ export function FreeformMini() {
   )
 }
 
-// Frame hugging a three-line text slug for "Hug content".
+// Frame hugging a three-line text slug for Auto-Sizing.
 export function HugMini() {
   return (
     <Svg viewBox="0 0 48 32" className="w-11 h-7">

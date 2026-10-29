@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { exportDocument, importDocument } from '../lib/document.js'
 import { DEFAULT_SETTINGS } from '../hooks/usePersistedSettings.js'
 
-export function DocumentMenu({ settings, onImport }) {
+const menuItem =
+  'w-full text-left px-2.5 py-2 rounded-[3px] font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase hover:bg-[#26262E]'
+
+export function DocumentMenu({ settings, onImport, onReset }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const [menuBox, setMenuBox] = useState(null)
@@ -56,6 +59,15 @@ export function DocumentMenu({ settings, onImport }) {
     window.print()
   }
 
+  const resetDocument = () => {
+    if (!window.confirm('Reset this document to a new banner? Current work will be replaced.')) {
+      return
+    }
+    onReset?.()
+    setOpen(false)
+    setError('')
+  }
+
   const onFile = async (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -90,19 +102,14 @@ export function DocumentMenu({ settings, onImport }) {
           className="fixed z-50 rounded-[4px] border border-[#43434E] bg-[#121214] p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.55)]"
           style={{ top: menuBox.top, left: menuBox.left, width: menuBox.width }}
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={download}
-            className="w-full text-left px-2.5 py-2 rounded-[3px] font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase hover:bg-[#26262E]"
-          >
+          <button type="button" role="menuitem" onClick={download} className={menuItem}>
             Export
           </button>
           <button
             type="button"
             role="menuitem"
             onClick={() => fileRef.current?.click()}
-            className="w-full text-left px-2.5 py-2 rounded-[3px] font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase hover:bg-[#26262E]"
+            className={menuItem}
           >
             Import
           </button>
@@ -110,17 +117,19 @@ export function DocumentMenu({ settings, onImport }) {
             <p className="px-2.5 py-1.5 font-mono text-[10px] leading-[1.4] text-[#E3FF33]">{error}</p>
           )}
           <div aria-hidden="true" className="h-px bg-[#43434E] my-1" />
-          <button
-            type="button"
-            role="menuitem"
-            onClick={exportPdf}
-            className="w-full text-left px-2.5 py-2 rounded-[3px] font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase hover:bg-[#26262E]"
-          >
+          <button type="button" role="menuitem" onClick={exportPdf} className={menuItem}>
             Export PDF
           </button>
           <p className="px-2.5 pt-1 pb-1 font-mono text-[9px] leading-[1.4] text-[#5A5A60]">
             Opens print — choose Save as PDF as the destination.
           </p>
+          <div aria-hidden="true" className="h-px bg-[#43434E] my-1" />
+          <p className="px-2.5 pt-1.5 pb-0.5 font-mono text-[9px] tracking-[0.14em] text-[#7A7A80] uppercase">
+            Debug
+          </p>
+          <button type="button" role="menuitem" onClick={resetDocument} className={menuItem}>
+            Reset Document
+          </button>
         </div>
       )}
       <input

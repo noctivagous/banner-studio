@@ -6,12 +6,15 @@ import {
   findNode,
   fontOf,
   getStack,
+  isIdSelected,
   lineText,
   moveCopyLine,
+  nextSelection,
   removeCopyLine,
   withAlignMode,
   withLine,
 } from '../lib/composition.js'
+import { useSectionOpen } from '../hooks/usePersistedSections.js'
 import { ParamSection } from './ParamSection.jsx'
 import { SectionSpine, ZoneHeader } from './SectionChrome.jsx'
 import { SegmentControl } from './SegmentControl.jsx'
@@ -138,13 +141,18 @@ export function CopyPanel({
   }, [selected, lines, container.id, onSelect])
 
   const kind = selected?.kind || 'line'
-  const line = kind === 'line' ? selected.node : null
+  const line = kind === 'line' ? selected?.node : null
+  const pickNode = (event, target) => {
+    onSelect(nextSelection(selection, target, event.shiftKey))
+  }
   const canAdd = canAddCopyLine(composition, printableHeight, { tile })
   const charCount = lines.reduce((sum, entry) => sum + (entry.copy?.length || 0), 0)
 
   const patchThisLine = (lineId, linePatch) => {
     onChange(withLine(composition, lineId, linePatch), lineId)
   }
+
+  const [open, setOpen] = useSectionOpen('sidebar.copy', false)
 
   const afterId = line?.id || lines[lines.length - 1]?.id
   const addLine = () => {
@@ -164,8 +172,20 @@ export function CopyPanel({
   }
 
   return (
-    <div className="zone-copy w-full xl:w-[340px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#14141c] xl:border-r border-b xl:border-b-0 border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] flex flex-row overflow-hidden">
-      <SectionSpine label="Copy Deck" sub="01" />
+    <div
+      className={`zone-copy min-h-0 bg-[#14141c] border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] flex flex-row overflow-hidden shrink-0 ${
+        open
+          ? 'w-full xl:w-[340px] max-h-[46vh] xl:max-h-none border-b xl:border-b-0 xl:border-r'
+          : 'w-full h-[4.5rem] xl:w-[22px] xl:h-auto border-r'
+      }`}
+    >
+      <SectionSpine
+        label="Copy Deck"
+        sub="01"
+        expanded={open}
+        onToggle={() => setOpen((value) => !value)}
+      />
+      {open ? (
       <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
       <div className="p-5 space-y-7">
         <div>
@@ -208,7 +228,7 @@ export function CopyPanel({
                 line={entry}
                 index={index}
                 align={stack?.align}
-                selected={kind === 'line' && selection?.id === entry.id}
+                selected={isIdSelected(selection, entry.id)}
                 onSelect={onSelect}
                 onPatch={patchThisLine}
               />
@@ -240,8 +260,8 @@ export function CopyPanel({
           </div>
           <div role="tree" aria-label="Structure" className="space-y-1 mb-2">
             <TreeRow
-              selected={kind === 'container'}
-              onClick={() => onSelect({ kind: 'container', id: container.id })}
+              selected={isIdSelected(selection, container.id)}
+              onClick={(event) => pickNode(event, { kind: 'container', id: container.id })}
               label={container.name}
               hint="rect"
               badge="Frame"
@@ -255,9 +275,9 @@ export function CopyPanel({
             />
             {stack && (
               <TreeRow
-                selected={kind === 'stack'}
+                selected={isIdSelected(selection, stack.id)}
                 indent={12}
-                onClick={() => onSelect({ kind: 'stack', id: stack.id })}
+                onClick={(event) => pickNode(event, { kind: 'stack', id: stack.id })}
                 label="Stack"
                 hint={stack.align}
                 badge="Stack"
@@ -275,9 +295,9 @@ export function CopyPanel({
               return (
                 <TreeRow
                   key={entry.id}
-                  selected={kind === 'line' && selection?.id === entry.id}
+                  selected={isIdSelected(selection, entry.id)}
                   indent={24}
-                  onClick={() => onSelect({ kind: 'line', id: entry.id })}
+                  onClick={(event) => pickNode(event, { kind: 'line', id: entry.id })}
                   label={preview}
                   hint={font.label}
                   badge="Line"
@@ -345,6 +365,7 @@ export function CopyPanel({
         </p>
       </div>
       </div>
+      ) : null}
     </div>
   )
 }

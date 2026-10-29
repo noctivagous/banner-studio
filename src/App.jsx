@@ -5,15 +5,18 @@ import { CopyPanel } from './components/CopyPanel.jsx'
 import { DocumentMenu } from './components/DocumentMenu.jsx'
 import { Inspector } from './components/Inspector.jsx'
 import { PrintButton } from './components/PrintButton.jsx'
-import { SectionSpine } from './components/SectionChrome.jsx'
+import { RailSection } from './components/SectionChrome.jsx'
+import { useSectionOpen } from './hooks/usePersistedSections.js'
 import { Output } from './components/Output.jsx'
 import { Preview } from './components/Preview.jsx'
 import { PrintArea } from './components/PrintArea.jsx'
 import { PrinterSafe } from './components/PrinterSafe.jsx'
-import { usePersistedSettings } from './hooks/usePersistedSettings.js'
+import { DEFAULT_SETTINGS, usePersistedSettings } from './hooks/usePersistedSettings.js'
 import {
-  fitCompositionToTrim,
-  getStack,
+  MAX_SHEETS,
+  applySheetGrid,
+  defaultSelection,
+  inferSheetCount,
   measureComposition,
   normalizeComposition,
 } from './lib/composition.js'
@@ -22,7 +25,6 @@ import {
   JOIN_ALIGN_RECUT,
   JOIN_OVERLAP_TAPE,
   assembledSpan,
-  axisCount,
   buildSheets,
   formatLength,
   joinDuplicates,
@@ -30,12 +32,14 @@ import {
 import { sheetSize } from './lib/paper.js'
 
 export default function App() {
-  const [settings, patch] = usePersistedSettings()
+  const [settings, patch, reset] = usePersistedSettings()
   const {
     composition,
     paperId,
     orientation,
     bannerMode,
+    cols: storedCols,
+    rows: storedRows,
     margins,
     overlap,
     join,
@@ -57,35 +61,92 @@ export default function App() {
   const trimH = pageH - margins.top - margins.bottom
   const contentW = Math.max(0.1, trimW - overlap)
   const contentH = Math.max(0.1, trimH - overlap)
-  const tile = bannerMode === 'tile'
+  const duplicate = joinDuplicates(join) && overlap > 0
   const normalized = useMemo(() => normalizeComposition(composition), [composition])
-  const [selection, setSelection] = useState(() => {
-    const stack = getStack(normalized)
-    return { kind: 'line', id: stack?.lines?.[0]?.id }
-  })
+  const inferredCols = inferSheetCount(
+    Number(normalized.container?.size?.width) || 0,
+    trimW,
+    contentW,
+    duplicate,
+    overlap,
+  )
+  const inferredRows = inferSheetCount(
+    Number(normalized.container?.size?.height) || 0,
+    trimH,
+    contentH,
+    duplicate,
+    overlap,
+  )
+  const cols = Math.min(MAX_SHEETS, Math.max(1, storedCols ?? inferredCols))
+  const rows = Math.min(MAX_SHEETS, Math.max(1, storedRows ?? inferredRows))
+  const tile = bannerMode === 'tile' || rows > 1
+  const [selection, setSelection] = useState(() => defaultSelection(normalized))
 
   const [fontsVersion, setFontsVersion] = useState(0)
 
-  const setComposition = useCallback(
-    (next, preferLineId) => {
+  const resetDocument = useCallback(() => {
+    reset()
+    setSelection(defaultSelection(DEFAULT_SETTINGS.composition))
+  }, [reset])
+
+  const importDocument = useCallback(
+    (next) => {
+      patch(next)
+      setSelection(defaultSelection(next?.composition))
+    },
+    [patch],
+  )
+
+  const applyGrid = useCallback(
+    (nextCols, nextRows, edges) => {
       patch((prev) => {
-        const incoming = typeof next === 'function' ? next(prev.composition) : next
-        const nextTile = prev.bannerMode === 'tile'
+        const sheet = sheetSize(prev.paperId, prev.orientation)
+        const nextTrimW = sheet.pageW - prev.margins.left - prev.margins.right
+        const nextTrimH = sheet.pageH - prev.margins.top - prev.margins.bottom
+        const nextOverlap = prev.overlap
+        const nextDuplicate = joinDuplicates(prev.join) && nextOverlap > 0
+        const ctx = {
+          trimW: nextTrimW,
+          trimH: nextTrimH,
+          contentW: Math.max(0.1, nextTrimW - nextOverlap),
+          contentH: Math.max(0.1, nextTrimH - nextOverlap),
+          duplicate: nextDuplicate,
+          overlap: nextOverlap,
+        }
+        const applied = applySheetGrid(prev.composition, nextCols, nextRows, ctx, edges)
+        const nextMode = applied.rows > 1 ? 'tile' : prev.bannerMode
+        if (
+          !applied.changed &&
+          applied.cols === prev.cols &&
+          applied.rows === prev.rows &&
+          nextMode === prev.bannerMode
+        ) {
+          return prev
+        }
         return {
           ...prev,
-          composition: nextTile
-            ? normalizeComposition(incoming)
-            : fitCompositionToTrim(incoming, trimH, preferLineId),
+          cols: applied.cols,
+          rows: applied.rows,
+          bannerMode: nextMode,
+          composition: applied.composition,
         }
       })
     },
-    [patch, trimH],
+    [patch],
   )
 
-  // Pointer-drag updates bypass auto-fit so the fitter never fights the
-  // pointer mid-gesture (rotate/resize change the measured height, which the
-  // fitter would immediately shrink back, oscillating every frame). The drag
-  // commit below re-applies the fit once on pointer-up.
+  const setComposition = useCallback(
+    (next) => {
+      patch((prev) => {
+        const incoming = normalizeComposition(
+          typeof next === 'function' ? next(prev.composition) : next,
+        )
+        return { ...prev, composition: incoming }
+      })
+    },
+    [patch],
+  )
+
   const patchCompositionLive = useCallback(
     (next) => {
       patch((prev) => {
@@ -96,26 +157,11 @@ export default function App() {
     [patch],
   )
 
-  const commitComposition = useCallback(
-    (preferLineId) => {
-      patch((prev) => {
-        if (prev.bannerMode === 'tile') return prev
-        const fitted = fitCompositionToTrim(prev.composition, trimH, preferLineId)
-        if (fitted === prev.composition) return prev
-        return { ...prev, composition: fitted }
-      })
-    },
-    [patch, trimH],
-  )
+  const commitComposition = useCallback(() => {}, [])
 
   useEffect(() => {
-    patch((prev) => {
-      if (prev.bannerMode === 'tile') return prev
-      const current = measureComposition(prev.composition, { maxHeight: trimH, ignoreFree: true })
-      if (current.height <= trimH + 1e-6) return prev
-      return { ...prev, composition: fitCompositionToTrim(prev.composition, trimH) }
-    })
-  }, [trimH, patch])
+    applyGrid(cols, rows)
+  }, [applyGrid, cols, rows, trimW, trimH, contentW, contentH, duplicate, overlap])
 
   // Measure synchronously so the preview never renders one frame with stale
   // geometry during a drag (the old async effect resolved after paint, making
@@ -145,14 +191,15 @@ export default function App() {
   }, [])
 
   const measured = useMemo(
-    () => measureComposition(normalized, tile ? {} : { maxHeight: trimH }),
+    () => measureComposition(normalized),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [normalized, trimH, tile, fontsVersion],
+    [normalized, fontsVersion],
   )
 
-  const textWidthIn = measured?.width ?? 0
-  const textHeightIn = measured?.height ?? 0
-  const duplicate = joinDuplicates(join) && overlap > 0
+  const [inspectorOpen, setInspectorOpen] = useSectionOpen('sidebar.inspector', false)
+  const [safeOpen, setSafeOpen] = useSectionOpen('sidebar.safe', false)
+  const [outputOpen, setOutputOpen] = useSectionOpen('sidebar.output', false)
+  const rightOpen = inspectorOpen || safeOpen || outputOpen
   const [joinBump, setJoinBump] = useState(false)
   const setJoin = (next) => {
     patch((prev) => {
@@ -165,24 +212,13 @@ export default function App() {
       return { ...prev, join: next }
     })
   }
-  const cols = axisCount(textWidthIn, trimW, contentW, duplicate, overlap)
-  const rows = tile && textWidthIn > 0
-    ? axisCount(textHeightIn, trimH, contentH, duplicate, overlap)
-    : cols > 0
-      ? 1
-      : 0
   const sheets = useMemo(
     () => buildSheets(cols, rows, contentW, contentH),
     [cols, rows, contentW, contentH],
   )
   const sheetCount = sheets.length
   const assembledInches = assembledSpan(cols, trimW, overlap)
-  const assembledHeight = tile ? assembledSpan(rows, trimH, overlap) : trimH
-  const derivedRows = rows > 0 ? rows : 1
-
-  useEffect(() => {
-    patch((prev) => (prev.rows === derivedRows ? prev : { ...prev, rows: derivedRows }))
-  }, [derivedRows, patch])
+  const assembledHeight = assembledSpan(rows, trimH, overlap)
 
   const print = () => window.print()
   const pageLabel = `${sheet.label} ${orientation} ${pageW.toFixed(2)}"×${pageH.toFixed(2)}"`
@@ -215,19 +251,10 @@ export default function App() {
               <div className="hidden md:inline-flex items-center gap-1.5">
                 <BannerModeControl
                   value={bannerMode}
-                  onChange={(mode) =>
-                    patch((prev) => {
-                      if (mode === prev.bannerMode) return prev
-                      if (mode === 'horiz') {
-                        return {
-                          ...prev,
-                          bannerMode: mode,
-                          composition: fitCompositionToTrim(prev.composition, trimH),
-                        }
-                      }
-                      return { ...prev, bannerMode: mode }
-                    })
-                  }
+                  onChange={(mode) => {
+                    if (mode === 'horiz') applyGrid(cols, 1)
+                    patch((prev) => (prev.bannerMode === mode ? prev : { ...prev, bannerMode: mode }))
+                  }}
                 />
                 <span className="pro-seg inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] bg-[#2b2b35] border text-[9px] font-mono tracking-[0.12em] text-[#9A9AA2] uppercase">
                   {pageW.toFixed(2)}×{pageH.toFixed(2)}
@@ -251,14 +278,12 @@ export default function App() {
             <div className="flex items-center gap-2 pr-1">
               <div className="hidden md:flex items-center gap-3 pr-3 border-r border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]">
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
-                  {tile && sheetCount > 0 ? `${cols}×${rows}` : sheetCount} Sheets
+                  {sheetCount > 0 ? `${cols}×${rows}` : sheetCount} Sheets
                 </span>
                 <span className="w-px h-3 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)]" />
                 <span className="font-mono text-[10px] tracking-[0.12em] text-[#F0F0F2]">
                   {assembledInches > 0
-                    ? tile
-                      ? `${formatLength(assembledInches)} × ${formatLength(assembledHeight)}`
-                      : formatLength(assembledInches)
+                    ? `${formatLength(assembledInches)} × ${formatLength(assembledHeight)}`
                     : '—'}
                 </span>
               </div>
@@ -275,7 +300,7 @@ export default function App() {
                 marks={{ printTrim, printNumbers, printCutMarks }}
                 onChange={patch}
               />
-              <DocumentMenu settings={settings} onImport={patch} />
+              <DocumentMenu settings={settings} onImport={importDocument} onReset={resetDocument} />
             </div>
           </div>
         </header>
@@ -315,6 +340,7 @@ export default function App() {
             onChange={setComposition}
             onLivePatch={patchCompositionLive}
             onLiveCommit={commitComposition}
+            onSheetGrid={applyGrid}
             join={join}
             showTrim={showTrim}
             showSafe={showSafe}
@@ -322,11 +348,24 @@ export default function App() {
             showNumbers={showNumbers}
             showCutMarks={showCutMarks}
           />
-          <div className="w-full xl:w-[320px] min-h-0 flex-1 xl:flex-none xl:shrink-0 bg-[#101014] border-t xl:border-t-0 xl:border-l border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] overflow-y-auto">
-            <div className="p-5 space-y-5">
-              <section className="zone-inspector pro-group flex flex-row rounded-[3px] bg-[#14141c] border overflow-hidden">
-                <SectionSpine label="Inspector" sub="02" />
-                <div className="flex-1 min-w-0 p-4">
+          <div
+            className={`min-h-0 bg-[#101014] border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] flex flex-col overflow-hidden shrink-0 ${
+              rightOpen
+                ? 'w-full xl:w-[320px] max-h-[46vh] xl:max-h-none border-t xl:border-t-0 xl:border-l overflow-y-auto'
+                : 'w-[22px] border-l'
+            }`}
+          >
+              <RailSection
+                sectionId="sidebar.inspector"
+                label="Inspector"
+                sub="02"
+                defaultOpen={false}
+                collapsedFill={!rightOpen}
+                zoneClass="zone-inspector bg-[#14141c] border-b border-black"
+                open={inspectorOpen}
+                onOpenChange={setInspectorOpen}
+              >
+                <div className="flex-1 min-w-0 p-4 overflow-y-auto">
                   <Inspector
                     composition={normalized}
                     selection={selection}
@@ -335,10 +374,18 @@ export default function App() {
                     onChange={setComposition}
                   />
                 </div>
-              </section>
-              <section className="zone-safe pro-group flex flex-row rounded-[3px] bg-[#2d2314] border overflow-hidden">
-                <SectionSpine label="Paper & Margins" sub="03" />
-                <div className="flex-1 min-w-0 p-4">
+              </RailSection>
+              <RailSection
+                sectionId="sidebar.safe"
+                label="Paper & Margins"
+                sub="03"
+                defaultOpen={false}
+                collapsedFill={!rightOpen}
+                zoneClass="zone-safe bg-[#2d2314] border-b border-black"
+                open={safeOpen}
+                onOpenChange={setSafeOpen}
+              >
+                <div className="flex-1 min-w-0 p-4 overflow-y-auto">
                   <PrinterSafe
                     margins={margins}
                     overlap={overlap}
@@ -355,17 +402,18 @@ export default function App() {
                     }}
                   />
                 </div>
-              </section>
-              <div aria-hidden="true" className="flex items-center gap-3 -mx-5">
-                <span className="flex-1 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
-                <span className="font-mono text-[9px] tracking-[0.2em] text-[#5A5A60] uppercase">
-                  Output below
-                </span>
-                <span className="flex-1 h-px bg-black shadow-[0_1px_0_rgba(255,255,255,0.05)]" />
-              </div>
-              <section className="zone-output pro-group flex flex-row rounded-[3px] bg-[#111a0b] border overflow-hidden">
-                <SectionSpine label="Output" sub="04" />
-                <div className="flex-1 min-w-0 p-4">
+              </RailSection>
+              <RailSection
+                sectionId="sidebar.output"
+                label="Output"
+                sub="04"
+                defaultOpen={false}
+                collapsedFill={!rightOpen}
+                zoneClass="zone-output bg-[#111a0b]"
+                open={outputOpen}
+                onOpenChange={setOutputOpen}
+              >
+                <div className="flex-1 min-w-0 p-4 overflow-y-auto">
                   <Output
                 sheetCount={sheetCount}
                 cols={cols}
@@ -389,8 +437,7 @@ export default function App() {
                 pageLabel={pageLabel}
               />
                 </div>
-              </section>
-            </div>
+              </RailSection>
           </div>
         </div>
         <footer className="pro-rail-t h-[10px] shrink-0 bg-[#0c0c0e]" />

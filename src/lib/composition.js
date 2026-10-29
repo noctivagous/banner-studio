@@ -3,6 +3,8 @@ import {
   DEFAULT_TEXT_LAYER,
   FONTS,
   PX_PER_INCH,
+  axisCount,
+  coveredSpan,
   createLayerId,
   glyphMaxInches,
   normalizeTextLayers,
@@ -13,6 +15,9 @@ import { engineLineWidthPx } from './typeEngine.js'
 export const MAX_COPY_LINES = 8
 export const MIN_GLYPH_HEIGHT = 0.5
 export const MAX_GLYPH_HEIGHT = 24
+export const MIN_FRAME_IN = 0.5
+export const MAX_FRAME_IN = 240
+export const MAX_SHEETS = 24
 export const FONT_SIZE_FACTOR = 0.9
 export const ASPECT_PRESETS = [
   { id: '1:1', w: 1, h: 1 },
@@ -40,6 +45,14 @@ function clamp(value, min, max, fallback) {
   const number = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(number)) return fallback
   return Math.min(max, Math.max(min, number))
+}
+
+function optionalFrameIn(value, fallback) {
+  const n = Number(value)
+  if (Number.isFinite(n) && n > 0) return clamp(n, MIN_FRAME_IN, MAX_FRAME_IN, 0)
+  const f = Number(fallback)
+  if (Number.isFinite(f) && f > 0) return clamp(f, MIN_FRAME_IN, MAX_FRAME_IN, 0)
+  return 0
 }
 
 function asBool(value, fallback) {
@@ -193,7 +206,9 @@ export function normalizeContainer(value, fallback) {
     name: asName(src.name, base.name || 'Frame'),
     shape: asEnum(src.shape, ['rect'], 'rect'),
     size: {
-      mode: asEnum(srcSize.mode, ['hug'], 'hug'),
+      mode: asEnum(srcSize.mode, ['hug', 'fixed'], 'fixed'),
+      width: optionalFrameIn(srcSize.width, baseSize.width),
+      height: optionalFrameIn(srcSize.height, baseSize.height),
       aspect: normalizeAspect(srcSize.aspect !== undefined ? srcSize.aspect : baseSize.aspect),
       padding: normalizePadding(srcSize.padding, baseSize.padding),
     },
@@ -236,11 +251,12 @@ export function normalizeComposition(value, fallback) {
 }
 
 export function defaultComposition() {
-  return normalizeComposition({
+  const auto = normalizeComposition({
     alignMode: 'auto',
     container: {
       id: 'container-root',
       name: 'Frame',
+      size: { mode: 'hug' },
       children: [
         {
           id: 'stack-main',
@@ -260,6 +276,27 @@ export function defaultComposition() {
           ],
         },
       ],
+    },
+  })
+  let width = 20
+  let height = 4.5
+  try {
+    const measured = measureComposition(auto)
+    if (Number(measured.width) > 0) width = measured.width
+    if (Number(measured.height) > 0) height = measured.height
+  } catch {
+    /* canvas metrics are unavailable outside the browser */
+  }
+  return normalizeComposition({
+    ...auto,
+    container: {
+      ...auto.container,
+      size: {
+        ...auto.container.size,
+        mode: 'fixed',
+        width,
+        height,
+      },
     },
   })
 }
@@ -331,6 +368,31 @@ export function findNode(composition, id) {
   return null
 }
 
+export function defaultSelection(composition) {
+  const line = getLines(composition)[0]
+  if (line) return { kind: 'line', id: line.id }
+  const id = composition?.container?.id
+  return id ? { kind: 'container', id } : null
+}
+
+export function isFrameSizeLocked(composition) {
+  return composition?.container?.size?.mode === 'fixed'
+}
+
+export function withFrameSizeLock(composition, locked, options = {}) {
+  if (!locked) return withContainer(composition, { size: { mode: 'hug' } })
+  let width = Number(options.measured?.width)
+  let height = Number(options.measured?.height)
+  if (!(width > 0) || !(height > 0)) {
+    const measured = measureComposition(composition, options.measureOptions || {})
+    if (!(width > 0)) width = Number(measured.width) || 0
+    if (!(height > 0)) height = Number(measured.height) || 0
+  }
+  return withContainer(composition, {
+    size: { mode: 'fixed', width, height },
+  })
+}
+
 export function withContainer(composition, patch) {
   const current = composition.container
   const nextPatch = { ...patch }
@@ -341,6 +403,10 @@ export function withContainer(composition, patch) {
       padding: patch.size.padding
         ? { ...current.size.padding, ...patch.size.padding }
         : current.size.padding,
+    }
+    if (nextPatch.size.mode === 'hug') {
+      nextPatch.size.width = 0
+      nextPatch.size.height = 0
     }
   }
   if (isPlainObject(patch.layout)) {
@@ -386,6 +452,66 @@ export function withLine(composition, lineId, patch) {
     line.id === lineId ? normalizeLine({ ...line, ...patch }) : line,
   )
   return withStack(composition, { lines })
+}
+
+export function selectionList(selection) {
+  if (!selection) return []
+  if (Array.isArray(selection.items) && selection.items.length > 0) {
+    return selection.items.filter((item) => item?.id)
+  }
+  if (selection.id) return [{ kind: selection.kind, id: selection.id }]
+  return []
+}
+
+export function isIdSelected(selection, id) {
+  return selectionList(selection).some((item) => item.id === id)
+}
+
+export function selectedLineIds(selection) {
+  return selectionList(selection)
+    .filter((item) => item.kind === 'line')
+    .map((item) => item.id)
+}
+
+export function nextSelection(current, target, additive = false) {
+  if (!target?.id) return current
+  if (!additive) return { kind: target.kind, id: target.id }
+  const items = selectionList(current)
+  const exists = items.some((item) => item.id === target.id)
+  const nextItems = exists
+    ? items.filter((item) => item.id !== target.id)
+    : [...items, { kind: target.kind, id: target.id }]
+  if (nextItems.length === 0) return { kind: target.kind, id: target.id }
+  const primary = exists ? nextItems[nextItems.length - 1] : { kind: target.kind, id: target.id }
+  if (nextItems.length === 1) return { kind: primary.kind, id: primary.id }
+  return { kind: primary.kind, id: primary.id, items: nextItems }
+}
+
+function roundPlace(value) {
+  return Math.round(Number(value) * 100) / 100
+}
+
+export function centerLinePlace(box, frameWidth, frameHeight, axes = { x: true, y: true }) {
+  const place = box.line.place || { mode: 'snap', dxIn: 0, dyIn: 0 }
+  const autoX = box.x - (Number(place.dxIn) || 0)
+  const autoY = box.y - (Number(place.dyIn) || 0)
+  const next = { ...place, mode: 'snap' }
+  if (axes.x) next.dxIn = roundPlace((frameWidth - box.width) / 2 - autoX)
+  if (axes.y) next.dyIn = roundPlace((frameHeight - box.height) / 2 - autoY)
+  return { place: next }
+}
+
+export function withLinesCentered(composition, lineIds, measured, axes = { x: true, y: true }) {
+  if (!measured || !Array.isArray(lineIds) || lineIds.length === 0) return composition
+  const width = Number(measured.width) || 0
+  const height = Number(measured.height) || 0
+  let next = composition
+  for (const id of lineIds) {
+    const box = measured.lineBoxes?.find((entry) => entry.id === id)
+    if (!box) continue
+    next = withLine(next, id, centerLinePlace(box, width, height, axes))
+  }
+  return next
 }
 
 export function addCopyLine(composition, afterId) {
@@ -581,6 +707,15 @@ export function measureComposition(composition, options = {}) {
         Number.isFinite(maxHeight) && maxHeight > 0 ? Math.min(grown, maxHeight) : grown
     }
   }
+  const contentWidth = width
+  const contentHeight = height
+  const fixed = container.size.mode === 'fixed'
+  if (fixed) {
+    const nextW = Number(container.size.width)
+    const nextH = Number(container.size.height)
+    if (nextW > 0) width = nextW
+    if (nextH > 0) height = nextH
+  }
 
   const innerW = Math.max(0, width - pad.left - pad.right)
   const innerH = Math.max(0, height - pad.top - pad.bottom)
@@ -621,16 +756,18 @@ export function measureComposition(composition, options = {}) {
   let minY = 0
   let maxX = width
   let maxY = height
-  for (const box of offsetBoxes) {
-    const deg = (Number(box.line.rotationDeg) || 0) * (Math.PI / 180)
-    const cx = box.x + box.width / 2
-    const cy = box.y + box.height / 2
-    const ex = (Math.abs(box.width * Math.cos(deg)) + Math.abs(box.height * Math.sin(deg))) / 2
-    const ey = (Math.abs(box.width * Math.sin(deg)) + Math.abs(box.height * Math.cos(deg))) / 2
-    minX = Math.min(minX, cx - ex)
-    minY = Math.min(minY, cy - ey)
-    maxX = Math.max(maxX, cx + ex)
-    maxY = Math.max(maxY, cy + ey, box.baselineY + box.descentIn)
+  if (!fixed) {
+    for (const box of offsetBoxes) {
+      const deg = (Number(box.line.rotationDeg) || 0) * (Math.PI / 180)
+      const cx = box.x + box.width / 2
+      const cy = box.y + box.height / 2
+      const ex = (Math.abs(box.width * Math.cos(deg)) + Math.abs(box.height * Math.sin(deg))) / 2
+      const ey = (Math.abs(box.width * Math.sin(deg)) + Math.abs(box.height * Math.cos(deg))) / 2
+      minX = Math.min(minX, cx - ex)
+      minY = Math.min(minY, cy - ey)
+      maxX = Math.max(maxX, cx + ex)
+      maxY = Math.max(maxY, cy + ey, box.baselineY + box.descentIn)
+    }
   }
   const grownBoxes =
     minX < 0 || minY < 0
@@ -647,11 +784,104 @@ export function measureComposition(composition, options = {}) {
   return {
     width: grownWidth,
     height: grownHeight,
+    contentWidth,
+    contentHeight,
     containerBox: { x: 0, y: 0, width: grownWidth, height: grownHeight },
     stackBox: { x: stackX - minX, y: stackY - minY, width: stackWidth, height: stackHeight },
     lineBoxes: grownBoxes,
     composition: normalized,
   }
+}
+
+export function clampSheetCount(value, fallback = 1) {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(MAX_SHEETS, Math.max(1, n))
+}
+
+export function inferSheetCount(span, trim, advance, duplicate, overlap) {
+  return clampSheetCount(axisCount(span, trim, advance, duplicate, overlap) || 1)
+}
+
+export function sheetGridSize(cols, rows, ctx) {
+  const c = clampSheetCount(cols)
+  const r = clampSheetCount(rows)
+  const { trimW, trimH, contentW, contentH, duplicate } = ctx
+  return {
+    cols: c,
+    rows: r,
+    width: roundHundredth(coveredSpan(c, trimW, contentW, duplicate) || MIN_FRAME_IN),
+    height: roundHundredth(coveredSpan(r, trimH, contentH, duplicate) || MIN_FRAME_IN),
+  }
+}
+
+function alignOriginDelta(align, delta) {
+  if (align === 'center') return delta / 2
+  if (align === 'right' || align === 'bottom') return delta
+  return 0
+}
+
+export function shiftComposition(composition, dxIn, dyIn) {
+  const dx = Number(dxIn) || 0
+  const dy = Number(dyIn) || 0
+  if (!dx && !dy) return composition
+  return getLines(composition).reduce((next, line) => {
+    const place = line.place || { mode: 'snap', dxIn: 0, dyIn: 0 }
+    return withLine(next, line.id, {
+      place: {
+        ...place,
+        dxIn: roundHundredth((Number(place.dxIn) || 0) + dx),
+        dyIn: roundHundredth((Number(place.dyIn) || 0) + dy),
+      },
+    })
+  }, composition)
+}
+
+export function applySheetGrid(composition, cols, rows, ctx, edges = { x: 'right', y: 'bottom' }) {
+  const next = sheetGridSize(cols, rows, ctx)
+  const size = composition?.container?.size
+  const storedW = Number(size?.width)
+  const storedH = Number(size?.height)
+  const sizeMatches =
+    size?.mode === 'fixed' &&
+    storedW > 0 &&
+    storedH > 0 &&
+    Math.abs(storedW - next.width) < 1e-6 &&
+    Math.abs(storedH - next.height) < 1e-6
+  if (sizeMatches) {
+    return { composition, cols: next.cols, rows: next.rows, changed: false }
+  }
+  const hasFrame = size?.mode === 'fixed' && storedW > 0 && storedH > 0
+  const dW = hasFrame ? next.width - storedW : 0
+  const dH = hasFrame ? next.height - storedH : 0
+  const extraX = edges.x === 'left' ? dW : 0
+  const extraY = edges.y === 'top' ? dH : 0
+  const alignX = composition?.container?.layout?.alignX || 'center'
+  const alignY = composition?.container?.layout?.alignY || 'center'
+  let nextComp = withContainer(composition, {
+    size: { mode: 'fixed', width: next.width, height: next.height },
+  })
+  nextComp = shiftComposition(
+    nextComp,
+    extraX - alignOriginDelta(alignX, dW),
+    extraY - alignOriginDelta(alignY, dH),
+  )
+  return { composition: nextComp, cols: next.cols, rows: next.rows, changed: true }
+}
+
+export function sheetGridFromFrameDrag(rawW, rawH, ctx) {
+  const cols = inferSheetCount(Number(rawW) || 0, ctx.trimW, ctx.contentW, ctx.duplicate, ctx.overlap)
+  const rows = inferSheetCount(Number(rawH) || 0, ctx.trimH, ctx.contentH, ctx.duplicate, ctx.overlap)
+  const grid = sheetGridSize(cols, rows, ctx)
+  return {
+    cols: grid.cols,
+    rows: grid.rows,
+    size: { mode: 'fixed', width: grid.width, height: grid.height },
+  }
+}
+
+export function sizeFromFrameDrag(rawW, rawH, ctx) {
+  return sheetGridFromFrameDrag(rawW, rawH, ctx).size
 }
 
 export function cornerLengthIn(container, width, height) {
@@ -689,13 +919,18 @@ export function cutPolygonCss(width, height, cut, unit) {
     .join(', ')})`
 }
 
+function stackedHeight(measured, box) {
+  const stackH = Number(measured.contentHeight)
+  const basis = stackH > 0 ? stackH : measured.height
+  return Math.max(0, basis - box.height)
+}
+
 export function glyphMaxForLine(composition, lineId, trimH) {
   const measured = measureComposition(composition, { maxHeight: trimH, ignoreFree: true })
   const box = measured.lineBoxes.find((entry) => entry.id === lineId)
   const hardMax = glyphMaxInches(trimH)
   if (!box) return hardMax
-  const others = measured.height - box.height
-  const room = trimH - others
+  const room = trimH - stackedHeight(measured, box)
   return Math.max(MIN_GLYPH_HEIGHT, Math.min(hardMax, Math.floor(room * 2) / 2))
 }
 
@@ -705,8 +940,7 @@ export function glyphMaxForTileLine(composition, lineId) {
   const measured = measureComposition(composition, { ignoreFree: true })
   const box = measured.lineBoxes.find((entry) => entry.id === lineId)
   if (!box) return MAX_GLYPH_HEIGHT
-  const others = measured.height - box.height
-  const room = MAX_GLYPH_HEIGHT - others
+  const room = MAX_GLYPH_HEIGHT - stackedHeight(measured, box)
   return Math.max(MIN_GLYPH_HEIGHT, Math.min(MAX_GLYPH_HEIGHT, Math.floor(Math.max(0, room) * 2) / 2))
 }
 

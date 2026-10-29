@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS = {
   composition: defaultComposition(),
   paperId: 'letter',
   orientation: 'landscape',
+  cols: 2,
   rows: 1,
   bannerMode: 'horiz',
   contentKind: 'text',
@@ -31,6 +32,15 @@ export const DEFAULT_SETTINGS = {
   zoom: 1,
   scaleToFit: true,
   extensions: {},
+}
+
+export function resetDocumentSettings() {
+  return {
+    ...DEFAULT_SETTINGS,
+    composition: defaultComposition(),
+    margins: { ...DEFAULT_SETTINGS.margins },
+    extensions: {},
+  }
 }
 
 function load() {
@@ -59,6 +69,8 @@ function load() {
       ...DEFAULT_SETTINGS,
       ...rest,
       composition,
+      cols: Number.isInteger(parsed.cols) && parsed.cols >= 1 ? parsed.cols : undefined,
+      rows: Number.isInteger(parsed.rows) && parsed.rows >= 1 ? parsed.rows : undefined,
       bannerMode: normalizeBannerMode(parsed.bannerMode ?? rest.bannerMode),
       margins: { ...DEFAULT_SETTINGS.margins, ...(parsed.margins || {}) },
       join: normalizeJoin(rest.join, _printOverlap),
@@ -89,5 +101,9 @@ export function usePersistedSettings() {
     )
   }, [])
 
-  return [settings, patch]
+  const reset = useCallback(() => {
+    setSettings(resetDocumentSettings())
+  }, [])
+
+  return [settings, patch, reset]
 }

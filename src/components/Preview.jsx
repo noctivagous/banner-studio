@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { PaperPreview } from './PaperPreview.jsx'
 import { SegmentControl } from './SegmentControl.jsx'
+import { SheetGridBar } from './SheetGridBar.jsx'
 import {
   MAX_GLYPH_HEIGHT,
   MIN_GLYPH_HEIGHT,
@@ -9,8 +10,13 @@ import {
   cutPolygonPoints,
   findLine,
   fontOf,
+  isIdSelected,
   lineText,
+  nextSelection,
+  selectedLineIds,
+  sheetGridFromFrameDrag,
   withLine,
+  withLinesCentered,
 } from '../lib/composition.js'
 import {
   GRID_HALF_IN,
@@ -33,6 +39,7 @@ import {
   verticalCutInches,
 } from '../lib/layout.js'
 import { SheetJoinMarks } from './JoinMarks.jsx'
+import { ObjectContextMenu } from './ObjectContextMenu.jsx'
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
 
@@ -261,6 +268,7 @@ export function BannerComposition({
   selection,
   showGuides,
   onSelect,
+  onObjectContextMenu,
   onChangeLine,
   onPatchLine,
   onLivePatch,
@@ -269,6 +277,8 @@ export function BannerComposition({
   onEditStart,
   onEditEnd,
   onEditCancel,
+  onFrameDrag,
+  onFrameCommit,
 }) {
   const scale = hatchUnit === 'px' ? unitPerInch : 1
   const container = composition.container
@@ -284,14 +294,14 @@ export function BannerComposition({
   const selectedId = selection?.id
   const stack = composition.container.children.find((child) => child.type === 'stack')
   const guidesOn =
-    showGuides && (selection?.kind === 'stack' || selection?.kind === 'line') && stack
+    showGuides && (isIdSelected(selection, stack?.id) || selectedLineIds(selection).length > 0) && stack
   const interactive = typeof onSelect === 'function'
   const stackBox = measured.stackBox
 
   const pick = (event, next) => {
     if (!interactive) return
     event.stopPropagation()
-    onSelect(next)
+    onSelect(nextSelection(selection, next, event.shiftKey))
   }
   const dragRef = useRef(null)
   const justDraggedRef = useRef(false)
@@ -357,8 +367,22 @@ export function BannerComposition({
 
   const moveDrag = (event) => {
     const drag = dragRef.current
+    if (!drag) return
     const applyPatch = onLivePatch ?? onPatchLine
-    if (!drag || typeof applyPatch !== 'function') return
+    if (drag.kind === 'frame-resize') {
+      const dxPx = event.clientX - drag.startX
+      const dyPx = event.clientY - drag.startY
+      if (Math.abs(dxPx) + Math.abs(dyPx) > 3) drag.moved = true
+      if (!drag.moved) return
+      if (typeof onFrameDrag !== 'function') return
+      onFrameDrag(
+        (event.clientX - drag.originX) / scale,
+        (event.clientY - drag.originY) / scale,
+        event.shiftKey,
+      )
+      return
+    }
+    if (typeof applyPatch !== 'function') return
     const dxPx = event.clientX - drag.startX
     const dyPx = event.clientY - drag.startY
     if (Math.abs(dxPx) + Math.abs(dyPx) > 3) drag.moved = true
@@ -396,7 +420,25 @@ export function BannerComposition({
     if (drag?.moved) {
       event.stopPropagation()
       justDraggedRef.current = true
-      onLiveCommit?.(drag.id)
+      if (drag.kind === 'frame-resize') onFrameCommit?.()
+      else onLiveCommit?.(drag.id)
+    }
+  }
+
+  const beginFrameResize = (event) => {
+    event.stopPropagation()
+    event.preventDefault()
+    if (typeof onFrameDrag !== 'function') return
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    const host = event.currentTarget.closest('[data-preview-node="container"]')
+    const rect = host?.getBoundingClientRect()
+    dragRef.current = {
+      kind: 'frame-resize',
+      originX: rect?.left ?? event.clientX,
+      originY: rect?.top ?? event.clientY,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
     }
   }
 
@@ -411,13 +453,20 @@ export function BannerComposition({
         position: 'relative',
         width: widthU,
         height: heightU,
-        overflow: 'hidden',
-        clipPath,
-        borderRadius,
+        overflow: 'visible',
         cursor: interactive ? 'pointer' : undefined,
         userSelect: interactive ? 'none' : undefined,
       }}
     >
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          overflow: 'hidden',
+          clipPath,
+          borderRadius,
+        }}
+      >
       <ContainerShape
         container={container}
         widthIn={w}
@@ -484,7 +533,8 @@ export function BannerComposition({
         </>
       )}
       {measured.lineBoxes.map((box) => {
-        const selected = selectedId === box.id
+        const selected = isIdSelected(selection, box.id)
+        const primary = selectedId === box.id
         const baselineFromTop = (box.baselineY - box.y) * scale
         const editing = editingLineId === box.id
         const hitWidth = Math.max(box.width, interactive ? 1 : 0)
@@ -509,6 +559,10 @@ export function BannerComposition({
                       justDraggedRef.current = false
                       return
                     }
+                    if (event.shiftKey) {
+                      pick(event, { kind: 'line', id: box.id })
+                      return
+                    }
                     if (selected && !editing && onEditStart) {
                       event.stopPropagation()
                       onEditStart(box.id)
@@ -518,12 +572,26 @@ export function BannerComposition({
                   }
                 : undefined
             }
+            onContextMenu={
+              interactive
+                ? (event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onObjectContextMenu?.({
+                      x: event.clientX,
+                      y: event.clientY,
+                      target: { kind: 'line', id: box.id },
+                      shift: event.shiftKey,
+                    })
+                  }
+                : undefined
+            }
             onDoubleClick={
               interactive && onEditStart
                 ? (event) => {
                     event.preventDefault()
                     event.stopPropagation()
-                    onSelect({ kind: 'line', id: box.id })
+                    onSelect(nextSelection(selection, { kind: 'line', id: box.id }, false))
                     onEditStart(box.id)
                   }
                 : undefined
@@ -546,14 +614,17 @@ export function BannerComposition({
               top: `${box.y * scale}${hatchUnit}`,
               width: hitW,
               height: boxH,
-              outline: selected ? '2px solid #E3FF33' : undefined,
+              outline: selected ? '2px solid #0D2B6B' : undefined,
               outlineOffset: 2,
+              boxShadow: selected
+                ? '0 0 0 1px #FFFFFF, 1px 2px 4px rgba(0,0,0,0.55)'
+                : undefined,
               cursor: interactive ? 'text' : undefined,
               overflow: editing ? 'visible' : undefined,
               zIndex: selected ? 3 : 2,
             }}
           >
-            {canLock && selected && !editing && (
+            {canLock && primary && !editing && (
               <div
                 style={{
                   position: 'absolute',
@@ -663,7 +734,7 @@ export function BannerComposition({
                 </span>
               </div>
             )}
-            {canLock && selected && !editing && (
+            {canLock && primary && !editing && (
               <>
                 <span
                   role="button"
@@ -779,7 +850,8 @@ export function BannerComposition({
                   left: 0,
                   right: 0,
                   top: `${baselineFromTop}${hatchUnit}`,
-                  borderTop: '1px solid #E3FF33',
+                  borderTop: '1px solid #0D2B6B',
+                  filter: 'drop-shadow(0 0 1px #FFFFFF) drop-shadow(1px 1px 2px rgba(0,0,0,0.55))',
                   pointerEvents: 'none',
                 }}
               />
@@ -787,18 +859,59 @@ export function BannerComposition({
           </div>
         )
       })}
-      {showGuides && selectedId === container.id && (
+      {showGuides && isIdSelected(selection, container.id) && (
         <div
           aria-hidden="true"
           style={{
             position: 'absolute',
             inset: 0,
-            outline: '1px solid #E3FF33',
+            outline: '2px solid #0D2B6B',
             outlineOffset: -1,
+            boxShadow: '0 0 0 1px #FFFFFF, 1px 2px 4px rgba(0,0,0,0.55)',
             pointerEvents: 'none',
             zIndex: 5,
           }}
         />
+      )}
+      </div>
+      {typeof onFrameDrag === 'function' && (
+        <span
+          role="button"
+          tabIndex={0}
+          title="Drag to add or remove pages"
+          aria-label="Drag to add or remove pages"
+          onPointerDown={beginFrameResize}
+          onPointerMove={moveDrag}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              event.stopPropagation()
+            }
+          }}
+          style={{
+            position: 'absolute',
+            right: -20,
+            bottom: -20,
+            width: 16,
+            height: 16,
+            borderRadius: 3,
+            border: '1px solid #000',
+            background: '#E3FF33',
+            color: '#000',
+            fontSize: 11,
+            lineHeight: '16px',
+            textAlign: 'center',
+            cursor: 'nwse-resize',
+            touchAction: 'none',
+            userSelect: 'none',
+            zIndex: 12,
+          }}
+        >
+          ⤡
+        </span>
       )}
     </div>
   )
@@ -1052,6 +1165,7 @@ export function Preview({
   onChange,
   onLivePatch,
   onLiveCommit,
+  onSheetGrid,
   join = 'overlap-tape',
   showTrim,
   showSafe,
@@ -1066,6 +1180,21 @@ export function Preview({
   const contentHpx = contentH * px
   const alignRecut = join === JOIN_ALIGN_RECUT
   const duplicateStrip = joinDuplicates(join) && overlap > 0
+  const applyDragGrid = (widthIn, heightIn) => {
+    if (!onSheetGrid) return
+    const next = sheetGridFromFrameDrag(widthIn, heightIn, {
+      trimW,
+      trimH,
+      contentW,
+      contentH,
+      duplicate: duplicateStrip,
+      overlap,
+    })
+    onSheetGrid(next.cols, next.rows, { x: 'right', y: 'bottom' })
+  }
+  const onFrameDrag = (widthIn, heightIn) => {
+    applyDragGrid(widthIn, heightIn)
+  }
   const sliceW = duplicateStrip ? trimW : contentW
   const sliceH = tile && !duplicateStrip ? contentH : trimH
   const slicePx = sliceW * px
@@ -1090,6 +1219,52 @@ export function Preview({
   const [arrangement, setArrangement] = useState('overlap')
   const [renderer, setRenderer] = useState('paper')
   const [editing, setEditing] = useState(null)
+  const [objectMenu, setObjectMenu] = useState(null)
+
+  const openObjectMenu = ({ x, y, target, shift }) => {
+    if (!target?.id) return
+    const keep = isIdSelected(selection, target.id)
+    const next = keep ? selection : nextSelection(selection, target, shift)
+    if (next !== selection) onSelect?.(next)
+    const lineIds =
+      target.kind === 'line' && !keep && !shift
+        ? [target.id]
+        : selectedLineIds(next)
+    if (lineIds.length === 0) return
+    setObjectMenu({ x, y, lineIds })
+  }
+
+  const objectMenuActions = objectMenu
+    ? [
+        {
+          id: 'center-frame',
+          label: 'Center in Frame',
+          disabled: !objectMenu.lineIds.length,
+          run: () => {
+            if (!onChange || !objectMenu.lineIds.length) return
+            onChange(withLinesCentered(composition, objectMenu.lineIds, measured, { x: true, y: true }))
+          },
+        },
+        {
+          id: 'center-x',
+          label: 'Center Horizontally',
+          disabled: !objectMenu.lineIds.length,
+          run: () => {
+            if (!onChange || !objectMenu.lineIds.length) return
+            onChange(withLinesCentered(composition, objectMenu.lineIds, measured, { x: true, y: false }))
+          },
+        },
+        {
+          id: 'center-y',
+          label: 'Center Vertically',
+          disabled: !objectMenu.lineIds.length,
+          run: () => {
+            if (!onChange || !objectMenu.lineIds.length) return
+            onChange(withLinesCentered(composition, objectMenu.lineIds, measured, { x: false, y: true }))
+          },
+        },
+      ]
+    : []
   const stacked = arrangement === 'overlap' && duplicateStrip
   const sheetGap = arrangement === 'separate' ? 24 : stacked ? 0 : 8
   const labelH = showNumbers ? 28 : 0
@@ -1099,7 +1274,8 @@ export function Preview({
   // The inch ruler sits above the first row only. Later rows start at the page.
   const pageTop = (row) =>
     rulerH + row * (stacked ? contentHpx : rowBody + sheetGap)
-  const boardW = cols > 0 ? (cols - 1) * pitchX + sheetW : 0
+  const sheetsW = cols > 0 ? (cols - 1) * pitchX + sheetW : 0
+  const boardW = sheetsW
   const boardH = rows > 0 ? pageTop(rows - 1) + rowBody : 0
 
   const measureScroll = useCallback(() => {
@@ -1147,7 +1323,11 @@ export function Preview({
     const labelH = showNumbers ? 28 : 0
     const availW = el.clientWidth - padX
     const availH = el.clientHeight - padY
-    if (availW < 40 || availH < 40 || cols < 1 || rows < 1) return
+    // Responsive rails can temporarily leave the canvas with virtually no
+    // height during a reflow. Do not replace a useful fit zoom with the
+    // minimum zoom from that intermediate layout; ResizeObserver will run
+    // again after the canvas receives its final bounds.
+    if (availW < 160 || availH < 120 || cols < 1 || rows < 1) return
     const spanWIn = stacked ? pageW + (cols - 1) * contentW : cols * pageW
     const spanHIn = stacked ? pageH + (rows - 1) * contentH : rows * pageH
     const extraX = stacked ? 0 : Math.max(0, cols - 1) * sheetGap
@@ -1226,7 +1406,7 @@ export function Preview({
                 onScaleToFit(false)
                 onZoom(level)
               }}
-              className={`pro-bevel h-7 px-2.5 rounded-[3px] border font-mono text-[11px] tracking-[0.08em] transition-colors ${
+              className={`hidden lg:inline-flex pro-bevel h-7 px-2.5 rounded-[3px] border font-mono text-[11px] tracking-[0.08em] transition-colors ${
                 !scaleToFit && Math.abs(zoom - level) < 0.001
                   ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
                   : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-[#F0F0F2] hover:border-[#5E5E69]'
@@ -1235,7 +1415,7 @@ export function Preview({
               {level * 100}%
             </button>
           ))}
-          <div className="w-px h-4 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)] mx-1" />
+          <div className="hidden lg:block w-px h-4 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)] mx-1" />
           <button
             type="button"
             onClick={() => onScaleToFit(true)}
@@ -1249,6 +1429,23 @@ export function Preview({
           </button>
         </div>
       </div>
+      {onSheetGrid ? (
+        <SheetGridBar
+          cols={cols}
+          rows={rows}
+          onNudge={(axis, edge, delta) => {
+            onSheetGrid(
+              axis === 'x' ? cols + delta : cols,
+              axis === 'y' ? rows + delta : rows,
+              {
+                x: axis === 'x' ? edge : 'right',
+                y: axis === 'y' ? edge : 'bottom',
+              },
+            )
+          }}
+          onSetGrid={(nextCols, nextRows) => onSheetGrid(nextCols, nextRows, { x: 'right', y: 'bottom' })}
+        />
+      ) : null}
 
       <div className="flex-1 relative min-h-0 min-w-0">
       <div
@@ -1327,6 +1524,7 @@ export function Preview({
                 measured={measured}
                 selection={selection}
                 onSelect={onSelect}
+                onObjectContextMenu={openObjectMenu}
                 onPatchLine={(lineId, patch) => {
                   if (!onChange) return
                   onChange(withLine(composition, lineId, patch), lineId)
@@ -1337,6 +1535,7 @@ export function Preview({
                         onLivePatch(withLine(composition, lineId, patch))
                     : undefined
                 }
+                onLivePatchFrame={onSheetGrid ? applyDragGrid : undefined}
                 onLiveCommit={onLiveCommit}
                 join={join}
                 showTrim={showTrim}
@@ -1488,7 +1687,27 @@ export function Preview({
                           onSelect
                             ? (event) => {
                                 if (event.target !== event.currentTarget) return
-                                onSelect({ kind: 'container', id: composition.container.id })
+                                onSelect(
+                                  nextSelection(
+                                    selection,
+                                    { kind: 'container', id: composition.container.id },
+                                    event.shiftKey,
+                                  ),
+                                )
+                              }
+                            : undefined
+                        }
+                        onContextMenu={
+                          onSelect
+                            ? (event) => {
+                                if (event.target !== event.currentTarget) return
+                                event.preventDefault()
+                                openObjectMenu({
+                                  x: event.clientX,
+                                  y: event.clientY,
+                                  target: { kind: 'container', id: composition.container.id },
+                                  shift: event.shiftKey,
+                                })
                               }
                             : undefined
                         }
@@ -1525,6 +1744,7 @@ export function Preview({
                             selection={selection}
                             showGuides
                             onSelect={onSelect}
+                            onObjectContextMenu={openObjectMenu}
                             onChangeLine={(lineId, copy) => {
                               if (!onChange) return
                               onChange(withLine(composition, lineId, { copy }), lineId)
@@ -1539,6 +1759,8 @@ export function Preview({
                                     onLivePatch(withLine(composition, lineId, patch))
                                 : undefined
                             }
+                            onFrameDrag={onSheetGrid ? onFrameDrag : undefined}
+                            onFrameCommit={onLiveCommit}
                             onLiveCommit={onLiveCommit}
                             editingLineId={editing?.hostId === sheet.index ? editing.lineId : null}
                             onEditStart={(lineId) => {
@@ -1806,6 +2028,14 @@ export function Preview({
         </div>
       )}
       </div>
+      {objectMenu && (
+        <ObjectContextMenu
+          x={objectMenu.x}
+          y={objectMenu.y}
+          actions={objectMenuActions}
+          onClose={() => setObjectMenu(null)}
+        />
+      )}
     </div>
   )
 }
