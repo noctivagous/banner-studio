@@ -1347,7 +1347,7 @@ export function Preview({
                 px={px}
                 stacked={stacked}
                 pitchX={pitchX}
-                pageTop={pageTop}
+                sheetGap={sheetGap}
                 boardW={boardW}
                 boardH={boardH}
                 sheetW={sheetW}
@@ -1356,10 +1356,10 @@ export function Preview({
                 labelH={labelH}
                 rulerH={rulerH}
                 editing={editing}
-                onEditStart={(lineId) => {
+                onEditStart={(lineId, hostId = 0) => {
                   const line = findLine(composition, lineId)
                   onSelect?.({ kind: 'line', id: lineId })
-                  setEditing({ lineId, hostId: 0, snapshot: line?.copy ?? '' })
+                  setEditing({ lineId, hostId, snapshot: line?.copy ?? '' })
                 }}
                 onChangeLine={(lineId, copy) => {
                   if (!onChange) return

@@ -1,37 +1,94 @@
 // PaperPreview: paper.js canvas renderer for the banner preview.
 //
-// Renders the same composition model as the DOM BannerComposition (frame,
-// lines, glyph-stack layers) plus the sheet tiling (cards, rulers, trim,
-// tape, cut marks), with direct manipulation: drag a line body to move,
-// corner handle to resize, top handle to rotate. Single-select contract
-// matches the DOM preview (onSelect/onPatchLine/onLivePatch/onLiveCommit).
+// Resting geometry matches the DOM BannerComposition: line boxes sit on the
+// measured baseline, rotate around the box center, and keep axis-aligned
+// selection chrome. A gesture does not rebuild the scene. The dragged items
+// keep their matrices and follow the pointer; the document updates on a frame
+// and the scene is redrawn from measurement when the pointer goes up.
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import paper from 'paper'
 import {
   MIN_GLYPH_HEIGHT,
   MAX_GLYPH_HEIGHT,
+  FONT_SIZE_FACTOR,
+  cornerLengthIn,
+  cutPolygonPoints,
+  findLine,
   fontOf,
   lineText,
 } from '../lib/composition.js'
-import { placeFrameInTrim, snapToGrid } from '../lib/grid.js'
 import {
+  GRID_HALF_IN,
+  GRID_PITCH_IN,
+  gridLinesIn,
+  placeFrameInTrim,
+  snapToGrid,
+} from '../lib/grid.js'
+import {
+  ALIGN_COLOR,
   JOIN_ALIGN_RECUT,
+  RECUT_COLOR,
   alignRecutOffset,
   coveredSpan,
+  crossArm,
   horizontalCutInches,
   joinDuplicates,
   overlapCutSlack,
+  resolveLayerHatchIn,
   verticalCutInches,
 } from '../lib/layout.js'
 import { getEngineFont } from '../lib/typeEngine.js'
 
 const LIME = '#E3FF33'
 const INK = '#111111'
+const BUTTONS = new Set(['snap', 'center-x', 'center-y'])
 
-// Per-character x offsets so letter-spacing (tracking) renders exactly and
-// matches engineLineWidthPx. Uses opentype advances + kerning when the engine
-// font is cached, otherwise canvas per-char measurement.
+function color(scope, value, alpha = 1) {
+  const next = new scope.Color(value)
+  next.alpha = alpha
+  return next
+}
+
+function rowTop(row, rulerH, stride) {
+  return rulerH + row * stride
+}
+
+function sheetBoardOrigin(sheet, pitchX, rulerH, stride) {
+  return {
+    x: sheet.col * pitchX,
+    y: sheet.row === 0 ? 0 : rowTop(sheet.row, rulerH, stride),
+  }
+}
+
+function pageBoardOrigin(sheet, pitchX, rulerH, stride) {
+  const origin = sheetBoardOrigin(sheet, pitchX, rulerH, stride)
+  return {
+    x: origin.x,
+    y: origin.y + (sheet.row === 0 ? rulerH : 0),
+  }
+}
+
+// Padding that centers the frame inside the sheet window, mirroring the
+// DOM preview's placeFrameInTrim usage.
+function frameOffset(composition, measured, frameBoxW, frameBoxH) {
+  if (!measured || !(measured.width > 0)) return { x: 0, y: 0 }
+  return {
+    x: placeFrameInTrim(
+      composition.container.layout.alignX,
+      measured.width,
+      frameBoxW,
+      composition.alignMode,
+    ),
+    y: placeFrameInTrim(
+      composition.container.layout.alignY,
+      measured.height,
+      frameBoxH,
+      composition.alignMode,
+    ),
+  }
+}
+
 function layoutChars(text, font, fontId, fontPx, trackingEm) {
   const tracking = (Number(trackingEm) || 0) * fontPx
   const engine = getEngineFont(fontId)
@@ -44,10 +101,12 @@ function layoutChars(text, font, fontId, fontPx, trackingEm) {
       for (let i = 0; i < glyphs.length; i += 1) {
         xs.push(x)
         x += glyphs[i].advanceWidth * scale
-        if (i < glyphs.length - 1) x += engine.getKerningValue(glyphs[i], glyphs[i + 1]) * scale
-        if (i < glyphs.length - 1) x += tracking
+        if (i < glyphs.length - 1) {
+          x += engine.getKerningValue(glyphs[i], glyphs[i + 1]) * scale
+          x += tracking
+        }
       }
-      return { xs, total: glyphs.length ? x - tracking : 0 }
+      return xs
     } catch {
       // fall through to canvas
     }
@@ -63,13 +122,980 @@ function layoutChars(text, font, fontId, fontPx, trackingEm) {
       if (i < text.length - 1) x += tracking
     }
   }
-  return { xs, total: text.length ? x - tracking : 0 }
+  return xs
 }
 
-function hex(color, alpha = 1) {
-  const c = new paper.Color(color)
-  c.alpha = alpha
-  return c
+// Browser glyphs, placed on the measured advances so the line fills the same
+// box the DOM preview measures. PointText's anchor is the alphabetic baseline.
+function buildGlyphs(scope, text, font, fontId, fontPx, originX, baseline, trackingEm, fill) {
+  const group = new scope.Group()
+  const xs = layoutChars(text, font, fontId, fontPx, trackingEm)
+  for (let i = 0; i < text.length; i += 1) {
+    const letter = new scope.PointText(new scope.Point(originX + (xs[i] ?? 0), baseline))
+    letter.content = text[i] === ' ' ? '\u00a0' : text[i]
+    letter.fontFamily = `"${font.family}", Impact, sans-serif`
+    letter.fontWeight = String(font.weight)
+    letter.fontSize = fontPx
+    letter.justification = 'left'
+    letter.fillColor = fill
+    group.addChild(letter)
+  }
+  return group
+}
+
+// Outline used only to clip a hatch. Null when the engine font is not loaded.
+function buildClipPath(scope, text, fontId, fontPx, originX, baseline, trackingEm) {
+  const engine = getEngineFont(fontId)
+  if (!engine) return null
+  try {
+    const tracking = (Number(trackingEm) || 0) * fontPx
+    const unit = fontPx / engine.unitsPerEm
+    const glyphs = engine.stringToGlyphs(text)
+    const parts = []
+    let x = originX
+    for (let i = 0; i < glyphs.length; i += 1) {
+      const glyph = glyphs[i]
+      if (text[i] !== ' ') {
+        const data = glyph.getPath(x, baseline, fontPx).toPathData(4)
+        if (data) parts.push(data)
+      }
+      x += glyph.advanceWidth * unit
+      if (i < glyphs.length - 1) {
+        x += engine.getKerningValue(glyph, glyphs[i + 1]) * unit
+        x += tracking
+      }
+    }
+    if (!parts.length) return null
+    const path = new scope.CompoundPath(parts.join(' '))
+    path.fillRule = 'nonzero'
+    path.fillColor = null
+    return path
+  } catch {
+    return null
+  }
+}
+
+// CSS skewX around the bottom of the line box, then the layer offset.
+// x' = x + tan * (y - originY) + dx, y' = y + dy.
+function layerMatrix(scope, skewDeg, originY, dx, dy) {
+  const tan = Math.tan(((Number(skewDeg) || 0) * Math.PI) / 180)
+  return new scope.Matrix(1, 0, tan, 1, dx - tan * originY, dy)
+}
+
+function hatchStripes(scope, source, angleDeg, spacing, lineWidth, fill) {
+  if (!(source instanceof scope.PathItem) || !(spacing > 0) || !(lineWidth > 0)) return null
+  const bounds = source.bounds
+  if (!(bounds.width > 0) || !(bounds.height > 0)) return null
+  const axis = (((angleDeg + 90) % 360) + 360) % 360
+  const cssAngle = (axis + 90) % 360
+  const rad = (cssAngle * Math.PI) / 180
+  const ux = Math.sin(rad)
+  const uy = -Math.cos(rad)
+  const vx = -uy
+  const vy = ux
+  const corners = [bounds.topLeft, bounds.topRight, bounds.bottomLeft, bounds.bottomRight]
+  let min = Infinity
+  let max = -Infinity
+  for (const corner of corners) {
+    const proj = corner.x * ux + corner.y * uy
+    min = Math.min(min, proj)
+    max = Math.max(max, proj)
+  }
+  const reach = Math.hypot(bounds.width, bounds.height) + spacing
+  const group = new scope.Group()
+  const mask = source.clone({ insert: false })
+  mask.clipMask = true
+  mask.data = { role: 'decor' }
+  group.addChild(mask)
+  for (let dist = min; dist <= max; dist += spacing) {
+    const ox = ux * dist
+    const oy = uy * dist
+    const wax = vx * reach
+    const way = vy * reach
+    const thickX = ux * lineWidth
+    const thickY = uy * lineWidth
+    const stripe = new scope.Path([
+      new scope.Point(ox - wax, oy - way),
+      new scope.Point(ox + wax, oy + way),
+      new scope.Point(ox + wax + thickX, oy + way + thickY),
+      new scope.Point(ox - wax + thickX, oy - way + thickY),
+    ])
+    stripe.closed = true
+    stripe.fillColor = fill
+    stripe.data = { role: 'decor' }
+    group.addChild(stripe)
+  }
+  group.clipped = true
+  return group
+}
+
+function diagonalHatch(scope, rect, spacing, lineWidth, fill) {
+  const group = new scope.Group()
+  const mask = new scope.Path.Rectangle(rect)
+  mask.clipMask = true
+  mask.data = { role: 'decor' }
+  group.addChild(mask)
+  const reach = rect.width + rect.height
+  const step = spacing * Math.SQRT2
+  const thick = lineWidth * Math.SQRT2
+  for (let offset = -rect.height; offset < rect.width + rect.height; offset += step) {
+    const stripe = new scope.Path([
+      new scope.Point(rect.x + offset, rect.y),
+      new scope.Point(rect.x + offset + thick, rect.y),
+      new scope.Point(rect.x + offset + thick + rect.height, rect.y + rect.height),
+      new scope.Point(rect.x + offset + rect.height, rect.y + rect.height),
+    ])
+    stripe.closed = true
+    stripe.fillColor = fill
+    stripe.data = { role: 'decor' }
+    group.addChild(stripe)
+  }
+  group.clipped = true
+  void reach
+  return group
+}
+
+function makeFramePath(scope, container, x, y, widthPx, heightPx, px) {
+  const widthIn = widthPx / px
+  const heightIn = heightPx / px
+  const corner = container.decoration?.corner
+  const cutPx = cornerLengthIn(container, widthIn, heightIn) * px
+  if (corner === 'cut' && cutPx > 0) {
+    const path = new scope.Path(
+      cutPolygonPoints(widthPx, heightPx, cutPx).map(([px0, py0]) => new scope.Point(x + px0, y + py0)),
+    )
+    path.closed = true
+    return path
+  }
+  const radius = corner === 'round' ? cutPx : 0
+  return new scope.Path.Rectangle(
+    new scope.Rectangle(x, y, widthPx, heightPx),
+    new scope.Size(radius, radius),
+  )
+}
+
+function tagged(item) {
+  let node = item
+  while (node) {
+    const role = node.data?.role
+    if (role === 'decor' || role === 'guide') return null
+    if (
+      role === 'handle' ||
+      role === 'glyph' ||
+      role === 'chrome' ||
+      role === 'frame' ||
+      role === 'stack' ||
+      role === 'sheet'
+    ) {
+      return node
+    }
+    node = node.parent
+  }
+  return null
+}
+
+function itemsWith(scope, lineId, role) {
+  return scope.project.getItems({
+    match: (item) => item.data?.lineId === lineId && item.data?.role === role,
+  })
+}
+
+function drawRuler(scope, x, y, originIn, widthIn, px) {
+  const group = new scope.Group()
+  const band = new scope.Path.Rectangle(new scope.Rectangle(x, y, widthIn * px, 28))
+  band.fillColor = color(scope, '#26262E')
+  band.data = { role: 'decor' }
+  group.addChild(band)
+  const first = Math.ceil(originIn - 1e-6)
+  const last = Math.floor(originIn + widthIn + 1e-6)
+  for (let inch = first; inch <= last; inch += 1) {
+    const tickX = x + (inch - originIn) * px
+    const foot = inch % 12 === 0
+    const mid = inch % 6 === 0
+    const tick = new scope.Path.Line(
+      new scope.Point(tickX, y + (foot ? 12 : 16)),
+      new scope.Point(tickX, y + 28),
+    )
+    tick.strokeColor = color(scope, foot ? '#F0F0F2' : '#5E5E69')
+    tick.strokeWidth = 1
+    tick.data = { role: 'decor' }
+    group.addChild(tick)
+    if (mid) {
+      const label = new scope.PointText(new scope.Point(tickX + 4, y + 11))
+      label.content = `${inch}"`
+      label.fontSize = 9
+      label.fontFamily = 'ui-monospace, monospace'
+      label.fillColor = color(scope, '#7A7A80')
+      label.data = { role: 'decor' }
+      group.addChild(label)
+    }
+    if (foot) {
+      const feet = new scope.PointText(new scope.Point(tickX + 6, y + 24))
+      feet.content = `${Math.floor(inch / 12)}'`
+      feet.fontSize = 10
+      feet.fontWeight = 'bold'
+      feet.fontFamily = 'ui-monospace, monospace'
+      feet.fillColor = color(scope, '#F0F0F2')
+      feet.data = { role: 'decor' }
+      group.addChild(feet)
+    }
+  }
+  return group
+}
+
+function drawLine(scope, box, px, frameX, frameY, selected, editing, sheetIndex) {
+  const line = box.line
+  const font = fontOf(line)
+  const text = lineText(line) || '\u00a0'
+  const fontPx = line.glyphHeight * FONT_SIZE_FACTOR * px
+  const left = frameX + box.x * px
+  const top = frameY + box.y * px
+  const width = Math.max(box.width, 0) * px
+  const height = box.height * px
+  const baseline = frameY + box.baselineY * px
+  const center = new scope.Point(left + width / 2, top + height / 2)
+  const topLeft = new scope.Point(left, top)
+  const bottom = top + height
+
+  const spin = new scope.Group()
+  spin.applyMatrix = false
+  const body = new scope.Group()
+  body.applyMatrix = false
+  const visible = (line.layers || []).filter((layer) => layer?.visible !== false)
+  if (!editing) {
+    for (const layer of visible) {
+      const dx = (Number(layer.dxIn) || 0) * px
+      const dy = (Number(layer.dyIn) || 0) * px
+      const glyphs = buildGlyphs(
+        scope,
+        text,
+        font,
+        line.fontId,
+        fontPx,
+        left,
+        baseline,
+        line.letterSpacing,
+        color(scope, layer.fill || INK),
+      )
+      if (layer.strokeOn) {
+        glyphs.strokeColor = color(scope, layer.strokeColor || INK)
+        glyphs.strokeWidth = (Number(layer.strokeWidthIn) || 0) * px
+        glyphs.strokeJoin = 'round'
+      }
+      const layerGroup = new scope.Group([glyphs])
+      layerGroup.applyMatrix = false
+      if (layer.overlayOn) {
+        const hatch = resolveLayerHatchIn(layer, line.glyphHeight, line.fontId)
+        const mask = buildClipPath(scope, text, line.fontId, fontPx, left, baseline, line.letterSpacing)
+        const stripes = mask
+          ? hatchStripes(
+            scope,
+            mask,
+            hatch.angle,
+            hatch.spacingIn * px,
+            Math.max(0.5, hatch.lineWidthIn * px),
+            color(scope, layer.overlayColor || layer.fill || INK),
+          )
+          : null
+        if (stripes) layerGroup.addChild(stripes)
+        else {
+          const veil = buildGlyphs(
+            scope,
+            text,
+            font,
+            line.fontId,
+            fontPx,
+            left,
+            baseline,
+            line.letterSpacing,
+            color(scope, layer.overlayColor || layer.fill || INK, 0.55),
+          )
+          layerGroup.addChild(veil)
+        }
+        mask?.remove()
+      }
+      layerGroup.matrix = layerMatrix(scope, layer.skewXDeg, bottom, dx, dy)
+      body.addChild(layerGroup)
+    }
+  }
+  spin.addChild(body)
+  spin.data = {
+    role: 'glyph',
+    lineId: box.id,
+    sheetIndex,
+    center,
+    topLeft,
+    body,
+  }
+  const rotation = Number(line.rotationDeg) || 0
+  if (rotation) spin.rotate(rotation, center)
+
+  const chrome = new scope.Group()
+  chrome.applyMatrix = false
+  chrome.data = {
+    role: 'chrome',
+    lineId: box.id,
+    sheetIndex,
+    center,
+    topLeft,
+  }
+  const hit = new scope.Path.Rectangle(
+    new scope.Rectangle(left, top, Math.max(width, px), height),
+  )
+  hit.fillColor = color(scope, '#000000', 0.001)
+  hit.data = { role: 'handle', handle: 'move', lineId: box.id, sheetIndex, center, topLeft }
+  chrome.addChild(hit)
+  if (selected && !editing) {
+    const outline = new scope.Path.Rectangle(new scope.Rectangle(left - 2, top - 2, Math.max(width, px) + 4, height + 4))
+    outline.strokeColor = color(scope, LIME)
+    outline.strokeWidth = 2
+    outline.data = { role: 'decor' }
+    chrome.addChild(outline)
+    const baseY = baseline
+    const guide = new scope.Path.Line(new scope.Point(left, baseY), new scope.Point(left + width, baseY))
+    guide.strokeColor = color(scope, LIME)
+    guide.strokeWidth = 1
+    guide.data = { role: 'decor' }
+    chrome.addChild(guide)
+    addHandles(scope, chrome, box, left, top, Math.max(width, px), height, center, topLeft, sheetIndex)
+  }
+  return { spin, chrome }
+}
+
+function addHandles(scope, chrome, box, left, top, width, height, center, topLeft, sheetIndex) {
+  const snap = (box.line.place?.mode || 'snap') !== 'free'
+  const buttons = [
+    { handle: 'snap', label: snap ? '🧲' : '🔓', fill: snap ? LIME : '#141417', ink: snap ? '#000000' : LIME },
+    { handle: 'center-x', label: '↔', fill: '#141417', ink: LIME },
+    { handle: 'center-y', label: '↕', fill: '#141417', ink: LIME },
+  ]
+  buttons.forEach((button, index) => {
+    const x = left + width - (buttons.length - index) * 22 - 1
+    const y = top + 1
+    const pad = new scope.Path.Rectangle(new scope.Rectangle(x, y, 20, 20), new scope.Size(3, 3))
+    pad.fillColor = color(scope, button.fill)
+    pad.strokeColor = color(scope, '#000000')
+    pad.strokeWidth = 1
+    pad.data = { role: 'handle', handle: button.handle, lineId: box.id, sheetIndex, center, topLeft }
+    const label = new scope.PointText(new scope.Point(x + 10, y + 14))
+    label.content = button.label
+    label.justification = 'center'
+    label.fontSize = 12
+    label.fillColor = color(scope, button.ink)
+    label.data = { role: 'decor' }
+    chrome.addChild(pad)
+    chrome.addChild(label)
+  })
+  const resize = new scope.Path.Rectangle(
+    new scope.Rectangle(left + width - 8, top + height - 8, 16, 16),
+    new scope.Size(3, 3),
+  )
+  resize.fillColor = color(scope, LIME)
+  resize.strokeColor = color(scope, '#000000')
+  resize.strokeWidth = 1
+  resize.data = { role: 'handle', handle: 'resize', lineId: box.id, sheetIndex, center, topLeft }
+  chrome.addChild(resize)
+  const rotate = new scope.Path.Circle(new scope.Point(left, top), 8)
+  rotate.fillColor = color(scope, LIME)
+  rotate.strokeColor = color(scope, '#000000')
+  rotate.strokeWidth = 1
+  rotate.data = { role: 'handle', handle: 'rotate', lineId: box.id, sheetIndex, center, topLeft }
+  chrome.addChild(rotate)
+}
+
+function drawScene(scope, ctx) {
+  const {
+    sheets,
+    composition,
+    measured,
+    selection,
+    margins,
+    overlap,
+    pageW,
+    pageH,
+    trimW,
+    trimH,
+    contentW,
+    contentH,
+    cols,
+    rows,
+    tile,
+    px,
+    sliceW,
+    sliceH,
+    duplicateStrip,
+    alignRecut,
+    showTrim,
+    showSafe,
+    showTape,
+    showNumbers,
+    showCutMarks,
+    stacked,
+    pitchX,
+    sheetGap,
+    rulerH,
+    sheetW,
+    sheetH,
+    labelH,
+    editingLineId,
+  } = ctx
+  scope.project.activeLayer.removeChildren()
+  const frameBoxW = coveredSpan(cols, trimW, contentW, duplicateStrip) || sliceW
+  const frameBoxH = sliceH
+  const pad = frameOffset(composition, measured, frameBoxW, frameBoxH)
+  const stride = stacked ? contentH * px : sheetH + labelH + sheetGap
+  const sheetCount = sheets.length
+  const cutSlackPx = overlapCutSlack(overlap, duplicateStrip && !alignRecut) * px
+
+  sheets.forEach((sheet) => {
+    const board = sheetBoardOrigin(sheet, pitchX, rulerH, stride)
+    const page = pageBoardOrigin(sheet, pitchX, rulerH, stride)
+    if (sheet.row === 0) {
+      scope.project.activeLayer.addChild(
+        drawRuler(scope, page.x + margins.left * px, board.y, sheet.originX, sliceW, px),
+      )
+    }
+
+    const clipIncoming = new scope.Path.Rectangle(
+      new scope.Rectangle(
+        page.x + (stacked && sheet.col > 0 ? margins.left * px : 0),
+        page.y + (stacked && sheet.row > 0 ? margins.top * px : 0),
+        sheetW - (stacked && sheet.col > 0 ? margins.left * px : 0),
+        sheetH - (stacked && sheet.row > 0 ? margins.top * px : 0),
+      ),
+    )
+    const sheetGroup = new scope.Group([clipIncoming])
+    clipIncoming.clipMask = true
+    sheetGroup.clipped = true
+
+    const card = new scope.Path.Rectangle(new scope.Rectangle(page.x, page.y, sheetW, sheetH), new scope.Size(2, 2))
+    card.fillColor = color(scope, '#FFFFFF')
+    card.data = { role: 'sheet', sheet: sheet.index }
+    card.shadowColor = color(scope, '#000000', stacked && (sheet.col > 0 || sheet.row > 0) ? 0.55 : 0.45)
+    card.shadowBlur = 18
+    card.shadowOffset = new scope.Point(sheet.col > 0 && stacked ? -6 : 0, 8)
+    sheetGroup.addChild(card)
+
+    if (showSafe) {
+      const hatch = color(scope, '#1a1a1a', 0.55)
+      const bands = []
+      if (margins.top > 0) bands.push(new scope.Rectangle(page.x, page.y, sheetW, margins.top * px))
+      if (margins.bottom > 0) {
+        bands.push(new scope.Rectangle(page.x, page.y + (margins.top + trimH) * px, sheetW, margins.bottom * px))
+      }
+      if (margins.left > 0) {
+        bands.push(new scope.Rectangle(page.x, page.y + margins.top * px, margins.left * px, trimH * px))
+      }
+      if (margins.right > 0) {
+        bands.push(
+          new scope.Rectangle(page.x + (margins.left + trimW) * px, page.y + margins.top * px, margins.right * px, trimH * px),
+        )
+      }
+      for (const band of bands) sheetGroup.addChild(diagonalHatch(scope, band, 7, 2, hatch))
+      const safe = new scope.Path.Rectangle(
+        new scope.Rectangle(page.x + margins.left * px, page.y + margins.top * px, trimW * px, trimH * px),
+      )
+      safe.strokeColor = color(scope, '#000000', 0.18)
+      safe.strokeWidth = 1
+      safe.dashArray = [1, 3]
+      safe.data = { role: 'decor' }
+      sheetGroup.addChild(safe)
+    }
+
+    const wx = page.x + margins.left * px
+    const wy = page.y + margins.top * px
+    const ww = sliceW * px
+    const wh = sliceH * px
+    if (showTape && overlap > 0 && !duplicateStrip && sheet.col < cols - 1) {
+      const zone = new scope.Rectangle(wx + contentW * px, wy, overlap * px, wh)
+      sheetGroup.addChild(diagonalHatch(scope, zone, 7, 2, color(scope, '#1a1a1a', 0.45)))
+    }
+    if (showTape && overlap > 0 && !duplicateStrip && tile && sheet.row < rows - 1) {
+      const zone = new scope.Rectangle(wx, wy + contentH * px, ww, overlap * px)
+      sheetGroup.addChild(diagonalHatch(scope, zone, 7, 2, color(scope, '#1a1a1a', 0.45)))
+    }
+
+    if (measured && measured.width > 0) {
+      const frameX = wx + pad.x * px - sheet.originX * px
+      const frameY = wy + pad.y * px - sheet.originY * px
+      const frameW = measured.width * px
+      const frameH = measured.height * px
+      const windowPath = new scope.Path.Rectangle(new scope.Rectangle(wx, wy, ww, wh))
+      const frameShape = makeFramePath(scope, composition.container, frameX, frameY, frameW, frameH, px)
+      let clip = windowPath
+      try {
+        const hit = windowPath.intersect(frameShape)
+        if (hit && !hit.isEmpty()) {
+          clip = hit
+          windowPath.remove()
+          frameShape.remove()
+        } else {
+          frameShape.remove()
+          hit?.remove()
+        }
+      } catch {
+        frameShape.remove()
+      }
+      clip.clipMask = true
+      clip.data = { role: 'decor' }
+      const comp = new scope.Group([clip])
+      comp.clipped = true
+
+      const container = composition.container
+      const frame = makeFramePath(scope, container, frameX, frameY, frameW, frameH, px)
+      frame.fillColor = container.fillOn ? color(scope, container.fill) : color(scope, '#FFFFFF', 0.001)
+      if (container.strokeOn) {
+        frame.strokeColor = color(scope, container.strokeColor)
+        frame.strokeWidth = (container.strokeWidthIn || 0) * px
+        frame.strokeJoin = 'miter'
+      }
+      frame.data = { role: 'frame' }
+      comp.addChild(frame)
+
+      const halves = gridLinesIn(sheet.originY, sheet.originY + sliceH, GRID_HALF_IN).filter(
+        (y) => Math.abs(y % GRID_PITCH_IN) > 1e-6,
+      )
+      const horizontals = gridLinesIn(sheet.originY, sheet.originY + sliceH, GRID_PITCH_IN)
+      const verticals = composition.alignMode === 'grid'
+        ? gridLinesIn(sheet.originX, sheet.originX + sliceW, GRID_PITCH_IN)
+        : []
+      for (const y of halves) {
+        const line = new scope.Path.Line(
+          new scope.Point(wx, wy + (y - sheet.originY) * px),
+          new scope.Point(wx + ww, wy + (y - sheet.originY) * px),
+        )
+        line.strokeColor = color(scope, LIME, 0.12)
+        line.strokeWidth = 1
+        line.data = { role: 'guide' }
+        comp.addChild(line)
+      }
+      for (const y of horizontals) {
+        const line = new scope.Path.Line(
+          new scope.Point(wx, wy + (y - sheet.originY) * px),
+          new scope.Point(wx + ww, wy + (y - sheet.originY) * px),
+        )
+        line.strokeColor = color(scope, LIME, 0.28)
+        line.strokeWidth = 1
+        line.data = { role: 'guide' }
+        comp.addChild(line)
+      }
+      for (const x of verticals) {
+        const line = new scope.Path.Line(
+          new scope.Point(wx + (x - sheet.originX) * px, wy),
+          new scope.Point(wx + (x - sheet.originX) * px, wy + wh),
+        )
+        line.strokeColor = color(scope, LIME, 0.22)
+        line.strokeWidth = 1
+        line.data = { role: 'guide' }
+        comp.addChild(line)
+      }
+
+      const stack = container.children?.find((child) => child.type === 'stack')
+      if (stack && measured.stackBox) {
+        const stackHit = new scope.Path.Rectangle(
+          new scope.Rectangle(
+            frameX + measured.stackBox.x * px,
+            frameY + measured.stackBox.y * px,
+            measured.stackBox.width * px,
+            measured.stackBox.height * px,
+          ),
+        )
+        stackHit.fillColor = color(scope, '#000000', 0.001)
+        stackHit.data = { role: 'stack', stackId: stack.id }
+        comp.addChild(stackHit)
+      }
+      const guidesOn = selection?.kind === 'stack' || selection?.kind === 'line'
+      if (guidesOn && stack && measured.stackBox) {
+        const box = measured.stackBox
+        for (const edge of ['left', 'center', 'right']) {
+          const x = edge === 'left' ? box.x : edge === 'right' ? box.x + box.width : box.x + box.width / 2
+          const guide = new scope.Path.Line(
+            new scope.Point(frameX + x * px, frameY + box.y * px),
+            new scope.Point(frameX + x * px, frameY + (box.y + box.height) * px),
+          )
+          guide.strokeColor = color(scope, LIME, stack.align === edge ? 1 : 0.35)
+          guide.strokeWidth = 1
+          guide.dashArray = stack.align === edge ? [] : [3, 3]
+          guide.data = { role: 'guide' }
+          comp.addChild(guide)
+        }
+      }
+      if (selection?.kind === 'container' && selection?.id === container.id) {
+        const outline = makeFramePath(scope, container, frameX, frameY, frameW, frameH, px)
+        outline.strokeColor = color(scope, LIME)
+        outline.strokeWidth = 1
+        outline.data = { role: 'decor' }
+        comp.addChild(outline)
+      }
+
+      const chromes = []
+      for (const box of measured.lineBoxes) {
+        const parts = drawLine(
+          scope,
+          box,
+          px,
+          frameX,
+          frameY,
+          selection?.id === box.id,
+          editingLineId === box.id,
+          sheet.index,
+        )
+        comp.addChild(parts.spin)
+        chromes.push(parts.chrome)
+      }
+      sheetGroup.addChild(comp)
+      for (const chrome of chromes) sheetGroup.addChild(chrome)
+    }
+
+    if (showTrim && !alignRecut) {
+      const cuts = [
+        ...verticalCutInches({
+          col: sheet.col,
+          cols,
+          duplicate: duplicateStrip,
+          overlap,
+          marginLeft: margins.left,
+          contentW,
+        }).map((x) => ({
+          from: new scope.Point(page.x + x * px, wy),
+          to: new scope.Point(page.x + x * px, wy + wh),
+        })),
+        ...horizontalCutInches({
+          row: sheet.row,
+          rows,
+          duplicate: duplicateStrip,
+          overlap,
+          marginTop: margins.top,
+          contentH,
+        }).map((y) => ({
+          from: new scope.Point(wx, page.y + y * px),
+          to: new scope.Point(wx + ww, page.y + y * px),
+        })),
+      ]
+      for (const cut of cuts) {
+        const line = new scope.Path.Line(cut.from, cut.to)
+        line.strokeColor = color(scope, LIME)
+        line.strokeWidth = 1
+        line.dashArray = [4, 4]
+        line.blendMode = 'difference'
+        line.data = { role: 'decor' }
+        sheetGroup.addChild(line)
+      }
+    }
+    if (showCutMarks) {
+      const marks = [
+        [wx, wy, 1, 1],
+        [wx + trimW * px, wy, -1, 1],
+        [wx, wy + trimH * px, 1, -1],
+        [wx + trimW * px, wy + trimH * px, -1, -1],
+      ]
+      for (const [x, y, sx, sy] of marks) {
+        const h = new scope.Path.Line(new scope.Point(x + sx * 4, y), new scope.Point(x + sx * 14, y))
+        const v = new scope.Path.Line(new scope.Point(x, y + sy * 4), new scope.Point(x, y + sy * 14))
+        h.strokeColor = color(scope, '#000000')
+        v.strokeColor = color(scope, '#000000')
+        h.strokeWidth = 1
+        v.strokeWidth = 1
+        h.data = { role: 'decor' }
+        v.data = { role: 'decor' }
+        sheetGroup.addChild(h)
+        sheetGroup.addChild(v)
+      }
+    }
+    if (alignRecut) {
+      drawJoinMarks(scope, sheetGroup, {
+        sheet,
+        cols,
+        rows,
+        overlap,
+        margins,
+        trimW,
+        trimH,
+        pageW,
+        pageH,
+        px,
+        page,
+      })
+    }
+    scope.project.activeLayer.addChild(sheetGroup)
+
+    if (showNumbers) {
+      const label = new scope.PointText(new scope.Point(page.x + 4, page.y + sheetH + Math.max(14, labelH - 8)))
+      const index = String(sheet.index + 1).padStart(2, '0')
+      const total = String(sheetCount).padStart(2, '0')
+      label.content = tile
+        ? `R${String(sheet.row + 1).padStart(2, '0')} C${String(sheet.col + 1).padStart(2, '0')} · ${index} / ${total}`
+        : `SHEET ${index} / ${total}  ${trimW.toFixed(2)}" × ${trimH.toFixed(2)}" TRIM`
+      label.fontSize = 10
+      label.fontFamily = 'ui-monospace, monospace'
+      label.fillColor = color(scope, '#F0F0F2')
+      label.data = { role: 'decor' }
+      scope.project.activeLayer.addChild(label)
+    }
+  })
+
+  if (showTrim && !alignRecut) {
+    sheets.forEach((sheet) => {
+      const page = pageBoardOrigin(sheet, pitchX, rulerH, stride)
+      const badges = []
+      const verticalSeam = duplicateStrip ? sheet.col > 0 : sheet.col < cols - 1
+      if (verticalSeam) {
+        const seam = duplicateStrip ? sheet.col - 1 : sheet.col
+        const cutSheet = duplicateStrip ? seam + 1 : seam
+        const onSheet = duplicateStrip ? margins.left * px + cutSlackPx : margins.left * px + contentW * px
+        badges.push({
+          x: cutSheet * pitchX + onSheet,
+          y: page.y + margins.top * px + (sliceH * px) / 2,
+        })
+      }
+      const horizontalSeam = tile && (duplicateStrip ? sheet.row > 0 : sheet.row < rows - 1)
+      if (horizontalSeam) {
+        const seam = duplicateStrip ? sheet.row - 1 : sheet.row
+        const cutSheet = duplicateStrip ? seam + 1 : seam
+        const onPage = duplicateStrip ? margins.top * px + cutSlackPx : margins.top * px + contentH * px
+        const cutPage = pageBoardOrigin({ col: sheet.col, row: cutSheet }, pitchX, rulerH, stride)
+        badges.push({
+          x: sheet.col * pitchX + margins.left * px + (sliceW * px) / 2,
+          y: cutPage.y + onPage,
+        })
+      }
+      for (const badge of badges) {
+        const dot = new scope.Path.Circle(new scope.Point(badge.x, badge.y), 10)
+        dot.fillColor = color(scope, LIME)
+        dot.data = { role: 'decor' }
+        const mark = new scope.PointText(new scope.Point(badge.x, badge.y + 4))
+        mark.content = '✂'
+        mark.justification = 'center'
+        mark.fontSize = 12
+        mark.fillColor = color(scope, '#000000')
+        mark.data = { role: 'decor' }
+        scope.project.activeLayer.addChild(dot)
+        scope.project.activeLayer.addChild(mark)
+      }
+    })
+  }
+  scope.view.update()
+}
+
+function drawJoinMarks(scope, parent, ctx) {
+  const { sheet, cols, rows, overlap, margins, trimW, trimH, pageW, pageH, px, page: origin } = ctx
+  const specs = []
+  if (sheet.col > 0) {
+    specs.push({ axis: 'vertical', side: 'start', along: margins.left, trim: trimW, cross: margins.top, crossFar: margins.bottom, pageCross: pageH })
+  }
+  if (sheet.col < cols - 1) {
+    specs.push({ axis: 'vertical', side: 'end', along: margins.left, trim: trimW, cross: margins.top, crossFar: margins.bottom, pageCross: pageH })
+  }
+  if (sheet.row > 0) {
+    specs.push({ axis: 'horizontal', side: 'start', along: margins.top, trim: trimH, cross: margins.left, crossFar: margins.right, pageCross: pageW })
+  }
+  if (sheet.row < rows - 1) {
+    specs.push({ axis: 'horizontal', side: 'end', along: margins.top, trim: trimH, cross: margins.left, crossFar: margins.right, pageCross: pageW })
+  }
+  for (const spec of specs) {
+    const marks = alignRecutOffset(overlap, spec.trim, spec.along, spec.side)
+    if (!marks) continue
+    const vertical = spec.axis === 'vertical'
+    const point = (along, cross) => (
+      vertical
+        ? new scope.Point(origin.x + along * px, origin.y + cross * px)
+        : new scope.Point(origin.x + cross * px, origin.y + along * px)
+    )
+    const paint = (along, ink) => {
+      const line = vertical
+        ? new scope.Path.Line(
+          new scope.Point(origin.x + along * px, origin.y),
+          new scope.Point(origin.x + along * px, origin.y + pageH * px),
+        )
+        : new scope.Path.Line(
+          new scope.Point(origin.x, origin.y + along * px),
+          new scope.Point(origin.x + pageW * px, origin.y + along * px),
+        )
+      line.strokeColor = color(scope, ink)
+      line.strokeWidth = 1
+      line.data = { role: 'decor' }
+      parent.addChild(line)
+    }
+    paint(marks.align, ALIGN_COLOR)
+    paint(marks.cut, RECUT_COLOR)
+    const armNear = crossArm(spec.cross) * px
+    const armFar = crossArm(spec.crossFar) * px
+    const nearAt = spec.cross > 0 ? spec.cross / 2 : 0.04
+    const farAt = spec.pageCross - (spec.crossFar > 0 ? spec.crossFar / 2 : 0.04)
+    for (const [at, arm, ink] of [[nearAt, armNear, ALIGN_COLOR], [farAt, armFar, ALIGN_COLOR]]) {
+      if (!(arm > 0)) continue
+      const center = point(marks.align, at)
+      const h = new scope.Path.Line(center.subtract(new scope.Point(arm, 0)), center.add(new scope.Point(arm, 0)))
+      const v = new scope.Path.Line(center.subtract(new scope.Point(0, arm)), center.add(new scope.Point(0, arm)))
+      h.strokeColor = color(scope, ink)
+      v.strokeColor = color(scope, ink)
+      h.strokeWidth = 1
+      v.strokeWidth = 1
+      h.data = { role: 'decor' }
+      v.data = { role: 'decor' }
+      parent.addChild(h)
+      parent.addChild(v)
+    }
+    const alignLabel = new scope.PointText(point(marks.align, nearAt))
+    alignLabel.content = 'ALIGN'
+    alignLabel.fillColor = color(scope, ALIGN_COLOR)
+    alignLabel.fontSize = (6 / 72) * px
+    alignLabel.fontFamily = 'ui-monospace, monospace'
+    alignLabel.data = { role: 'decor' }
+    const cutLabel = new scope.PointText(point(marks.cut, nearAt))
+    cutLabel.content = 'CUT'
+    cutLabel.fillColor = color(scope, RECUT_COLOR)
+    cutLabel.fontSize = (6 / 72) * px
+    cutLabel.fontFamily = 'ui-monospace, monospace'
+    cutLabel.data = { role: 'decor' }
+    parent.addChild(alignLabel)
+    parent.addChild(cutLabel)
+  }
+}
+
+function captureParts(scope, lineId) {
+  const spins = itemsWith(scope, lineId, 'glyph')
+  const chromes = itemsWith(scope, lineId, 'chrome')
+  return spins.map((spin) => {
+    const chrome = chromes.find((item) => item.data.sheetIndex === spin.data.sheetIndex) ?? null
+    return {
+      spin,
+      spinMatrix: spin.matrix.clone(),
+      body: spin.data.body,
+      bodyMatrix: spin.data.body.matrix.clone(),
+      chrome,
+      chromeMatrix: chrome ? chrome.matrix.clone() : null,
+      center: spin.data.center.clone(),
+      topLeft: spin.data.topLeft.clone(),
+    }
+  })
+}
+
+function applyGesture(drag, point, shift) {
+  const dxPx = point.x - drag.startX
+  const dyPx = point.y - drag.startY
+  if (drag.kind === 'resize') {
+    let next = drag.baseH + dyPx / drag.px
+    if (shift) next = Math.round(next / 0.5) * 0.5
+    next = Math.min(MAX_GLYPH_HEIGHT, Math.max(MIN_GLYPH_HEIGHT, next))
+    next = Math.round(next * 100) / 100
+    const scale = drag.baseH > 0 ? next / drag.baseH : 1
+    for (const part of drag.parts) {
+      part.body.matrix = part.bodyMatrix.clone()
+      if (scale !== 1) part.body.scale(scale, part.topLeft)
+      if (part.chrome && part.chromeMatrix) {
+        part.chrome.matrix = part.chromeMatrix.clone()
+        if (scale !== 1) part.chrome.scale(scale, part.topLeft)
+      }
+    }
+    return { glyphHeight: next }
+  }
+  if (drag.kind === 'rotate') {
+    const center = drag.center
+    const ang = (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI
+    let next = drag.baseDeg + (ang - drag.startAng)
+    if (shift) next = Math.round(next / 5) * 5
+    next = ((next + 540) % 360) - 180
+    next = Math.round(next * 100) / 100
+    const delta = next - drag.baseDeg
+    for (const part of drag.parts) {
+      part.spin.matrix = part.spinMatrix.clone()
+      if (delta) part.spin.rotate(delta, part.center)
+    }
+    return { rotationDeg: next }
+  }
+  let dx = drag.baseDx + dxPx / drag.px
+  let dy = drag.baseDy + dyPx / drag.px
+  if (drag.snap) {
+    dx = snapToGrid(drag.autoX + dx) - drag.autoX
+    dy = snapToGrid(drag.autoY + dy) - drag.autoY
+  }
+  const round2 = (n) => Math.round(n * 100) / 100
+  dx = round2(dx)
+  dy = round2(dy)
+  const ddx = (dx - drag.baseDx) * drag.px
+  const ddy = (dy - drag.baseDy) * drag.px
+  for (const part of drag.parts) {
+    part.spin.matrix = part.spinMatrix.clone()
+    if (ddx || ddy) part.spin.translate(ddx, ddy)
+    if (part.chrome && part.chromeMatrix) {
+      part.chrome.matrix = part.chromeMatrix.clone()
+      if (ddx || ddy) part.chrome.translate(ddx, ddy)
+    }
+  }
+  return {
+    place: { mode: drag.snap ? 'snap' : 'free', dxIn: dx, dyIn: dy },
+  }
+}
+
+function EditField({ line, width, height, px, onChange, onCommit, onCancel }) {
+  const font = fontOf(line)
+  const ref = useRef(null)
+  const cancelled = useRef(false)
+  const visible = (line.layers || []).filter((layer) => layer?.visible !== false)
+  const front = visible[visible.length - 1] ?? line.layers?.[0]
+  const transform = line.transform === 'uppercase' ? 'uppercase' : line.transform === 'lowercase' ? 'lowercase' : 'none'
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.focus({ preventScroll: true })
+    el.select()
+  }, [])
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.width = '0px'
+    const next = Math.max(el.scrollWidth + 2, width)
+    el.style.width = `${next}px`
+  }, [line.copy, width])
+
+  return (
+    <input
+      ref={ref}
+      aria-label="Edit line"
+      value={line.copy}
+      spellCheck={false}
+      onChange={(event) => onChange(event.target.value.replace(/\n/g, ' '))}
+      onBlur={() => {
+        if (!cancelled.current) onCommit()
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          event.currentTarget.blur()
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          cancelled.current = true
+          onCancel()
+        }
+      }}
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        margin: 0,
+        padding: 0,
+        border: 0,
+        outline: 'none',
+        background: 'transparent',
+        caretColor: INK,
+        fontFamily: `"${font.family}", Impact, sans-serif`,
+        fontWeight: font.weight,
+        fontSize: line.glyphHeight * FONT_SIZE_FACTOR * px,
+        letterSpacing: `${line.letterSpacing}em`,
+        lineHeight: `${height}px`,
+        height,
+        minWidth: width,
+        whiteSpace: 'nowrap',
+        color: front?.overlayOn ? INK : front?.fill || INK,
+        textTransform: transform,
+      }}
+    />
+  )
 }
 
 export function PaperPreview(props) {
@@ -102,12 +1128,11 @@ export function PaperPreview(props) {
     px,
     stacked,
     pitchX,
-    pageTop,
+    sheetGap = 0,
     boardW,
     boardH,
     sheetW,
     sheetH,
-    cardH,
     labelH,
     rulerH,
     editing,
@@ -118,9 +1143,11 @@ export function PaperPreview(props) {
   } = props
 
   const canvasRef = useRef(null)
-  const wrapRef = useRef(null)
   const scopeRef = useRef(null)
   const dragRef = useRef(null)
+  const pendingRef = useRef({ raf: 0, patch: null })
+  const lastClickRef = useRef({ time: 0, id: null })
+  const [sceneTick, setSceneTick] = useState(0)
   const stateRef = useRef({})
   stateRef.current = {
     composition,
@@ -131,6 +1158,7 @@ export function PaperPreview(props) {
     onLivePatch,
     onLiveCommit,
     onEditStart,
+    editing,
     px,
   }
 
@@ -139,133 +1167,244 @@ export function PaperPreview(props) {
   const sliceW = duplicateStrip ? trimW : contentW
   const sliceH = tile && !duplicateStrip ? contentH : trimH
 
-  // paper.js scene setup + redraw on every relevant change.
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || boardW <= 0 || boardH <= 0) return
-    if (!scopeRef.current) {
-      scopeRef.current = new paper.PaperScope()
-      scopeRef.current.setup(canvas)
-      const tool = new scopeRef.current.Tool()
-      tool.onMouseDown = (event) => {
-        const s = stateRef.current
-        const hit = scopeRef.current.project.hitTest(event.point, {
-          fill: true,
-          stroke: true,
-          segments: true,
-          tolerance: 6,
-        })
-        window.__paperHit = hit
-          ? { type: hit.type, lineId: hit.item?.data?.lineId ?? null, kind: hit.item?.data?.kind ?? null }
-          : null
-        let node = hit?.item ?? null
-        while (node && !node.data?.lineId && node.data?.kind !== 'frame' && !node.data?.sheet) {
-          node = node.parent
-        }
-        if (!node || node.data?.sheet) {
-          // Clicked empty board: select the frame container.
-          s.onSelect?.({ kind: 'container', id: s.composition.container.id })
-          return
-        }
-        const lineId = node.data?.lineId
-        if (!lineId) {
-          if (node.data?.kind === 'frame') s.onSelect?.({ kind: 'container', id: s.composition.container.id })
-          return
-        }
-        const box = (s.measured?.lineBoxes ?? []).find((b) => b.id === lineId)
-        if (!box) return
-        s.onSelect?.({ kind: 'line', id: lineId })
-        const kind = node.data?.handle ?? 'move'
-        const place = box.line.place || { mode: 'snap', dxIn: 0, dyIn: 0 }
-        let center = null
-        let ancestor = node
-        while (ancestor) {
-          if (ancestor.data?.center) {
-            center = ancestor.data.center
-            break
-          }
-          ancestor = ancestor.parent
-        }
-        const startAng =
-          kind === 'rotate' && center
-            ? (Math.atan2(event.point.y - center.y, event.point.x - center.x) * 180) / Math.PI
-            : null
-        dragRef.current = {
-          id: lineId,
-          kind,
-          startX: event.point.x,
-          startY: event.point.y,
-          center,
-          startAng,
-          autoX: box.x - (Number(place.dxIn) || 0),
-          autoY: box.y - (Number(place.dyIn) || 0),
-          baseDx: Number(place.dxIn) || 0,
-          baseDy: Number(place.dyIn) || 0,
-          baseH: Number(box.line.glyphHeight) || MIN_GLYPH_HEIGHT,
-          baseDeg: Number(box.line.rotationDeg) || 0,
-          snap: (place.mode || 'snap') !== 'free',
-          moved: false,
-        }
-      }
-      tool.onMouseDrag = (event) => {
-        const s = stateRef.current
-        const drag = dragRef.current
-        const apply = s.onLivePatch ?? s.onPatchLine
-        if (!drag || typeof apply !== 'function') return
-        const dxPx = event.point.x - drag.startX
-        const dyPx = event.point.y - drag.startY
-        if (Math.abs(dxPx) + Math.abs(dyPx) > 3) drag.moved = true
-        if (!drag.moved) return
-        const scale = s.px
-        const round2 = (n) => Math.round(n * 100) / 100
-        if (drag.kind === 'resize') {
-          const next = Math.min(
-            MAX_GLYPH_HEIGHT,
-            Math.max(MIN_GLYPH_HEIGHT, Math.round(((drag.baseH + dyPx / scale) / 0.5)) * 0.5),
-          )
-          apply(drag.id, { glyphHeight: Math.round(next * 100) / 100 })
-          return
-        }
-        if (drag.kind === 'rotate') {
-          const center = drag.center ?? event.point
-          const ang = (Math.atan2(event.point.y - center.y, event.point.x - center.x) * 180) / Math.PI
-          if (drag.startAng == null) {
-            drag.startAng =
-              (Math.atan2(drag.startY - center.y, drag.startX - center.x) * 180) / Math.PI
-          }
-          const next = drag.baseDeg + (ang - drag.startAng)
-          const wrapped = ((next + 540) % 360) - 180
-          apply(drag.id, { rotationDeg: Math.round(wrapped / 5) * 5 })
-          return
-        }
-        let dx = drag.baseDx + dxPx / scale
-        let dy = drag.baseDy + dyPx / scale
-        if (drag.snap) {
-          dx = snapToGrid(drag.autoX + dx) - drag.autoX
-          dy = snapToGrid(drag.autoY + dy) - drag.autoY
-        }
-        apply(drag.id, {
-          place: { mode: drag.snap ? 'snap' : 'free', dxIn: round2(dx), dyIn: round2(dy) },
-        })
-      }
-      tool.onMouseUp = () => {
-        const s = stateRef.current
-        const drag = dragRef.current
-        dragRef.current = null
-        if (drag?.moved) s.onLiveCommit?.(drag.id)
-      }
-      // NOTE: paper.js emulates double-click only on item handlers, not on
-      // the tool, so line groups get their own onDoubleClick in drawScene.
-      scopeRef.current._tool = tool
-      // Debug handle for automated hit-test verification.
-      canvas._paperScope = scopeRef.current
+    if (!canvas || scopeRef.current) return undefined
+    const scope = new paper.PaperScope()
+    scope.setup(canvas)
+    scopeRef.current = scope
+    canvas._paperScope = scope
+    const tool = new scope.Tool()
+
+    const pick = (point) => {
+      const hit = scope.project.hitTest(point, {
+        fill: true,
+        stroke: true,
+        tolerance: 6,
+        match: (result) => Boolean(tagged(result.item)),
+      })
+      return hit ? tagged(hit.item) : null
     }
+
+    const schedulePatch = (id, patch) => {
+      pendingRef.current.patch = { id, patch }
+      if (pendingRef.current.raf) return
+      pendingRef.current.raf = requestAnimationFrame(() => {
+        pendingRef.current.raf = 0
+        const next = pendingRef.current.patch
+        pendingRef.current.patch = null
+        if (!next) return
+        const s = stateRef.current
+        const apply = s.onLivePatch ?? s.onPatchLine
+        apply?.(next.id, next.patch)
+      })
+    }
+
+    const flushPatch = () => {
+      if (pendingRef.current.raf) cancelAnimationFrame(pendingRef.current.raf)
+      pendingRef.current.raf = 0
+      const next = pendingRef.current.patch
+      pendingRef.current.patch = null
+      if (!next) return
+      const s = stateRef.current
+      const apply = s.onLivePatch ?? s.onPatchLine
+      apply?.(next.id, next.patch)
+    }
+
+    const runButton = (kind, lineId) => {
+      const s = stateRef.current
+      const box = s.measured?.lineBoxes?.find((entry) => entry.id === lineId)
+      if (!box || typeof s.onPatchLine !== 'function') return
+      const place = box.line.place || { mode: 'snap', dxIn: 0, dyIn: 0 }
+      if (kind === 'snap') {
+        const snapping = (place.mode || 'snap') !== 'free'
+        s.onPatchLine(lineId, { place: { ...place, mode: snapping ? 'free' : 'snap' } })
+        return
+      }
+      const autoX = box.x - (Number(place.dxIn) || 0)
+      const autoY = box.y - (Number(place.dyIn) || 0)
+      const patch = kind === 'center-x'
+        ? { dxIn: Math.round(((s.measured.width - box.width) / 2 - autoX) * 100) / 100 }
+        : { dyIn: Math.round(((s.measured.height - box.height) / 2 - autoY) * 100) / 100 }
+      s.onPatchLine(lineId, { place: { ...place, mode: 'snap', ...patch } })
+    }
+
+    const finish = () => {
+      const drag = dragRef.current
+      if (!drag) return
+      dragRef.current = null
+      const s = stateRef.current
+      canvas.style.cursor = 'default'
+      if (drag.kind === 'empty' || drag.kind === 'frame') {
+        s.onSelect?.({ kind: 'container', id: s.composition.container.id })
+        return
+      }
+      if (drag.kind === 'stack') {
+        s.onSelect?.({ kind: 'stack', id: drag.stackId })
+        return
+      }
+      if (!drag.id) return
+      if (BUTTONS.has(drag.kind)) {
+        s.onSelect?.({ kind: 'line', id: drag.id })
+        runButton(drag.kind, drag.id)
+        return
+      }
+      if (drag.moved) {
+        flushPatch()
+        s.onLiveCommit?.(drag.id)
+        setSceneTick((tick) => tick + 1)
+        return
+      }
+      if (drag.pendingEdit) {
+        s.onSelect?.({ kind: 'line', id: drag.id })
+        s.onEditStart?.(drag.id, drag.sheetIndex ?? 0)
+        return
+      }
+      s.onSelect?.({ kind: 'line', id: drag.id })
+      lastClickRef.current = { time: performance.now(), id: drag.id }
+    }
+
+    tool.onMouseDown = (event) => {
+      const s = stateRef.current
+      if (s.editing) return
+      const node = pick(event.point)
+      if (!node) {
+        dragRef.current = { kind: 'empty' }
+        return
+      }
+      if (node.data.role === 'sheet' || node.data.role === 'frame') {
+        dragRef.current = { kind: 'frame' }
+        return
+      }
+      if (node.data.role === 'stack') {
+        dragRef.current = { kind: 'stack', stackId: node.data.stackId }
+        return
+      }
+      const lineId = node.data.lineId
+      const handle = node.data.role === 'handle' ? node.data.handle : 'move'
+      const now = performance.now()
+      const pendingEdit = handle === 'move'
+        && lastClickRef.current.id === lineId
+        && now - lastClickRef.current.time < 350
+      if (pendingEdit) lastClickRef.current = { time: 0, id: null }
+      const box = s.measured?.lineBoxes?.find((entry) => entry.id === lineId)
+      if (!box) return
+      const place = box.line.place || { mode: 'snap', dxIn: 0, dyIn: 0 }
+      const center = node.data.center
+      dragRef.current = {
+        id: lineId,
+        kind: handle,
+        sheetIndex: node.data.sheetIndex ?? 0,
+        pendingEdit,
+        startX: event.point.x,
+        startY: event.point.y,
+        center,
+        startAng: center
+          ? (Math.atan2(event.point.y - center.y, event.point.x - center.x) * 180) / Math.PI
+          : 0,
+        autoX: box.x - (Number(place.dxIn) || 0),
+        autoY: box.y - (Number(place.dyIn) || 0),
+        baseDx: Number(place.dxIn) || 0,
+        baseDy: Number(place.dyIn) || 0,
+        baseH: Number(box.line.glyphHeight) || MIN_GLYPH_HEIGHT,
+        baseDeg: Number(box.line.rotationDeg) || 0,
+        snap: (place.mode || 'snap') !== 'free',
+        px: s.px,
+        moved: false,
+        parts: null,
+      }
+    }
+
+    tool.onMouseDrag = (event) => {
+      const drag = dragRef.current
+      if (!drag?.id || BUTTONS.has(drag.kind)) return
+      const dxPx = event.point.x - drag.startX
+      const dyPx = event.point.y - drag.startY
+      if (!drag.moved) {
+        if (Math.abs(dxPx) + Math.abs(dyPx) <= 3) return
+        drag.moved = true
+        drag.pendingEdit = false
+        drag.parts = captureParts(scope, drag.id)
+        if (!drag.parts.length) return
+        stateRef.current.onSelect?.({ kind: 'line', id: drag.id })
+        canvas.style.cursor = 'grabbing'
+      }
+      if (!drag.parts?.length) return
+      const patch = applyGesture(drag, event.point, Boolean(event.modifiers?.shift))
+      schedulePatch(drag.id, patch)
+    }
+
+    tool.onMouseUp = () => finish()
+    tool.onMouseMove = (event) => {
+      if (dragRef.current?.moved) return
+      const node = pick(event.point)
+      const handle = node?.data?.role === 'handle' ? node.data.handle : node?.data?.lineId ? 'move' : null
+      const cursor = handle === 'resize'
+        ? 'nwse-resize'
+        : handle === 'rotate'
+          ? 'grab'
+          : handle === 'move'
+            ? 'grab'
+            : BUTTONS.has(handle)
+              ? 'pointer'
+              : 'default'
+      canvas.style.cursor = cursor
+    }
+
+    const onWindowUp = () => finish()
+    window.addEventListener('mouseup', onWindowUp)
+    return () => {
+      window.removeEventListener('mouseup', onWindowUp)
+      tool.remove()
+      scope.remove()
+      scopeRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
     const scope = scopeRef.current
+    if (!canvas || !scope || boardW <= 0 || boardH <= 0) return
+    if (dragRef.current?.moved) return
+    scope.activate()
     scope.view.viewSize = new scope.Size(Math.max(1, boardW), Math.max(1, boardH))
-    drawScene(scope, { ...props, px, sliceW, sliceH, duplicateStrip, alignRecut })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    drawScene(scope, {
+      sheets,
+      composition,
+      measured,
+      selection,
+      margins,
+      overlap,
+      pageW,
+      pageH,
+      trimW,
+      trimH,
+      contentW,
+      contentH,
+      cols,
+      rows,
+      tile,
+      px,
+      sliceW,
+      sliceH,
+      duplicateStrip,
+      alignRecut,
+      showTrim,
+      showSafe,
+      showTape,
+      showNumbers,
+      showCutMarks,
+      stacked,
+      pitchX,
+      sheetGap,
+      rulerH,
+      sheetW,
+      sheetH,
+      labelH,
+      editingLineId: editing?.lineId ?? null,
+    })
   }, [
-    canvasRef,
+    sceneTick,
     boardW,
     boardH,
     px,
@@ -281,388 +1420,84 @@ export function PaperPreview(props) {
     showNumbers,
     showCutMarks,
     stacked,
-  ])
-
-  // Editing overlay position: anchor the HTML input to the line's board
-  // position in the first sheet that shows it.
-  const editBox = (() => {
-    if (!editing || !measured) return null
-    const box = measured.lineBoxes.find((b) => b.id === editing.lineId)
-    if (!box || sheets.length === 0) return null
-    const sheet = sheets[editing.hostId] ?? sheets[0]
-    const pad = frameOffset(
-      composition,
-      measured,
-      coveredSpan(cols, trimW, contentW, duplicateStrip) || sliceW,
-      sliceH,
-    )
-    const left = sheet.col * pitchX + margins.left * px + pad.x * px + (box.x - sheet.originX) * px
-    const top =
-      (sheet.row === 0 ? rulerH : 0) +
-      sheetTopOffset(sheet, pageTop) +
-      margins.top * px +
-      pad.y * px +
-      (box.y - sheet.originY) * px
-    return { left, top, width: Math.max(60, box.width * px), height: box.height * px, box }
-  })()
-
-  return (
-    <div ref={wrapRef} className="relative" style={{ width: boardW, height: boardH }}>
-      <canvas ref={canvasRef} style={{ width: boardW, height: boardH, display: 'block' }} />
-      {editBox && (
-        <input
-          // eslint-disable-next-line jsx-a11y/no-autofocus
-          autoFocus
-          aria-label="Edit line"
-          value={editBox.box.line.copy}
-          spellCheck={false}
-          onChange={(event) => onChangeLine?.(editBox.box.id, event.target.value.replace(/\n/g, ' '))}
-          onBlur={() => onEditEnd?.()}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.currentTarget.blur()
-            if (event.key === 'Escape') onEditCancel?.()
-          }}
-          style={{
-            position: 'absolute',
-            left: editBox.left,
-            top: editBox.top,
-            width: editBox.width,
-            height: editBox.height,
-            fontFamily: `"${fontOf(editBox.box.line).family}", Impact, sans-serif`,
-            fontWeight: fontOf(editBox.box.line).weight,
-            fontSize: editBox.box.line.glyphHeight * 0.9 * px,
-            letterSpacing: `${editBox.box.line.letterSpacing}em`,
-            color: INK,
-            background: 'rgba(255,255,255,0.9)',
-            outline: `2px solid ${LIME}`,
-            border: 0,
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
-function sheetTopOffset(sheet, pageTop) {
-  return typeof pageTop === 'function' ? pageTop(sheet.row) : 0
-}
-
-// Padding that centers the frame inside the sheet window, mirroring the
-// DOM preview's placeFrameInTrim usage.
-function frameOffset(composition, measured, frameBoxW, frameBoxH) {
-  if (!measured || !(measured.width > 0)) return { x: 0, y: 0 }
-  return {
-    x: placeFrameInTrim(
-      composition.container.layout.alignX,
-      measured.width,
-      frameBoxW,
-      composition.alignMode,
-    ),
-    y: placeFrameInTrim(
-      composition.container.layout.alignY,
-      measured.height,
-      frameBoxH,
-      composition.alignMode,
-    ),
-  }
-}
-
-function drawSheetRuler(scope, gx, sliceOriginX, sliceW, px) {
-  const group = new scope.Group()
-  const first = Math.ceil(sliceOriginX - 1e-6)
-  const last = Math.floor(sliceOriginX + sliceW + 1e-6)
-  for (let inch = first; inch <= last; inch += 1) {
-    const x = gx + (inch - sliceOriginX) * px
-    const tick = new scope.Path.Line(new scope.Point(x, 18), new scope.Point(x, 28))
-    tick.strokeColor = hex('#5E5E69')
-    tick.strokeWidth = 1
-    group.addChild(tick)
-    if (inch % 6 === 0) {
-      const label = new scope.PointText(new scope.Point(x + 3, 12))
-      label.content = `${inch}"`
-      label.fontSize = 9
-      label.fillColor = hex('#7A7A80')
-      label.fontFamily = 'monospace'
-      group.addChild(label)
-    }
-  }
-  return group
-}
-
-function drawLineGroup(scope, box, px, selected) {
-  const line = box.line
-  const font = fontOf(line)
-  const text = lineText(line) || ' '
-  const fontPx = line.glyphHeight * 0.9 * px
-  const { xs } = layoutChars(text, font, line.fontId, fontPx, line.letterSpacing)
-  const group = new scope.Group()
-  group.data = { lineId: box.id }
-  const visible = (line.layers || []).filter((layer) => layer?.visible !== false)
-  for (const layer of visible) {
-    const layerGroup = new scope.Group()
-    const dx = (Number(layer.dxIn) || 0) * px
-    const dy = (Number(layer.dyIn) || 0) * px
-    for (let i = 0; i < text.length; i += 1) {
-      const pt = new scope.PointText(new scope.Point((xs[i] ?? 0) + dx, dy))
-      pt.content = text[i] === ' ' ? ' ' : text[i]
-      pt.fontFamily = `"${font.family}", Impact, sans-serif`
-      pt.fontWeight = font.weight
-      pt.fontSize = fontPx
-      pt.fillColor = hex(layer.fill || '#000000')
-      if (layer.strokeOn) {
-        pt.strokeColor = hex(layer.strokeColor || '#000000')
-        pt.strokeWidth = (Number(layer.strokeWidthIn) || 0) * px
-      }
-      // Hatch overlays have no vector equivalent here yet: approximate with
-      // a translucent second copy in the overlay color.
-      if (layer.overlayOn) {
-        pt.fillColor = hex(layer.overlayColor || layer.fill || '#000000', 0.55)
-      }
-      layerGroup.addChild(pt)
-    }
-    const skew = Number(layer.skewXDeg) || 0
-    if (skew) {
-      const tan = Math.tan((skew * Math.PI) / 180)
-      layerGroup.transform(new scope.Matrix(1, 0, tan, 1, 0, 0))
-    }
-    group.addChild(layerGroup)
-  }
-  // Align the rendered glyph box top to the measured box top.
-  const bounds = group.bounds
-  group.position = group.position.subtract(new scope.Point(0, bounds.top - box.y * px))
-  const rotation = Number(line.rotationDeg) || 0
-  if (rotation) group.rotate(rotation, group.bounds.center)
-  group.data.center = group.bounds.center.clone()
-  if (selected) {
-    const outline = new scope.Path.Rectangle(group.bounds.expand(4))
-    outline.strokeColor = hex(LIME)
-    outline.strokeWidth = 2
-    outline.data = { lineId: box.id }
-    group.addChild(outline)
-    const resize = new scope.Path.Rectangle(
-      new scope.Rectangle(group.bounds.bottomRight.subtract(new scope.Point(8, 8)), new scope.Size(16, 16)),
-    )
-    resize.fillColor = hex(LIME)
-    resize.data = { lineId: box.id, handle: 'resize' }
-    group.addChild(resize)
-    const rotate = new scope.Path.Circle(group.bounds.topLeft, 8)
-    rotate.fillColor = hex(LIME)
-    rotate.data = { lineId: box.id, handle: 'rotate' }
-    group.addChild(rotate)
-  }
-  return group
-}
-
-function drawScene(scope, ctx) {
-  const {
-    sheets,
-    composition,
-    measured,
-    selection,
+    editing,
+    cols,
+    rows,
+    tile,
     margins,
-    overlap,
     pageW,
     pageH,
     trimW,
     trimH,
     contentW,
     contentH,
-    cols,
-    tile,
-    px,
-    sliceW,
-    sliceH,
-    duplicateStrip,
-    alignRecut,
-    showTrim,
-    showSafe,
-    showTape,
-    showNumbers,
-    showCutMarks,
-    stacked,
     pitchX,
-    pageTop,
+    sheetGap,
     rulerH,
     sheetW,
     sheetH,
     labelH,
-  } = ctx
-  scope.project.activeLayer.removeChildren()
-  const root = new scope.Group()
-  const frameBoxW = coveredSpan(cols, trimW, contentW, duplicateStrip) || sliceW
-  const frameBoxH = sliceH
-  const pad = frameOffset(composition, measured, frameBoxW, frameBoxH)
+    duplicateStrip,
+    alignRecut,
+    sliceW,
+    sliceH,
+  ])
 
-  sheets.forEach((sheet) => {
-    const gx = sheet.col * pitchX
-    const cardTop = sheetTopOffset(sheet, pageTop)
-    const sy = cardTop + (sheet.row === 0 ? rulerH : 0)
-    if (sheet.row === 0) {
-      const ruler = drawSheetRuler(scope, gx + margins.left * px, sheet.originX, sliceW, px)
-      ruler.position = ruler.position.add(new scope.Point(0, cardTop))
-      root.addChild(ruler)
-    }
-    const card = new scope.Path.Rectangle(
-      new scope.Rectangle(gx, sy, sheetW, sheetH),
-      new scope.Size(2, 2),
+  const editBox = (() => {
+    if (!editing || !measured) return null
+    const box = measured.lineBoxes.find((entry) => entry.id === editing.lineId)
+    const line = findLine(composition, editing.lineId)
+    const sheet = sheets.find((entry) => entry.index === editing.hostId) ?? sheets[0]
+    if (!box || !line || !sheet) return null
+    const stride = stacked ? contentH * px : sheetH + labelH + sheetGap
+    const page = pageBoardOrigin(sheet, pitchX, rulerH, stride)
+    const pad = frameOffset(
+      composition,
+      measured,
+      coveredSpan(cols, trimW, contentW, duplicateStrip) || sliceW,
+      sliceH,
     )
-    card.fillColor = hex('#FFFFFF')
-    card.data = { sheet: sheet.index }
-    root.addChild(card)
-    if (showSafe) {
-      const safe = hex('#000000', 0.08)
-      const top = new scope.Path.Rectangle(new scope.Rectangle(gx, sy, sheetW, margins.top * px))
-      top.fillColor = safe
-      const bottom = new scope.Path.Rectangle(
-        new scope.Rectangle(gx, sy + (margins.top + trimH) * px, sheetW, margins.bottom * px),
-      )
-      bottom.fillColor = safe
-      const left = new scope.Path.Rectangle(
-        new scope.Rectangle(gx, sy + margins.top * px, margins.left * px, trimH * px),
-      )
-      left.fillColor = safe
-      const right = new scope.Path.Rectangle(
-        new scope.Rectangle(
-          gx + (margins.left + trimW) * px,
-          sy + margins.top * px,
-          margins.right * px,
-          trimH * px,
-        ),
-      )
-      right.fillColor = safe
-      root.addChild(top, bottom, left, right)
+    const left = page.x + margins.left * px + pad.x * px + (box.x - sheet.originX) * px
+    const top = page.y + margins.top * px + pad.y * px + (box.y - sheet.originY) * px
+    return {
+      left,
+      top,
+      width: Math.max(px, box.width * px),
+      height: box.height * px,
+      line,
     }
-    const wx = gx + margins.left * px
-    const wy = sy + margins.top * px
-    const ww = sliceW * px
-    const wh = sliceH * px
-    if (showTape && duplicateStrip && overlap > 0) {
-      const tape = hex('#E3FF33', 0.35)
-      if (sheet.col < cols - 1 || cols <= 1) {
-        const zone = new scope.Path.Rectangle(
-          new scope.Rectangle(wx + ww - overlap * px, wy, overlap * px, wh),
-        )
-        zone.fillColor = tape
-        root.addChild(zone)
-      }
-      if (tile && sheet.row < (ctx.rows ?? 0) - 1) {
-        const zone = new scope.Path.Rectangle(
-          new scope.Rectangle(wx, wy + wh - overlap * px, ww, overlap * px),
-        )
-        zone.fillColor = tape
-        root.addChild(zone)
-      }
-    }
-    // Composition, clipped to the sheet window.
-    if (measured && measured.width > 0) {
-      const clip = new scope.Path.Rectangle(new scope.Rectangle(wx, wy, ww, wh))
-      clip.clipMask = true
-      const comp = new scope.Group([clip])
-      comp.clipped = true
-      const ox = wx + pad.x * px - sheet.originX * px
-      const oy = wy + pad.y * px - sheet.originY * px
-      const container = composition.container
-      if (container.fillOn || container.strokeOn) {
-        const frame = new scope.Path.Rectangle(
-          new scope.Rectangle(ox, oy, measured.width * px, measured.height * px),
-        )
-        frame.fillColor = container.fillOn ? hex(container.fill) : null
-        if (container.strokeOn) {
-          frame.strokeColor = hex(container.strokeColor)
-          frame.strokeWidth = (container.strokeWidthIn || 0) * px
-        }
-        frame.data = { kind: 'frame' }
-        comp.addChild(frame)
-      }
-      if (composition.alignMode === 'grid') {
-        for (let y = Math.ceil(sheet.originY); y <= sheet.originY + sliceH; y += 1) {
-          const line = new scope.Path.Line(
-            new scope.Point(wx, wy + (y - sheet.originY) * px),
-            new scope.Point(wx + ww, wy + (y - sheet.originY) * px),
-          )
-          line.strokeColor = hex('#4d7c0f', 0.35)
-          line.strokeWidth = 1
-          comp.addChild(line)
-        }
-      }
-      for (const box of measured.lineBoxes) {
-        const g = drawLineGroup(scope, box, px, selection?.id === box.id)
-        g.position = g.position.add(new scope.Point(ox, oy))
-        g.onDoubleClick = () => {
-          ctx.onSelect?.({ kind: 'line', id: box.id })
-          ctx.onEditStart?.(box.id)
-        }
-        comp.addChild(g)
-        if (showTrim && selection?.id === box.id) {
-          const base = new scope.Path.Line(
-            new scope.Point(ox + box.x * px, oy + box.baselineY * px),
-            new scope.Point(ox + (box.x + box.width) * px, oy + box.baselineY * px),
-          )
-          base.strokeColor = hex(LIME)
-          base.strokeWidth = 1
-          comp.addChild(base)
-        }
-      }
-      root.addChild(comp)
-    }
-    if (showTrim) {
-      const trim = new scope.Path.Rectangle(new scope.Rectangle(wx, wy, ww, wh))
-      trim.strokeColor = hex('#4d7c0f')
-      trim.strokeWidth = 1.5
-      root.addChild(trim)
-    }
-    if (showCutMarks) {
-      const cuts = [
-        ...verticalCutInches({
-          col: sheet.col,
-          cols,
-          duplicate: duplicateStrip && !alignRecut,
-          overlap,
-          marginLeft: margins.left,
-          contentW,
-        }).map((x) => ({
-          from: new scope.Point(gx + x * px, sy),
-          to: new scope.Point(gx + x * px, sy + sheetH),
-        })),
-        ...horizontalCutInches({
-          row: sheet.row,
-          rows: ctx.rows ?? 0,
-          duplicate: duplicateStrip && !alignRecut,
-          overlap,
-          marginTop: margins.top,
-          contentH,
-        }).map((y) => ({
-          from: new scope.Point(gx, sy + y * px),
-          to: new scope.Point(gx + sheetW, sy + y * px),
-        })),
-      ]
-      for (const cut of cuts) {
-        const line = new scope.Path.Line(cut.from, cut.to)
-        line.strokeColor = showTrim ? hex('#365314') : hex('#FFFFFF')
-        line.strokeWidth = 1
-        line.dashArray = [4, 4]
-        root.addChild(line)
-      }
-      if (alignRecut) {
-        const marks = (side, vertical) => {
-          const m = alignRecutOffset(overlap, vertical ? trimW : trimH, 0, side)
-          return m
-        }
-        void marks
-      }
-    }
-    if (showNumbers) {
-      const label = new scope.PointText(new scope.Point(gx + 4, sy + sheetH + (labelH ? 18 : 0)))
-      label.content = `S${sheet.index + 1}`
-      label.fontSize = 11
-      label.fontFamily = 'monospace'
-      label.fillColor = hex('#7A7A80')
-      root.addChild(label)
-    }
-  })
-  scope.view.update()
-  void pageW
-  void pageH
-  void stacked
-  void overlapCutSlack
+  })()
+
+  return (
+    <div className="relative" style={{ width: boardW, height: boardH }}>
+      <canvas
+        ref={canvasRef}
+        aria-label="Banner preview"
+        style={{ width: boardW, height: boardH, display: 'block', touchAction: 'none' }}
+      />
+      {editBox && (
+        <div
+          style={{
+            position: 'absolute',
+            left: editBox.left,
+            top: editBox.top,
+            width: editBox.width,
+            height: editBox.height,
+            overflow: 'visible',
+            zIndex: 5,
+          }}
+        >
+          <EditField
+            line={editBox.line}
+            width={editBox.width}
+            height={editBox.height}
+            px={px}
+            onChange={(copy) => onChangeLine?.(editBox.line.id, copy)}
+            onCommit={() => onEditEnd?.()}
+            onCancel={() => onEditCancel?.()}
+          />
+        </div>
+      )}
+    </div>
+  )
 }
