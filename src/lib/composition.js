@@ -5,10 +5,10 @@ import {
   PX_PER_INCH,
   createLayerId,
   glyphMaxInches,
-  measureTextWidthPx,
   normalizeTextLayers,
   transformLines,
 } from './layout.js'
+import { engineLineWidthPx } from './typeEngine.js'
 
 export const MAX_COPY_LINES = 8
 export const MIN_GLYPH_HEIGHT = 0.5
@@ -459,7 +459,7 @@ export function measureLineWidthIn(line) {
   if (text.trim() === '') return 0
   const font = fontOf(line)
   const fontPx = line.glyphHeight * PX_PER_INCH * FONT_SIZE_FACTOR
-  return measureTextWidthPx([text], font, fontPx, line.letterSpacing) / PX_PER_INCH
+  return engineLineWidthPx(text, font, line.fontId, fontPx, line.letterSpacing) / PX_PER_INCH
 }
 
 export function measureLineMetrics(line) {

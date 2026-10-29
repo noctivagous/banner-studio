@@ -120,7 +120,8 @@ export default function App() {
   // Measure synchronously so the preview never renders one frame with stale
   // geometry during a drag (the old async effect resolved after paint, making
   // every pointermove flicker). fonts.ready only bumps a version key to
-  // re-measure once webfonts arrive.
+  // re-measure once webfonts arrive. The opentype engine warms in parallel
+  // and bumps the same key so kerned advances take over when ready.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -128,6 +129,13 @@ export default function App() {
         if (document.fonts?.ready) await document.fonts.ready
       } catch {
         /* fonts.ready is optional */
+      }
+      if (!cancelled) setFontsVersion((v) => v + 1)
+      try {
+        const { warmTypeEngine } = await import('./lib/typeEngine.js')
+        await warmTypeEngine()
+      } catch {
+        /* engine warmup is optional; canvas fallback stays */
       }
       if (!cancelled) setFontsVersion((v) => v + 1)
     })()

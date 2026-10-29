@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { PaperPreview } from './PaperPreview.jsx'
 import { SegmentControl } from './SegmentControl.jsx'
 import {
   MAX_GLYPH_HEIGHT,
@@ -1087,6 +1088,7 @@ export function Preview({
   const rulerH = 28
   const zoomPresets = [0.25, 0.5, 0.75, 1]
   const [arrangement, setArrangement] = useState('overlap')
+  const [renderer, setRenderer] = useState('paper')
   const [editing, setEditing] = useState(null)
   const stacked = arrangement === 'overlap' && duplicateStrip
   const sheetGap = arrangement === 'separate' ? 24 : stacked ? 0 : 8
@@ -1196,6 +1198,15 @@ export function Preview({
                 { value: 'overlap', label: 'Overlap' },
               ]}
             />
+            <SegmentControl
+              ariaLabel="Preview renderer"
+              value={renderer}
+              onChange={setRenderer}
+              options={[
+                { value: 'paper', label: 'Paper.js' },
+                { value: 'dom', label: 'DOM' },
+              ]}
+            />
           </div>
           <div className="hidden md:flex items-center gap-2 ml-3 pl-3 border-l border-black shadow-[inset_1px_0_0_rgba(255,255,255,0.05)]">
             <span className="font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
@@ -1292,6 +1303,79 @@ export function Preview({
                   </div>
                 </div>
               </div>
+            </div>
+          ) : renderer === 'paper' ? (
+            <div
+              ref={rowRef}
+              className="relative"
+              style={{ width: boardW, height: boardH }}
+            >
+              <PaperPreview
+                sheets={sheets}
+                cols={cols}
+                rows={rows}
+                tile={tile}
+                margins={margins}
+                overlap={overlap}
+                pageW={pageW}
+                pageH={pageH}
+                trimW={trimW}
+                trimH={trimH}
+                contentW={contentW}
+                contentH={contentH}
+                composition={composition}
+                measured={measured}
+                selection={selection}
+                onSelect={onSelect}
+                onPatchLine={(lineId, patch) => {
+                  if (!onChange) return
+                  onChange(withLine(composition, lineId, patch), lineId)
+                }}
+                onLivePatch={
+                  onLivePatch
+                    ? (lineId, patch) =>
+                        onLivePatch(withLine(composition, lineId, patch))
+                    : undefined
+                }
+                onLiveCommit={onLiveCommit}
+                join={join}
+                showTrim={showTrim}
+                showSafe={showSafe}
+                showTape={showTape}
+                showNumbers={showNumbers}
+                showCutMarks={showCutMarks}
+                px={px}
+                stacked={stacked}
+                pitchX={pitchX}
+                pageTop={pageTop}
+                boardW={boardW}
+                boardH={boardH}
+                sheetW={sheetW}
+                sheetH={sheetH}
+                cardH={cardH}
+                labelH={labelH}
+                rulerH={rulerH}
+                editing={editing}
+                onEditStart={(lineId) => {
+                  const line = findLine(composition, lineId)
+                  onSelect?.({ kind: 'line', id: lineId })
+                  setEditing({ lineId, hostId: 0, snapshot: line?.copy ?? '' })
+                }}
+                onChangeLine={(lineId, copy) => {
+                  if (!onChange) return
+                  onChange(withLine(composition, lineId, { copy }), lineId)
+                }}
+                onEditEnd={() => setEditing(null)}
+                onEditCancel={() => {
+                  if (editing && onChange) {
+                    onChange(
+                      withLine(composition, editing.lineId, { copy: editing.snapshot }),
+                      editing.lineId,
+                    )
+                  }
+                  setEditing(null)
+                }}
+              />
             </div>
           ) : (
             <div
