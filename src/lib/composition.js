@@ -837,6 +837,57 @@ export function shiftComposition(composition, dxIn, dyIn) {
   }, composition)
 }
 
+function rotatedAabb(box) {
+  const deg = (Number(box.line?.rotationDeg) || 0) * (Math.PI / 180)
+  const width = Number(box.width) || 0
+  const height = Number(box.height) || 0
+  const cx = box.x + width / 2
+  const cy = box.y + height / 2
+  const ex = (Math.abs(width * Math.cos(deg)) + Math.abs(height * Math.sin(deg))) / 2
+  const ey = (Math.abs(width * Math.sin(deg)) + Math.abs(height * Math.cos(deg))) / 2
+  return { left: cx - ex, right: cx + ex, top: cy - ey, bottom: cy + ey }
+}
+
+function shiftLinePlace(composition, lineId, dx, dy) {
+  if (!dx && !dy) return composition
+  const line = findLine(composition, lineId)
+  if (!line) return composition
+  const place = line.place || { mode: 'snap', dxIn: 0, dyIn: 0 }
+  return withLine(composition, lineId, {
+    place: {
+      ...place,
+      dxIn: roundHundredth((Number(place.dxIn) || 0) + dx),
+      dyIn: roundHundredth((Number(place.dyIn) || 0) + dy),
+    },
+  })
+}
+
+export function rescueHiddenLines(composition, frameW, frameH, edges = { x: 'right', y: 'bottom' }, dW, dH) {
+  const shrinkX = dW < -1e-6
+  const shrinkY = dH < -1e-6
+  if (!shrinkX && !shrinkY) return composition
+  const measured = measureComposition(composition)
+  const boxes = measured.lineBoxes || []
+  let next = composition
+  for (const box of boxes) {
+    const bounds = rotatedAabb(box)
+    let dx = 0
+    let dy = 0
+    if (shrinkX && edges.x === 'right' && bounds.left >= frameW - 1e-6) {
+      dx = frameW - bounds.right
+    } else if (shrinkX && edges.x === 'left' && bounds.right <= 1e-6) {
+      dx = -bounds.left
+    }
+    if (shrinkY && edges.y === 'bottom' && bounds.top >= frameH - 1e-6) {
+      dy = frameH - bounds.bottom
+    } else if (shrinkY && edges.y === 'top' && bounds.bottom <= 1e-6) {
+      dy = -bounds.top
+    }
+    next = shiftLinePlace(next, box.id, dx, dy)
+  }
+  return next
+}
+
 export function applySheetGrid(composition, cols, rows, ctx, edges = { x: 'right', y: 'bottom' }) {
   const next = sheetGridSize(cols, rows, ctx)
   const size = composition?.container?.size
@@ -866,6 +917,7 @@ export function applySheetGrid(composition, cols, rows, ctx, edges = { x: 'right
     extraX - alignOriginDelta(alignX, dW),
     extraY - alignOriginDelta(alignY, dH),
   )
+  nextComp = rescueHiddenLines(nextComp, next.width, next.height, edges, dW, dH)
   return { composition: nextComp, cols: next.cols, rows: next.rows, changed: true }
 }
 

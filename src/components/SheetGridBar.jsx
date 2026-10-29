@@ -26,20 +26,32 @@ function CountField({ label, value, onCommit }) {
       onKeyDown={(event) => {
         if (event.key === 'Enter') event.currentTarget.blur()
       }}
-      className="h-7 w-11 rounded-[3px] border border-[#43434E] bg-[#050506] px-1.5 text-center font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]"
+      className="h-7 w-11 rounded-[3px] border border-[#43434E] bg-[#08080A] px-1.5 text-center font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]"
     />
   )
 }
 
-function EdgeButtons({ addLabel, removeLabel, addTitle, removeTitle, onAdd, onRemove, canAdd, canRemove }) {
+function IconButton({ label, title, disabled, onClick }) {
   return (
-    <div className="inline-flex items-center gap-0.5">
-      <button type="button" className={btn} title={removeTitle} aria-label={removeLabel} disabled={!canRemove} onClick={onRemove}>
-        {removeLabel}
-      </button>
-      <button type="button" className={btn} title={addTitle} aria-label={addLabel} disabled={!canAdd} onClick={onAdd}>
-        {addLabel}
-      </button>
+    <button type="button" className={btn} title={title} aria-label={title} disabled={disabled} onClick={onClick}>
+      {label}
+    </button>
+  )
+}
+
+function AxisGroup({ label, fieldLabel, value, onCommit, before, after }) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="inline-flex items-center gap-1 rounded-[4px] border border-[#43434E] bg-[#16161c] pl-2 pr-1 py-1"
+    >
+      <span className="font-mono text-[9px] tracking-[0.12em] text-[#7A7A80] uppercase shrink-0 pr-1">
+        {label}
+      </span>
+      {before}
+      <CountField label={fieldLabel} value={value} onCommit={onCommit} />
+      {after}
     </div>
   )
 }
@@ -53,50 +65,81 @@ export function SheetGridBar({ cols, rows, onNudge, onSetGrid }) {
         <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase shrink-0">
           Pages
         </span>
-        <EdgeButtons
-          removeLabel="−←"
-          addLabel="+←"
-          removeTitle="Remove a page from the left"
-          addTitle="Add a page on the left"
-          canRemove={cols > 1}
-          canAdd={canAddCol}
-          onRemove={() => onNudge('x', 'left', -1)}
-          onAdd={() => onNudge('x', 'left', 1)}
+        <AxisGroup
+          label="Cols"
+          fieldLabel="Columns"
+          value={cols}
+          onCommit={(next) => onSetGrid(next, rows)}
+          before={
+            <>
+              <IconButton
+                label="−←"
+                title="Remove a page from the left"
+                disabled={cols <= 1}
+                onClick={() => onNudge('x', 'left', -1)}
+              />
+              <IconButton
+                label="+←"
+                title="Add a page on the left"
+                disabled={!canAddCol}
+                onClick={() => onNudge('x', 'left', 1)}
+              />
+            </>
+          }
+          after={
+            <>
+              <IconButton
+                label="+→"
+                title="Add a page on the right"
+                disabled={!canAddCol}
+                onClick={() => onNudge('x', 'right', 1)}
+              />
+              <IconButton
+                label="−→"
+                title="Remove a page from the right"
+                disabled={cols <= 1}
+                onClick={() => onNudge('x', 'right', -1)}
+              />
+            </>
+          }
         />
-        <EdgeButtons
-          removeLabel="−↑"
-          addLabel="+↑"
-          removeTitle="Remove a page from the top"
-          addTitle="Add a page on the top"
-          canRemove={rows > 1}
-          canAdd={canAddRow}
-          onRemove={() => onNudge('y', 'top', -1)}
-          onAdd={() => onNudge('y', 'top', 1)}
-        />
-        <div className="inline-flex items-center gap-1.5">
-          <CountField label="Rows" value={rows} onCommit={(next) => onSetGrid(cols, next)} />
-          <span className="font-mono text-[11px] text-[#7A7A80]">×</span>
-          <CountField label="Columns" value={cols} onCommit={(next) => onSetGrid(next, rows)} />
-        </div>
-        <EdgeButtons
-          removeLabel="−↓"
-          addLabel="+↓"
-          removeTitle="Remove a page from the bottom"
-          addTitle="Add a page on the bottom"
-          canRemove={rows > 1}
-          canAdd={canAddRow}
-          onRemove={() => onNudge('y', 'bottom', -1)}
-          onAdd={() => onNudge('y', 'bottom', 1)}
-        />
-        <EdgeButtons
-          removeLabel="−→"
-          addLabel="+→"
-          removeTitle="Remove a page from the right"
-          addTitle="Add a page on the right"
-          canRemove={cols > 1}
-          canAdd={canAddCol}
-          onRemove={() => onNudge('x', 'right', -1)}
-          onAdd={() => onNudge('x', 'right', 1)}
+        <AxisGroup
+          label="Rows"
+          fieldLabel="Rows"
+          value={rows}
+          onCommit={(next) => onSetGrid(cols, next)}
+          before={
+            <>
+              <IconButton
+                label="−↑"
+                title="Remove a page from the top"
+                disabled={rows <= 1}
+                onClick={() => onNudge('y', 'top', -1)}
+              />
+              <IconButton
+                label="+↑"
+                title="Add a page on the top"
+                disabled={!canAddRow}
+                onClick={() => onNudge('y', 'top', 1)}
+              />
+            </>
+          }
+          after={
+            <>
+              <IconButton
+                label="+↓"
+                title="Add a page on the bottom"
+                disabled={!canAddRow}
+                onClick={() => onNudge('y', 'bottom', 1)}
+              />
+              <IconButton
+                label="−↓"
+                title="Remove a page from the bottom"
+                disabled={rows <= 1}
+                onClick={() => onNudge('y', 'bottom', -1)}
+              />
+            </>
+          }
         />
       </div>
       <span className="hidden lg:block font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase shrink-0">

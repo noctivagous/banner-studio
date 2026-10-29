@@ -102,6 +102,40 @@ function pageBoardOrigin(sheet, pitchX, rulerH, stride) {
   }
 }
 
+// DOM overlapMask keeps incoming left/top margins at 45% so the printer-safe
+// hatch reads as the overlap band. Clip those margins and the hatch disappears.
+const OVERLAP_FLAP_OPACITY = 0.45
+
+function incomingOverlapInset(stacked, sheet, margins, px) {
+  return {
+    x: stacked && sheet.col > 0 ? margins.left * px : 0,
+    y: stacked && sheet.row > 0 ? margins.top * px : 0,
+  }
+}
+
+function addIncomingOverlapFlaps(scope, sheetGroup, { page, sheetW, sheetH, insetX, insetY, sheetIndex }) {
+  if (!(insetX > 0 || insetY > 0)) return null
+  const flapGroup = new scope.Group()
+  flapGroup.opacity = OVERLAP_FLAP_OPACITY
+  flapGroup.data = { role: 'decor' }
+  if (insetX > 0) {
+    const leftFlap = new scope.Path.Rectangle(new scope.Rectangle(page.x, page.y, insetX, sheetH))
+    leftFlap.fillColor = color(scope, '#FFFFFF')
+    leftFlap.data = { role: 'sheet', sheet: sheetIndex }
+    flapGroup.addChild(leftFlap)
+  }
+  if (insetY > 0) {
+    const topFlap = new scope.Path.Rectangle(
+      new scope.Rectangle(page.x + insetX, page.y, sheetW - insetX, insetY),
+    )
+    topFlap.fillColor = color(scope, '#FFFFFF')
+    topFlap.data = { role: 'sheet', sheet: sheetIndex }
+    flapGroup.addChild(topFlap)
+  }
+  sheetGroup.addChild(flapGroup)
+  return flapGroup
+}
+
 // Padding that centers the frame inside the sheet window, mirroring the
 // DOM preview's placeFrameInTrim usage.
 function frameOffset(composition, measured, frameBoxW, frameBoxH) {
@@ -624,19 +658,28 @@ function drawScene(scope, ctx) {
       )
     }
 
-    const clipIncoming = new scope.Path.Rectangle(
-      new scope.Rectangle(
-        page.x + (stacked && sheet.col > 0 ? margins.left * px : 0),
-        page.y + (stacked && sheet.row > 0 ? margins.top * px : 0),
-        sheetW - (stacked && sheet.col > 0 ? margins.left * px : 0),
-        sheetH - (stacked && sheet.row > 0 ? margins.top * px : 0),
-      ),
+    const inset = incomingOverlapInset(stacked, sheet, margins, px)
+    const clipSheet = new scope.Path.Rectangle(
+      new scope.Rectangle(page.x, page.y, sheetW, sheetH),
+      new scope.Size(2, 2),
     )
-    const sheetGroup = new scope.Group([clipIncoming])
-    clipIncoming.clipMask = true
+    const sheetGroup = new scope.Group([clipSheet])
+    clipSheet.clipMask = true
     sheetGroup.clipped = true
 
-    const card = new scope.Path.Rectangle(new scope.Rectangle(page.x, page.y, sheetW, sheetH), new scope.Size(2, 2))
+    const flapGroup = addIncomingOverlapFlaps(scope, sheetGroup, {
+      page,
+      sheetW,
+      sheetH,
+      insetX: inset.x,
+      insetY: inset.y,
+      sheetIndex: sheet.index,
+    })
+
+    const card = new scope.Path.Rectangle(
+      new scope.Rectangle(page.x + inset.x, page.y + inset.y, sheetW - inset.x, sheetH - inset.y),
+      inset.x > 0 || inset.y > 0 ? new scope.Size(0, 0) : new scope.Size(2, 2),
+    )
     card.fillColor = color(scope, '#FFFFFF')
     card.data = { role: 'sheet', sheet: sheet.index }
     card.shadowColor = color(scope, '#000000', stacked && (sheet.col > 0 || sheet.row > 0) ? 0.55 : 0.45)
@@ -646,20 +689,31 @@ function drawScene(scope, ctx) {
 
     if (showSafe) {
       const hatch = color(scope, '#1a1a1a', 0.55)
-      const bands = []
-      if (margins.top > 0) bands.push(new scope.Rectangle(page.x, page.y, sheetW, margins.top * px))
+      const solidBands = []
+      const flapBands = []
+      if (margins.top > 0) {
+        const band = new scope.Rectangle(page.x, page.y, sheetW, margins.top * px)
+        if (inset.y > 0) flapBands.push(band)
+        else solidBands.push(band)
+      }
       if (margins.bottom > 0) {
-        bands.push(new scope.Rectangle(page.x, page.y + (margins.top + trimH) * px, sheetW, margins.bottom * px))
+        solidBands.push(new scope.Rectangle(page.x, page.y + (margins.top + trimH) * px, sheetW, margins.bottom * px))
       }
       if (margins.left > 0) {
-        bands.push(new scope.Rectangle(page.x, page.y + margins.top * px, margins.left * px, trimH * px))
+        const band = new scope.Rectangle(page.x, page.y + margins.top * px, margins.left * px, trimH * px)
+        if (inset.x > 0) flapBands.push(band)
+        else solidBands.push(band)
       }
       if (margins.right > 0) {
-        bands.push(
+        solidBands.push(
           new scope.Rectangle(page.x + (margins.left + trimW) * px, page.y + margins.top * px, margins.right * px, trimH * px),
         )
       }
-      for (const band of bands) sheetGroup.addChild(diagonalHatch(scope, band, 7, 2, hatch))
+      for (const band of flapBands) {
+        const host = flapGroup ?? sheetGroup
+        host.addChild(diagonalHatch(scope, band, 7, 2, hatch))
+      }
+      for (const band of solidBands) sheetGroup.addChild(diagonalHatch(scope, band, 7, 2, hatch))
       const safe = new scope.Path.Rectangle(
         new scope.Rectangle(page.x + margins.left * px, page.y + margins.top * px, trimW * px, trimH * px),
       )
