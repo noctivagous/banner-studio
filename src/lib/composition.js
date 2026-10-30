@@ -140,6 +140,39 @@ export function normalizePlace(value, fallback) {
   }
 }
 
+export function normalizeArt(value) {
+  if (!isPlainObject(value)) return null
+  if (typeof value.blobId !== 'string' || value.blobId === '') return null
+  const aspect = Number(value.aspect)
+  return {
+    blobId: value.blobId,
+    name: typeof value.name === 'string' && value.name !== '' ? value.name.slice(0, 48) : 'Artwork',
+    kind: asEnum(value.kind, ['raster', 'svg', 'pdf'], 'raster'),
+    aspect:
+      Number.isFinite(aspect) && aspect > 0 ? Math.min(32, Math.max(1 / 32, aspect)) : 1,
+    widthIn: clamp(value.widthIn, MIN_FRAME_IN, MAX_FRAME_IN, 4),
+    fit: asEnum(value.fit, ['contain', 'cover'], 'contain'),
+  }
+}
+
+export function isArtLine(line) {
+  return Boolean(line?.art)
+}
+
+export function createArtLine(art) {
+  return normalizeLine({ id: createNodeId('line'), copy: '', art })
+}
+
+export function appendArtLine(composition, art) {
+  const stack = getStack(composition)
+  if (!stack || stack.lines.length >= MAX_COPY_LINES) {
+    return { composition, lineId: null, added: false }
+  }
+  const line = createArtLine(art)
+  const lines = [...stack.lines, line]
+  return { composition: withStack(composition, { lines }), lineId: line.id, added: true }
+}
+
 export function normalizeLine(value, fallback) {
   const base = fallback && typeof fallback === 'object' ? fallback : {}
   const src = isPlainObject(value) ? value : {}
@@ -147,6 +180,7 @@ export function normalizeLine(value, fallback) {
   return {
     id: typeof src.id === 'string' && src.id !== '' ? src.id : createNodeId('line'),
     copy: typeof src.copy === 'string' ? src.copy.replace(/\n/g, ' ') : (base.copy ?? ''),
+    art: normalizeArt(src.art ?? base.art),
     fontId,
     glyphHeight: clamp(src.glyphHeight, MIN_GLYPH_HEIGHT, MAX_GLYPH_HEIGHT, base.glyphHeight ?? 4.5),
     letterSpacing: clamp(src.letterSpacing, -0.05, 0.3, base.letterSpacing ?? 0.02),
@@ -589,6 +623,20 @@ export function measureLineWidthIn(line) {
 }
 
 export function measureLineMetrics(line) {
+  if (line?.art) {
+    const width = clamp(Number(line.art.widthIn) || 0, MIN_FRAME_IN, MAX_FRAME_IN, 4)
+    const aspect = Number(line.art.aspect) > 0 ? Number(line.art.aspect) : 1
+    const height = width / aspect
+    return {
+      width,
+      height,
+      ascentIn: height,
+      descentIn: 0,
+      cssAscentIn: height,
+      cssDescentIn: 0,
+      fontSizeIn: 0,
+    }
+  }
   const font = fontOf(line)
   const fontPx = line.glyphHeight * PX_PER_INCH * FONT_SIZE_FACTOR
   const width = measureLineWidthIn(line)

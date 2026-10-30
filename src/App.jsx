@@ -14,12 +14,15 @@ import { PrinterSafe } from './components/PrinterSafe.jsx'
 import { DEFAULT_SETTINGS, usePersistedSettings } from './hooks/usePersistedSettings.js'
 import {
   MAX_SHEETS,
+  appendArtLine,
   applySheetGrid,
   defaultSelection,
+  getLines,
   inferSheetCount,
   measureComposition,
   normalizeComposition,
 } from './lib/composition.js'
+import { fitArtworkToGrid } from './lib/artwork.js'
 import {
   ALIGN_RECUT_MIN_OVERLAP,
   JOIN_ALIGN_RECUT,
@@ -196,6 +199,50 @@ export default function App() {
     [normalized, fontsVersion],
   )
 
+  const [pendingArtSelect, setPendingArtSelect] = useState(null)
+
+  useEffect(() => {
+    if (!pendingArtSelect) return
+    const line = getLines(normalized).find((entry) => entry.art?.blobId === pendingArtSelect)
+    if (line) {
+      setSelection({ kind: 'line', id: line.id })
+      setPendingArtSelect(null)
+    }
+  }, [normalized, pendingArtSelect])
+
+  const placeArtwork = useCallback(
+    (artMeta, options = {}) => {
+      const fit = options.fit === 'cover' ? 'cover' : 'contain'
+      const matchSheets = options.matchSheets !== false
+      const grid = { trimW, trimH, contentW, contentH, duplicate, overlap, cols, rows }
+      const fitted = fitArtworkToGrid({
+        aspect: artMeta.aspect,
+        fit,
+        matchSheets,
+        grid,
+        frame: { w: measured?.width || 0, h: measured?.height || 0 },
+      })
+      if (!(fitted.widthIn > 0)) return
+      const art = { ...artMeta, fit, widthIn: Math.round(fitted.widthIn * 100) / 100 }
+      patch((prev) => {
+        const next = appendArtLine(prev.composition, art)
+        if (!next.added) return prev
+        if (fitted.cols !== prev.cols || fitted.rows !== prev.rows) {
+          return {
+            ...prev,
+            composition: next.composition,
+            cols: fitted.cols,
+            rows: fitted.rows,
+            bannerMode: fitted.rows > 1 ? 'tile' : prev.bannerMode,
+          }
+        }
+        return { ...prev, composition: next.composition }
+      })
+      setPendingArtSelect(artMeta.blobId)
+    },
+    [trimW, trimH, contentW, contentH, duplicate, overlap, cols, rows, measured],
+  )
+
   const [inspectorOpen, setInspectorOpen] = useSectionOpen('sidebar.inspector', false)
   const [safeOpen, setSafeOpen] = useSectionOpen('sidebar.safe', false)
   const [outputOpen, setOutputOpen] = useSectionOpen('sidebar.output', false)
@@ -313,6 +360,7 @@ export default function App() {
             printableHeight={trimH}
             tile={tile}
             onChange={setComposition}
+            onPlaceArtwork={placeArtwork}
           />
           <Preview
             zoom={zoom}

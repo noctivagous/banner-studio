@@ -40,6 +40,7 @@ import {
 } from '../lib/layout.js'
 import { SheetJoinMarks } from './JoinMarks.jsx'
 import { ObjectContextMenu } from './ObjectContextMenu.jsx'
+import { ArtworkImage } from './ArtworkImage.jsx'
 
 const PAPER_NOISE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`
 
@@ -549,7 +550,7 @@ export function BannerComposition({
             key={box.id}
             role={interactive ? 'button' : undefined}
             tabIndex={interactive ? 0 : undefined}
-            aria-label={interactive ? lineText(box.line) || 'Line' : undefined}
+            aria-label={interactive ? box.line.art?.name || lineText(box.line) || 'Line' : undefined}
             data-preview-node="line"
             data-node-id={box.id}
             onClick={
@@ -563,7 +564,7 @@ export function BannerComposition({
                       pick(event, { kind: 'line', id: box.id })
                       return
                     }
-                    if (selected && !editing && onEditStart) {
+                    if (selected && !editing && onEditStart && !box.line.art) {
                       event.stopPropagation()
                       onEditStart(box.id)
                       return
@@ -587,7 +588,7 @@ export function BannerComposition({
                 : undefined
             }
             onDoubleClick={
-              interactive && onEditStart
+              interactive && onEditStart && !box.line.art
                 ? (event) => {
                     event.preventDefault()
                     event.stopPropagation()
@@ -603,7 +604,7 @@ export function BannerComposition({
                       event.preventDefault()
                       event.stopPropagation()
                       onSelect({ kind: 'line', id: box.id })
-                      if (event.key === 'Enter' && onEditStart) onEditStart(box.id)
+                      if (event.key === 'Enter' && onEditStart && !box.line.art) onEditStart(box.id)
                     }
                   }
                 : undefined
@@ -734,7 +735,7 @@ export function BannerComposition({
                 </span>
               </div>
             )}
-            {canLock && primary && !editing && (
+            {canLock && primary && !editing && !box.line.art && (
               <>
                 <span
                   role="button"
@@ -833,13 +834,23 @@ export function BannerComposition({
                   transformOrigin: 'center',
                 }}
               >
-                <GlyphLine
-                  line={box.line}
-                  width={boxW}
-                  height={boxH}
-                  hatchUnit={hatchUnit}
-                  scale={scale}
-                />
+                {box.line.art ? (
+                  <ArtworkImage
+                    art={box.line.art}
+                    width={box.width * scale}
+                    height={box.height * scale}
+                    hatchUnit={hatchUnit}
+                    scale={scale}
+                  />
+                ) : (
+                  <GlyphLine
+                    line={box.line}
+                    width={boxW}
+                    height={boxH}
+                    hatchUnit={hatchUnit}
+                    scale={scale}
+                  />
+                )}
               </div>
             )}
             {selected && showGuides && !editing && (
@@ -1558,6 +1569,7 @@ export function Preview({
                 onEditStart={(lineId, hostId = 0) => {
                   const line = findLine(composition, lineId)
                   onSelect?.({ kind: 'line', id: lineId })
+                  if (line?.art) return
                   setEditing({ lineId, hostId, snapshot: line?.copy ?? '' })
                 }}
                 onChangeLine={(lineId, copy) => {

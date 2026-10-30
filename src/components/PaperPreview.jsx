@@ -43,6 +43,11 @@ import {
   verticalCutInches,
 } from '../lib/layout.js'
 import { getEngineFont } from '../lib/typeEngine.js'
+import {
+  ensureArtworkImage,
+  peekArtworkImage,
+  subscribeArtworkImages,
+} from '../lib/artworkStore.js'
 
 const LIME = '#E3FF33'
 const INK = '#111111'
@@ -410,6 +415,32 @@ function drawRuler(scope, x, y, originIn, widthIn, px) {
   return group
 }
 
+function drawArtwork(scope, body, art, left, top, width, height) {
+  const rect = new scope.Rectangle(left, top, Math.max(width, 1), Math.max(height, 1))
+  const img = peekArtworkImage(art.blobId)
+  if (img) {
+    const raster = new scope.Raster(img)
+    raster.fitBounds(rect, art.fit === 'cover')
+    if (art.fit === 'cover') {
+      const mask = new scope.Path.Rectangle(rect)
+      mask.clipMask = true
+      const clipped = new scope.Group([mask, raster])
+      clipped.clipped = true
+      body.addChild(clipped)
+    } else {
+      body.addChild(raster)
+    }
+    return
+  }
+  void ensureArtworkImage(art.blobId)
+  const placeholder = new scope.Path.Rectangle(rect)
+  placeholder.fillColor = color(scope, '#2b2b35')
+  placeholder.strokeColor = color(scope, '#E3FF33')
+  placeholder.strokeWidth = 1
+  placeholder.dashArray = [4, 4]
+  body.addChild(placeholder)
+}
+
 function drawLine(scope, box, px, frameX, frameY, selected, editing, sheetIndex, showHandles = true) {
   const line = box.line
   const font = fontOf(line)
@@ -429,7 +460,9 @@ function drawLine(scope, box, px, frameX, frameY, selected, editing, sheetIndex,
   const body = new scope.Group()
   body.applyMatrix = false
   const visible = (line.layers || []).filter((layer) => layer?.visible !== false)
-  if (!editing) {
+  if (line.art) {
+    drawArtwork(scope, body, line.art, left, top, width, height)
+  } else if (!editing) {
     for (const layer of visible) {
       const dx = (Number(layer.dxIn) || 0) * px
       const dy = (Number(layer.dyIn) || 0) * px
@@ -588,21 +621,23 @@ function addHandles(scope, chrome, box, frame, center, topLeft, sheetIndex) {
     chrome.addChild(pad)
     chrome.addChild(label)
   })
-  const resize = new scope.Path.Rectangle(
-    new scope.Rectangle(frame.right - 8, frame.bottom - 8, 16, 16),
-    new scope.Size(3, 3),
-  )
-  resize.fillColor = color(scope, LIME)
-  resize.strokeColor = color(scope, '#000000')
-  resize.strokeWidth = 1
-  resize.data = { role: 'handle', handle: 'resize', lineId: box.id, sheetIndex, center, topLeft }
-  chrome.addChild(resize)
-  const rotate = new scope.Path.Circle(frame.topLeft, 8)
-  rotate.fillColor = color(scope, LIME)
-  rotate.strokeColor = color(scope, '#000000')
-  rotate.strokeWidth = 1
-  rotate.data = { role: 'handle', handle: 'rotate', lineId: box.id, sheetIndex, center, topLeft }
-  chrome.addChild(rotate)
+  if (!box.line?.art) {
+    const resize = new scope.Path.Rectangle(
+      new scope.Rectangle(frame.right - 8, frame.bottom - 8, 16, 16),
+      new scope.Size(3, 3),
+    )
+    resize.fillColor = color(scope, LIME)
+    resize.strokeColor = color(scope, '#000000')
+    resize.strokeWidth = 1
+    resize.data = { role: 'handle', handle: 'resize', lineId: box.id, sheetIndex, center, topLeft }
+    chrome.addChild(resize)
+    const rotate = new scope.Path.Circle(frame.topLeft, 8)
+    rotate.fillColor = color(scope, LIME)
+    rotate.strokeColor = color(scope, '#000000')
+    rotate.strokeWidth = 1
+    rotate.data = { role: 'handle', handle: 'rotate', lineId: box.id, sheetIndex, center, topLeft }
+    chrome.addChild(rotate)
+  }
 }
 
 function drawScene(scope, ctx) {
@@ -1580,6 +1615,8 @@ export function PaperPreview(props) {
       scopeRef.current = null
     }
   }, [])
+
+  useEffect(() => subscribeArtworkImages(() => setSceneTick((tick) => tick + 1)), [])
 
   useEffect(() => {
     const canvas = canvasRef.current

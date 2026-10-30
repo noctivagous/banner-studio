@@ -6,6 +6,7 @@ import {
   findNode,
   fontOf,
   getStack,
+  isArtLine,
   isIdSelected,
   lineText,
   moveCopyLine,
@@ -14,6 +15,7 @@ import {
   withAlignMode,
   withLine,
 } from '../lib/composition.js'
+import { UploadForTiling } from './UploadForTiling.jsx'
 import { useSectionOpen } from '../hooks/usePersistedSections.js'
 import { ParamSection } from './ParamSection.jsx'
 import { SectionSpine, ZoneHeader } from './SectionChrome.jsx'
@@ -120,6 +122,41 @@ function StackLineInput({ line, index, align, selected, onSelect, onPatch }) {
   )
 }
 
+function ArtworkRow({ line, index, selected, onSelect }) {
+  return (
+    <div
+      onClick={() => onSelect({ kind: 'line', id: line.id })}
+      className={`relative rounded-[4px] border transition-colors cursor-pointer px-3 py-2.5 min-h-[48px] flex items-center gap-2.5 bg-[#08080A] ${
+        selected ? 'border-[#E3FF33]' : 'border-[#43434E] hover:border-[#5E5E69]'
+      }`}
+      role="button"
+      tabIndex={0}
+      aria-label={line.art?.name || `Artwork ${index + 1}`}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onSelect({ kind: 'line', id: line.id })
+        }
+      }}
+    >
+      <span
+        aria-hidden="true"
+        className="w-8 h-8 rounded-[2px] border border-[#43434E] bg-[#1e1e27] text-[#E3FF33] font-mono text-[11px] flex items-center justify-center shrink-0"
+      >
+        ▦
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block font-mono text-[11px] tracking-[0.04em] text-[#F0F0F2] truncate uppercase">
+          {line.art?.name || `Artwork ${index + 1}`}
+        </span>
+        <span className="block font-mono text-[9px] text-[#7A7A80] uppercase">
+          {(line.art?.widthIn ?? 0).toFixed(1)}&quot; wide · {line.art?.fit || 'contain'} · on top
+        </span>
+      </span>
+    </div>
+  )
+}
+
 export function CopyPanel({
   composition,
   selection,
@@ -127,6 +164,7 @@ export function CopyPanel({
   printableHeight,
   tile = false,
   onChange,
+  onPlaceArtwork,
 }) {
   const container = composition.container
   const stack = getStack(composition)
@@ -218,21 +256,34 @@ export function CopyPanel({
                 >
                   −
                 </button>
+                {onPlaceArtwork && (
+                  <UploadForTiling disabled={!canAdd} onPlace={onPlaceArtwork} />
+                )}
               </span>
             }
           />
           <div className="space-y-2">
-            {lines.map((entry, index) => (
-              <StackLineInput
-                key={entry.id}
-                line={entry}
-                index={index}
-                align={stack?.align}
-                selected={isIdSelected(selection, entry.id)}
-                onSelect={onSelect}
-                onPatch={patchThisLine}
-              />
-            ))}
+            {lines.map((entry, index) =>
+              isArtLine(entry) ? (
+                <ArtworkRow
+                  key={entry.id}
+                  line={entry}
+                  index={index}
+                  selected={isIdSelected(selection, entry.id)}
+                  onSelect={onSelect}
+                />
+              ) : (
+                <StackLineInput
+                  key={entry.id}
+                  line={entry}
+                  index={index}
+                  align={stack?.align}
+                  selected={isIdSelected(selection, entry.id)}
+                  onSelect={onSelect}
+                  onPatch={patchThisLine}
+                />
+              ),
+            )}
           </div>
         </div>
         <div className="space-y-7">
@@ -291,7 +342,8 @@ export function CopyPanel({
             )}
             {lines.map((entry, index) => {
               const font = fontOf(entry)
-              const preview = lineText(entry) || `Line ${index + 1}`
+              const art = isArtLine(entry)
+              const preview = art ? entry.art.name : lineText(entry) || `Line ${index + 1}`
               return (
                 <TreeRow
                   key={entry.id}
@@ -299,17 +351,26 @@ export function CopyPanel({
                   indent={24}
                   onClick={(event) => pickNode(event, { kind: 'line', id: entry.id })}
                   label={preview}
-                  hint={font.label}
-                  badge="Line"
+                  hint={art ? `${(entry.art.widthIn ?? 0).toFixed(1)}"` : font.label}
+                  badge={art ? 'Image' : 'Line'}
                   kind="line"
                   media={
-                    <span
-                      aria-hidden="true"
-                      className="text-[14px] leading-none text-[#F0F0F2] shrink-0 w-6 text-center"
-                      style={{ fontFamily: `"${font.family}", Impact, sans-serif` }}
-                    >
-                      Ag
-                    </span>
+                    art ? (
+                      <span
+                        aria-hidden="true"
+                        className="text-[14px] leading-none text-[#E3FF33] shrink-0 w-6 text-center"
+                      >
+                        ▦
+                      </span>
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="text-[14px] leading-none text-[#F0F0F2] shrink-0 w-6 text-center"
+                        style={{ fontFamily: `"${font.family}", Impact, sans-serif` }}
+                      >
+                        Ag
+                      </span>
+                    )
                   }
                 >
                   <button

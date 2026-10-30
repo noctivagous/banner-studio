@@ -1,4 +1,6 @@
 import {
+  MAX_FRAME_IN,
+  MIN_FRAME_IN,
   MIN_GLYPH_HEIGHT,
   findNode,
   fontOf,
@@ -6,6 +8,7 @@ import {
   getStack,
   glyphMaxForLine,
   glyphMaxForTileLine,
+  isArtLine,
   withAlignX,
   withContainer,
   withLine,
@@ -388,7 +391,92 @@ export function StackFields({ stack, onPatch, onAlignX }) {
   )
 }
 
+function ArtworkProperties({ line, onPatch }) {
+  const art = line.art
+  return (
+    <div className="pro-divided">
+      <ParamSection
+        icon={<FontIcon />}
+        title="Artwork"
+        defaultOpen
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0 truncate max-w-[140px]">
+            {art.name}
+          </span>
+        }
+      >
+        <p className="font-mono text-[10px] leading-[1.5] text-[#7A7A80]">
+          {art.kind === 'pdf' ? 'PDF page' : art.kind.toUpperCase()} · sits on top of the stack.
+          Drag the ⠿ handle to move it; it tiles with the sheets.
+        </p>
+      </ParamSection>
+      <ParamSection
+        icon={<GlyphHeightIcon />}
+        title="Width"
+        defaultOpen
+        value={
+          <span className="font-tech text-[12px] px-1.5 py-0.5 bg-[var(--ctl)] border border-[#43434E] rounded-[3px] text-[#F0F0F2]">
+            {art.widthIn.toFixed(1)}&quot;
+          </span>
+        }
+      >
+        <input
+          type="range"
+          min={MIN_FRAME_IN}
+          max={MAX_FRAME_IN}
+          step={0.5}
+          value={Math.min(art.widthIn, MAX_FRAME_IN)}
+          onChange={(e) =>
+            onPatch({
+              art: { ...art, widthIn: Math.round(parseFloat(e.target.value) * 10) / 10 },
+            })
+          }
+          className="w-full"
+        />
+        <div className="flex justify-between mt-1">
+          <span className="font-mono text-[8px] text-[#7A7A80]">{MIN_FRAME_IN}&quot;</span>
+          <span className="font-mono text-[8px] text-[#7A7A80]">
+            {((art.widthIn || 0) / (art.aspect || 1)).toFixed(1)}&quot; tall
+          </span>
+        </div>
+      </ParamSection>
+      <ParamSection
+        icon={<TransformIcon />}
+        title="Fit"
+        sectionId="inspector.art.fit"
+        defaultOpen={false}
+        value={
+          <span className="font-tech text-[12px] text-[#F0F0F2] shrink-0">
+            {art.fit === 'cover' ? 'Cover' : 'Contain'}
+          </span>
+        }
+      >
+        <div className="grid grid-cols-2 gap-1.5">
+          {[
+            { id: 'contain', label: 'Contain' },
+            { id: 'cover', label: 'Cover' },
+          ].map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => onPatch({ art: { ...art, fit: mode.id } })}
+              className={`h-8 rounded-[4px] border text-[11px] font-mono uppercase tracking-[0.08em] transition-all ${
+                art.fit === mode.id
+                  ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
+                  : 'bg-[var(--ctl)] text-[#7A7A80] border-[#43434E] hover:text-white'
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+      </ParamSection>
+    </div>
+  )
+}
+
 function LineProperties({ line, glyphMax, onPatch }) {
+  if (isArtLine(line)) return <ArtworkProperties line={line} onPatch={onPatch} />
   const font = fontOf(line)
   return (
     <div className="pro-divided">
