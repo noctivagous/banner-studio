@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { exportDocument, importDocument } from '../lib/document.js'
 import { DEFAULT_SETTINGS } from '../hooks/usePersistedSettings.js'
+import { UploadForTiling } from './UploadForTiling.jsx'
 
 const menuItem =
   'w-full text-left px-2.5 py-2 rounded-[3px] font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase hover:bg-[#26262E]'
 
-export function DocumentMenu({ settings, onImport, onReset }) {
+export function DocumentMenu({ settings, onImport, onReset, onPlaceArtwork, uploadDisabled }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const [menuBox, setMenuBox] = useState(null)
@@ -113,6 +114,14 @@ export function DocumentMenu({ settings, onImport, onReset }) {
           >
             Import
           </button>
+          {onPlaceArtwork && (
+            <UploadForTiling
+              variant="menu"
+              disabled={uploadDisabled}
+              onPlace={onPlaceArtwork}
+              onOpen={() => setOpen(false)}
+            />
+          )}
           {error && (
             <p className="px-2.5 py-1.5 font-mono text-[10px] leading-[1.4] text-[#E3FF33]">{error}</p>
           )}

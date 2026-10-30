@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { decodeArtwork, pdfPageCount } from '../lib/artwork.js'
 import { createArtworkId, deleteArtwork, putArtwork } from '../lib/artworkStore.js'
 
@@ -24,8 +25,14 @@ function DialogShell({ onClose, children }) {
   )
 }
 
-export function UploadForTiling({ disabled, onPlace }) {
-  const [open, setOpen] = useState(false)
+const triggerClass =
+  'h-6 px-2 rounded-[3px] border border-[#43434E] bg-[var(--ctl)] font-mono text-[9px] tracking-[0.12em] uppercase leading-none text-[#F0F0F2] hover:border-[#E3FF33] hover:text-[#E3FF33] disabled:opacity-40 flex items-center justify-center'
+
+const menuTriggerClass =
+  'w-full text-left px-2.5 py-2 rounded-[3px] font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase hover:bg-[#26262E] disabled:opacity-40 flex items-center justify-between'
+
+export function UploadForTiling({ disabled, onPlace, variant, onOpen }) {
+  const [dialogOpen, setDialogOpen] = useState(false)
   const [phase, setPhase] = useState('idle')
   const [file, setFile] = useState(null)
   const [pageCount, setPageCount] = useState(0)
@@ -54,7 +61,13 @@ export function UploadForTiling({ disabled, onPlace }) {
       }
     }
     reset()
-    setOpen(false)
+    setDialogOpen(false)
+  }
+
+  const launch = () => {
+    reset()
+    setDialogOpen(true)
+    onOpen?.()
   }
 
   const pick = async (nextFile) => {
@@ -107,26 +120,30 @@ export function UploadForTiling({ disabled, onPlace }) {
     )
     setStaged({ ...staged, placed: true })
     reset()
-    setOpen(false)
+    setDialogOpen(false)
   }
 
   return (
     <>
       <button
         type="button"
-        title="Upload an image, SVG, or PDF and tile it"
+        role={variant === 'menu' ? 'menuitem' : undefined}
+        title={disabled ? 'Line limit reached — remove a line to upload' : 'Upload an image, SVG, or PDF and tile it'}
         aria-label="Upload for tiling"
         disabled={disabled}
-        onClick={() => {
-          reset()
-          setOpen(true)
-        }}
-        className="h-6 px-2 rounded-[3px] border border-[#43434E] bg-[var(--ctl)] font-mono text-[9px] tracking-[0.12em] uppercase leading-none text-[#F0F0F2] hover:border-[#E3FF33] hover:text-[#E3FF33] disabled:opacity-40 flex items-center justify-center"
+        onClick={launch}
+        className={variant === 'menu' ? menuTriggerClass : triggerClass}
       >
-        ⇪ Upload for Tiling
+        <span>⇪ Upload for Tiling</span>
+        {variant === 'menu' && (
+          <span aria-hidden="true" className="text-[#7A7A80]">
+            ⧉
+          </span>
+        )}
       </button>
-      {open && (
-        <DialogShell onClose={close}>
+      {dialogOpen &&
+        createPortal(
+          <DialogShell onClose={close}>
           <div className="flex items-center justify-between">
             <h2 className="font-mono text-[12px] tracking-[0.12em] uppercase text-[#F0F0F2]">
               Upload for Tiling
@@ -293,8 +310,9 @@ export function UploadForTiling({ disabled, onPlace }) {
               event.target.value = ''
             }}
           />
-        </DialogShell>
-      )}
+          </DialogShell>,
+          document.body,
+        )}
     </>
   )
 }

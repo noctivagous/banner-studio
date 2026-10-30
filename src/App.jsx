@@ -13,6 +13,7 @@ import { PrintArea } from './components/PrintArea.jsx'
 import { PrinterSafe } from './components/PrinterSafe.jsx'
 import { DEFAULT_SETTINGS, usePersistedSettings } from './hooks/usePersistedSettings.js'
 import {
+  MAX_COPY_LINES,
   MAX_SHEETS,
   appendArtLine,
   applySheetGrid,
@@ -347,7 +348,13 @@ export default function App() {
                 marks={{ printTrim, printNumbers, printCutMarks }}
                 onChange={patch}
               />
-              <DocumentMenu settings={settings} onImport={importDocument} onReset={resetDocument} />
+              <DocumentMenu
+                settings={settings}
+                onImport={importDocument}
+                onReset={resetDocument}
+                onPlaceArtwork={placeArtwork}
+                uploadDisabled={getLines(normalized).length >= MAX_COPY_LINES}
+              />
             </div>
           </div>
         </header>
@@ -360,7 +367,6 @@ export default function App() {
             printableHeight={trimH}
             tile={tile}
             onChange={setComposition}
-            onPlaceArtwork={placeArtwork}
           />
           <Preview
             zoom={zoom}

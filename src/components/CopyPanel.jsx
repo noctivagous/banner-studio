@@ -15,7 +15,6 @@ import {
   withAlignMode,
   withLine,
 } from '../lib/composition.js'
-import { UploadForTiling } from './UploadForTiling.jsx'
 import { useSectionOpen } from '../hooks/usePersistedSections.js'
 import { ParamSection } from './ParamSection.jsx'
 import { SectionSpine, ZoneHeader } from './SectionChrome.jsx'
@@ -164,7 +163,6 @@ export function CopyPanel({
   printableHeight,
   tile = false,
   onChange,
-  onPlaceArtwork,
 }) {
   const container = composition.container
   const stack = getStack(composition)
@@ -256,9 +254,6 @@ export function CopyPanel({
                 >
                   −
                 </button>
-                {onPlaceArtwork && (
-                  <UploadForTiling disabled={!canAdd} onPlace={onPlaceArtwork} />
-                )}
               </span>
             }
           />
