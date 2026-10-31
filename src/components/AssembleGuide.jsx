@@ -7,8 +7,19 @@ import {
   OVERLAP_CUT_SLACK,
 } from '../lib/layout.js'
 
-export function AssembleGuide({ join = 'trim-tape', asymmetric, overlap, multiRow = false }) {
-  const [open, setOpen] = useState(false)
+export function AssembleGuide({
+  join = 'trim-tape',
+  asymmetric,
+  overlap,
+  multiRow = false,
+  hideButton = false,
+  open: openProp,
+  onOpenChange,
+  anchorRef,
+}) {
+  const [storedOpen, setStoredOpen] = useState(false)
+  const open = openProp ?? storedOpen
+  const setOpen = onOpenChange ?? setStoredOpen
   const [box, setBox] = useState(null)
   const buttonRef = useRef(null)
   const panelRef = useRef(null)
@@ -32,29 +43,35 @@ export function AssembleGuide({ join = 'trim-tape', asymmetric, overlap, multiRo
     }
   }, [open])
 
-  const toggle = () => {
-    const rect = buttonRef.current.getBoundingClientRect()
+  useEffect(() => {
+    if (!open) return
+    const anchor = anchorRef?.current || buttonRef.current
+    if (!anchor) return
+    const rect = anchor.getBoundingClientRect()
     const width = 340
     setBox({
       top: rect.bottom + 8,
-      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
       width,
     })
-    setOpen((value) => !value)
-  }
+  }, [open, anchorRef])
+
+  const toggle = () => setOpen((value) => !value)
 
   return (
     <>
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        aria-controls={titleId}
-        className="h-6 px-2 rounded-[4px] border border-[#43434E] bg-[#26262E] font-mono text-[10px] tracking-[0.12em] text-[#E3FF33] uppercase hover:border-[#5E5E69]"
-      >
-        How to assemble
-      </button>
+      {hideButton ? null : (
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          aria-controls={titleId}
+          className="h-6 px-2 rounded-[4px] border border-[#43434E] bg-[#26262E] font-mono text-[10px] tracking-[0.12em] text-[#E3FF33] uppercase hover:border-[#5E5E69]"
+        >
+          How to assemble
+        </button>
+      )}
       {open && box && (
         <div
           ref={panelRef}

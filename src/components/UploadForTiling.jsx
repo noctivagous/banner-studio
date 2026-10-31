@@ -31,8 +31,35 @@ const triggerClass =
 const menuTriggerClass =
   'w-full text-left px-2.5 py-2 rounded-[3px] font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase hover:bg-[#26262E] disabled:opacity-40 flex items-center justify-between'
 
-export function UploadForTiling({ disabled, onPlace, variant, onOpen }) {
-  const [dialogOpen, setDialogOpen] = useState(false)
+export function UploadForTilingTrigger({ disabled, variant, onClick }) {
+  return (
+    <button
+      type="button"
+      role={variant === 'menu' ? 'menuitem' : undefined}
+      title={disabled ? 'Line limit reached — remove a line to upload' : 'Upload an image, SVG, or PDF and tile it'}
+      aria-label="Upload for tiling"
+      disabled={disabled}
+      onClick={onClick}
+      className={variant === 'menu' ? menuTriggerClass : triggerClass}
+    >
+      <span>⇪ Upload for Tiling</span>
+      {variant === 'menu' && (
+        <span aria-hidden="true" className="text-[#7A7A80]">
+          ⧉
+        </span>
+      )}
+    </button>
+  )
+}
+
+export function UploadForTiling({ disabled, onPlace, variant, onOpen, hideTrigger, open, onOpenChange }) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = open !== undefined
+  const dialogOpen = isControlled ? open : uncontrolledOpen
+  const setDialogOpen = (next) => {
+    if (isControlled) onOpenChange?.(next)
+    else setUncontrolledOpen(next)
+  }
   const [phase, setPhase] = useState('idle')
   const [file, setFile] = useState(null)
   const [pageCount, setPageCount] = useState(0)
@@ -125,22 +152,9 @@ export function UploadForTiling({ disabled, onPlace, variant, onOpen }) {
 
   return (
     <>
-      <button
-        type="button"
-        role={variant === 'menu' ? 'menuitem' : undefined}
-        title={disabled ? 'Line limit reached — remove a line to upload' : 'Upload an image, SVG, or PDF and tile it'}
-        aria-label="Upload for tiling"
-        disabled={disabled}
-        onClick={launch}
-        className={variant === 'menu' ? menuTriggerClass : triggerClass}
-      >
-        <span>⇪ Upload for Tiling</span>
-        {variant === 'menu' && (
-          <span aria-hidden="true" className="text-[#7A7A80]">
-            ⧉
-          </span>
-        )}
-      </button>
+      {!hideTrigger && (
+        <UploadForTilingTrigger disabled={disabled} variant={variant} onClick={launch} />
+      )}
       {dialogOpen &&
         createPortal(
           <DialogShell onClose={close}>

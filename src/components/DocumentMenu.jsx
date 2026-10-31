@@ -1,13 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
 import { exportDocument, importDocument } from '../lib/document.js'
 import { DEFAULT_SETTINGS } from '../hooks/usePersistedSettings.js'
-import { UploadForTiling } from './UploadForTiling.jsx'
+import { AssembleGuide } from './AssembleGuide.jsx'
+import { SegmentControl } from './SegmentControl.jsx'
+import { UploadForTiling, UploadForTilingTrigger } from './UploadForTiling.jsx'
 
 const menuItem =
   'w-full text-left px-2.5 py-2 rounded-[3px] font-mono text-[11px] tracking-[0.08em] text-[#F0F0F2] uppercase hover:bg-[#26262E]'
 
-export function DocumentMenu({ settings, onImport, onReset, onPlaceArtwork, uploadDisabled }) {
+export function DocumentMenu({
+  settings,
+  onImport,
+  onReset,
+  onPlaceArtwork,
+  uploadDisabled,
+  renderer = 'paper',
+  onRendererChange,
+  arrangement = 'overlap',
+  onArrangementChange,
+  join,
+  asymmetric,
+  overlap,
+  multiRow,
+}) {
   const [open, setOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
   const [error, setError] = useState('')
   const [menuBox, setMenuBox] = useState(null)
   const rootRef = useRef(null)
@@ -103,6 +121,52 @@ export function DocumentMenu({ settings, onImport, onReset, onPlaceArtwork, uplo
           className="fixed z-50 rounded-[4px] border border-[#43434E] bg-[#121214] p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.55)]"
           style={{ top: menuBox.top, left: menuBox.left, width: menuBox.width }}
         >
+          {onRendererChange ? (
+            <div className="px-1.5 pt-1 pb-1.5">
+              <p className="px-1 pb-1.5 font-mono text-[9px] tracking-[0.14em] text-[#7A7A80] uppercase">
+                Preview
+              </p>
+              <SegmentControl
+                ariaLabel="Preview renderer"
+                fill
+                value={renderer}
+                onChange={onRendererChange}
+                options={[
+                  { value: 'paper', label: 'Paper.js' },
+                  { value: 'dom', label: 'DOM' },
+                ]}
+              />
+            </div>
+          ) : null}
+          {onArrangementChange ? (
+            <div className="px-1.5 pt-1 pb-1.5">
+              <p className="px-1 pb-1.5 font-mono text-[9px] tracking-[0.14em] text-[#7A7A80] uppercase">
+                Arrangement
+              </p>
+              <SegmentControl
+                ariaLabel="Sheet arrangement"
+                fill
+                value={arrangement}
+                onChange={onArrangementChange}
+                options={[
+                  { value: 'separate', label: 'Separate' },
+                  { value: 'overlap', label: 'Overlap' },
+                ]}
+              />
+            </div>
+          ) : null}
+          <div aria-hidden="true" className="h-px bg-[#43434E] my-1" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false)
+              setGuideOpen(true)
+            }}
+            className={menuItem}
+          >
+            How to assemble
+          </button>
           <button type="button" role="menuitem" onClick={download} className={menuItem}>
             Export
           </button>
@@ -115,11 +179,13 @@ export function DocumentMenu({ settings, onImport, onReset, onPlaceArtwork, uplo
             Import
           </button>
           {onPlaceArtwork && (
-            <UploadForTiling
+            <UploadForTilingTrigger
               variant="menu"
               disabled={uploadDisabled}
-              onPlace={onPlaceArtwork}
-              onOpen={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false)
+                setUploadOpen(true)
+              }}
             />
           )}
           {error && (
@@ -147,6 +213,24 @@ export function DocumentMenu({ settings, onImport, onReset, onPlaceArtwork, uplo
         accept=".json,application/json"
         className="hidden"
         onChange={onFile}
+      />
+      {onPlaceArtwork && (
+        <UploadForTiling
+          hideTrigger
+          open={uploadOpen}
+          onOpenChange={setUploadOpen}
+          onPlace={onPlaceArtwork}
+        />
+      )}
+      <AssembleGuide
+        hideButton
+        open={guideOpen}
+        onOpenChange={setGuideOpen}
+        anchorRef={rootRef}
+        join={join}
+        asymmetric={asymmetric}
+        overlap={overlap}
+        multiRow={multiRow}
       />
     </div>
   )

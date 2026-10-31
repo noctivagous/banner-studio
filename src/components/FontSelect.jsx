@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { FONTS, FONT_GROUPS } from '../lib/layout.js'
 
 const GROUPS = FONT_GROUPS.map((label) => ({
@@ -9,11 +9,12 @@ const GROUPS = FONT_GROUPS.map((label) => ({
 const FLAT = GROUPS.flatMap((g) => g.fonts)
 const INDEX_OF = new Map(FLAT.map((f, i) => [f.id, i]))
 
-export function FontSelect({ fontId, onChange }) {
+export function FontSelect({ fontId, onChange, compact = false }) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const rootRef = useRef(null)
   const listRef = useRef(null)
+  const listId = useId()
   const current = FONTS.find((f) => f.id === fontId) || FONTS[0]
 
   useEffect(() => {
@@ -67,13 +68,17 @@ export function FontSelect({ fontId, onChange }) {
         type="button"
         role="combobox"
         aria-expanded={open}
-        aria-controls="font-listbox"
+        aria-controls={listId}
         aria-activedescendant={open ? `font-opt-${FLAT[active].id}` : undefined}
         onClick={() => setOpen((o) => !o)}
-        className="w-full bg-[#08080A] border border-[#43434E] rounded-[4px] px-3 py-2.5 text-left focus:outline-none focus:border-[#E3FF33]/60 flex items-center justify-between gap-2"
+        className={
+          compact
+            ? 'h-7 min-w-[148px] max-w-[200px] bg-[#26262E] border border-[#43434E] rounded-[3px] px-2 text-left focus:outline-none focus:border-[#E3FF33] flex items-center justify-between gap-2 hover:border-[#5E5E69]'
+            : 'w-full bg-[#08080A] border border-[#43434E] rounded-[4px] px-3 py-2.5 text-left focus:outline-none focus:border-[#E3FF33]/60 flex items-center justify-between gap-2'
+        }
         style={{ fontFamily: `"${current.family}", Impact, sans-serif` }}
       >
-        <span className="text-[16px] leading-none text-[#F0F0F2] truncate">
+        <span className={`${compact ? 'text-[13px]' : 'text-[16px]'} leading-none text-[#F0F0F2] truncate`}>
           {current.label}
         </span>
         <span aria-hidden="true" className="text-[#7A7A80] text-[10px] shrink-0">
@@ -82,11 +87,13 @@ export function FontSelect({ fontId, onChange }) {
       </button>
       {open && (
         <ul
-          id="font-listbox"
+          id={listId}
           ref={listRef}
           role="listbox"
           aria-label="Font family"
-          className="absolute z-50 left-0 right-0 top-full mt-1 max-h-64 overflow-y-auto bg-[#08080A] border border-[#43434E] rounded-[4px] p-1 shadow-[0_12px_40px_rgba(0,0,0,0.7)]"
+          className={`absolute z-50 top-full mt-1 max-h-64 overflow-y-auto bg-[#08080A] border border-[#43434E] rounded-[4px] p-1 shadow-[0_12px_40px_rgba(0,0,0,0.7)] ${
+            compact ? 'left-0 w-[240px]' : 'left-0 right-0'
+          }`}
         >
           {GROUPS.map((g) => (
             <li key={g.label} role="presentation">

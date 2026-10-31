@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AssembleGuide } from './components/AssembleGuide.jsx'
 import { BannerModeControl } from './components/BannerModeControl.jsx'
+import { Logo } from './components/Logo.jsx'
 import { CopyPanel } from './components/CopyPanel.jsx'
 import { DocumentMenu } from './components/DocumentMenu.jsx'
 import { Inspector } from './components/Inspector.jsx'
+import { PaperSizeMenu } from './components/PaperSizeMenu.jsx'
 import { PrintButton } from './components/PrintButton.jsx'
 import { RailSection } from './components/SectionChrome.jsx'
 import { useSectionOpen } from './hooks/usePersistedSections.js'
 import { Output } from './components/Output.jsx'
 import { Preview } from './components/Preview.jsx'
+import { SheetCountMenu } from './components/SheetGridBar.jsx'
 import { PrintArea } from './components/PrintArea.jsx'
 import { PrinterSafe } from './components/PrinterSafe.jsx'
 import { DEFAULT_SETTINGS, usePersistedSettings } from './hooks/usePersistedSettings.js'
@@ -30,17 +32,19 @@ import {
   JOIN_OVERLAP_TAPE,
   assembledSpan,
   buildSheets,
-  formatLength,
   joinDuplicates,
 } from './lib/layout.js'
 import { sheetSize } from './lib/paper.js'
+import { formatSize } from './lib/units.js'
 
 export default function App() {
   const [settings, patch, reset] = usePersistedSettings()
   const {
     composition,
     paperId,
+    customPaper,
     orientation,
+    unit,
     bannerMode,
     cols: storedCols,
     rows: storedRows,
@@ -59,7 +63,7 @@ export default function App() {
     scaleToFit,
   } = settings
 
-  const sheet = sheetSize(paperId, orientation)
+  const sheet = sheetSize(paperId, orientation, customPaper)
   const { pageW, pageH } = sheet
   const trimW = pageW - margins.left - margins.right
   const trimH = pageH - margins.top - margins.bottom
@@ -104,7 +108,7 @@ export default function App() {
   const applyGrid = useCallback(
     (nextCols, nextRows, edges) => {
       patch((prev) => {
-        const sheet = sheetSize(prev.paperId, prev.orientation)
+        const sheet = sheetSize(prev.paperId, prev.orientation, prev.customPaper)
         const nextTrimW = sheet.pageW - prev.margins.left - prev.margins.right
         const nextTrimH = sheet.pageH - prev.margins.top - prev.margins.bottom
         const nextOverlap = prev.overlap
@@ -244,11 +248,14 @@ export default function App() {
     [trimW, trimH, contentW, contentH, duplicate, overlap, cols, rows, measured],
   )
 
+  const [copyOpen, setCopyOpen] = useSectionOpen('sidebar.copy', false)
   const [inspectorOpen, setInspectorOpen] = useSectionOpen('sidebar.inspector', false)
   const [safeOpen, setSafeOpen] = useSectionOpen('sidebar.safe', false)
   const [outputOpen, setOutputOpen] = useSectionOpen('sidebar.output', false)
   const rightOpen = inspectorOpen || safeOpen || outputOpen
   const [joinBump, setJoinBump] = useState(false)
+  const [renderer, setRenderer] = useState('paper')
+  const [arrangement, setArrangement] = useState('overlap')
   const setJoin = (next) => {
     patch((prev) => {
       if (next === prev.join) return prev
@@ -269,7 +276,7 @@ export default function App() {
   const assembledHeight = assembledSpan(rows, trimH, overlap)
 
   const print = () => window.print()
-  const pageLabel = `${sheet.label} ${orientation} ${pageW.toFixed(2)}"×${pageH.toFixed(2)}"`
+  const pageLabel = `${sheet.label} ${orientation} ${formatSize(pageW, pageH, unit)}`
 
   useEffect(() => {
     let style = document.getElementById('banner-page-size')
@@ -289,13 +296,8 @@ export default function App() {
       >
         <header className="pro-bar h-14 bg-[#141417] flex items-center justify-between px-4 shrink-0 sticky top-0 z-30">
           <div className="flex items-center gap-4">
-            <div className="flex items-baseline gap-3">
-              <span
-                className="font-black tracking-[-0.02em] text-[15px] leading-none"
-                style={{ fontFamily: 'Anton, Impact, sans-serif' }}
-              >
-                TILE<span className="text-[#7A7A80] mx-[5px]">/</span>BANNER STUDIO
-              </span>
+            <div className="flex items-center gap-3">
+              <Logo />
               <div className="hidden md:inline-flex items-center gap-1.5">
                 <BannerModeControl
                   value={bannerMode}
@@ -304,17 +306,44 @@ export default function App() {
                     patch((prev) => (prev.bannerMode === mode ? prev : { ...prev, bannerMode: mode }))
                   }}
                 />
-                <span className="pro-seg inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] bg-[#2b2b35] border text-[9px] font-mono tracking-[0.12em] text-[#9A9AA2] uppercase">
-                  {pageW.toFixed(2)}×{pageH.toFixed(2)}
-                </span>
+                <PaperSizeMenu
+                  paperId={paperId}
+                  orientation={orientation}
+                  customPaper={customPaper}
+                  unit={unit}
+                  onChange={patch}
+                />
               </div>
             </div>
-            <div className="hidden lg:flex items-center gap-2 ml-2">
-              <div className="w-px h-4 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)]" />
-              <span className="font-mono text-[10px] tracking-[0.14em] text-[#7A7A80] uppercase">
-                No edge-to-edge • Inside safe area
-              </span>
-              <AssembleGuide
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 pr-1">
+              <div className="inline-flex items-stretch">
+                <SheetCountMenu
+                  cols={cols}
+                  rows={rows}
+                  sheetCount={sheetCount}
+                  onSetGrid={(nextCols, nextRows) => applyGrid(nextCols, nextRows, { x: 'right', y: 'bottom' })}
+                />
+                <PrintButton
+                  flushLeft
+                  disabled={sheetCount === 0}
+                  onPrint={print}
+                  join={join}
+                  marks={{ printTrim, printNumbers, printCutMarks }}
+                  onChange={patch}
+                />
+              </div>
+              <DocumentMenu
+                settings={settings}
+                onImport={importDocument}
+                onReset={resetDocument}
+                onPlaceArtwork={placeArtwork}
+                uploadDisabled={getLines(normalized).length >= MAX_COPY_LINES}
+                renderer={renderer}
+                onRendererChange={setRenderer}
+                arrangement={arrangement}
+                onArrangementChange={setArrangement}
                 join={join}
                 asymmetric={join === JOIN_OVERLAP_TAPE}
                 overlap={overlap}
@@ -322,44 +351,10 @@ export default function App() {
               />
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 pr-1">
-              <div className="hidden md:flex items-center gap-3 pr-3 border-r border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)]">
-                <span className="font-mono text-[10px] tracking-[0.12em] text-[#7A7A80] uppercase">
-                  {sheetCount > 0 ? `${cols}×${rows}` : sheetCount} Sheets
-                </span>
-                <span className="w-px h-3 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)]" />
-                <span className="font-mono text-[10px] tracking-[0.12em] text-[#F0F0F2]">
-                  {assembledInches > 0
-                    ? `${formatLength(assembledInches)} × ${formatLength(assembledHeight)}`
-                    : '—'}
-                </span>
-              </div>
-              <div className="pro-seg h-8 px-3 bg-[#2b2b35] border rounded-[3px] flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#E3FF33] animate-pulse" />
-                <span className="font-mono text-[10px] tracking-[0.12em] text-[#F0F0F2] uppercase">
-                  {trimW.toFixed(2)}&quot; × {trimH.toFixed(2)}&quot; TRIM
-                </span>
-              </div>
-              <PrintButton
-                disabled={sheetCount === 0}
-                onPrint={print}
-                join={join}
-                marks={{ printTrim, printNumbers, printCutMarks }}
-                onChange={patch}
-              />
-              <DocumentMenu
-                settings={settings}
-                onImport={importDocument}
-                onReset={resetDocument}
-                onPlaceArtwork={placeArtwork}
-                uploadDisabled={getLines(normalized).length >= MAX_COPY_LINES}
-              />
-            </div>
-          </div>
         </header>
 
-        <div className="flex-1 flex flex-col xl:flex-row overflow-hidden min-h-0 min-w-0">
+        <div className="flex-1 flex flex-row overflow-hidden min-h-0 min-w-0">
+          <div className="order-2 flex w-max max-w-[46vw] shrink-0 flex-col overflow-x-hidden overflow-y-auto border-l border-black min-h-0 xl:contents">
           <CopyPanel
             composition={normalized}
             selection={selection}
@@ -367,46 +362,13 @@ export default function App() {
             printableHeight={trimH}
             tile={tile}
             onChange={setComposition}
-          />
-          <Preview
-            zoom={zoom}
-            scaleToFit={scaleToFit}
-            onZoom={(next) => patch({ zoom: next })}
-            onScaleToFit={(next) => patch({ scaleToFit: next })}
-            sheetCount={sheetCount}
-            sheets={sheets}
-            cols={cols}
-            rows={rows}
-            tile={tile}
-            assembledInches={assembledInches}
-            margins={margins}
-            overlap={overlap}
-            pageW={pageW}
-            pageH={pageH}
-            trimW={trimW}
-            trimH={trimH}
-            contentW={contentW}
-            contentH={contentH}
-            composition={normalized}
-            measured={measured}
-            selection={selection}
-            onSelect={setSelection}
-            onChange={setComposition}
-            onLivePatch={patchCompositionLive}
-            onLiveCommit={commitComposition}
-            onSheetGrid={applyGrid}
-            join={join}
-            showTrim={showTrim}
-            showSafe={showSafe}
-            showTape={showTape}
-            showNumbers={showNumbers}
-            showCutMarks={showCutMarks}
+            open={copyOpen}
+            onOpenChange={setCopyOpen}
+            fill={!copyOpen && !rightOpen}
           />
           <div
-            className={`min-h-0 bg-[#101014] border-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] flex flex-col overflow-hidden shrink-0 ${
-              rightOpen
-                ? 'w-full xl:w-[320px] max-h-[46vh] xl:max-h-none border-t xl:border-t-0 xl:border-l overflow-y-auto'
-                : 'w-[22px] border-l'
+            className={`contents xl:order-3 xl:flex xl:min-h-0 xl:flex-none xl:flex-col xl:overflow-hidden xl:border-l xl:border-black ${
+              rightOpen ? 'xl:w-[320px] xl:overflow-y-auto' : 'xl:w-[22px]'
             }`}
           >
               <RailSection
@@ -414,7 +376,7 @@ export default function App() {
                 label="Inspector"
                 sub="02"
                 defaultOpen={false}
-                collapsedFill={!rightOpen}
+                collapsedFill={!copyOpen && !rightOpen}
                 zoneClass="zone-inspector bg-[#14141c] border-b border-black"
                 open={inspectorOpen}
                 onOpenChange={setInspectorOpen}
@@ -434,7 +396,7 @@ export default function App() {
                 label="Paper & Margins"
                 sub="03"
                 defaultOpen={false}
-                collapsedFill={!rightOpen}
+                collapsedFill={!copyOpen && !rightOpen}
                 zoneClass="zone-safe bg-[#2d2314] border-b border-black"
                 open={safeOpen}
                 onOpenChange={setSafeOpen}
@@ -462,7 +424,7 @@ export default function App() {
                 label="Output"
                 sub="04"
                 defaultOpen={false}
-                collapsedFill={!rightOpen}
+                collapsedFill={!copyOpen && !rightOpen}
                 zoneClass="zone-output bg-[#111a0b]"
                 open={outputOpen}
                 onOpenChange={setOutputOpen}
@@ -489,12 +451,80 @@ export default function App() {
                 join={join}
                 printMarks={{ printTrim, printNumbers, printCutMarks }}
                 pageLabel={pageLabel}
+                unit={unit}
               />
                 </div>
               </RailSection>
           </div>
+          </div>
+          <Preview
+            zoom={zoom}
+            scaleToFit={scaleToFit}
+            onZoom={(next) => patch({ zoom: next })}
+            onScaleToFit={(next) => patch({ scaleToFit: next })}
+            sheetCount={sheetCount}
+            sheets={sheets}
+            cols={cols}
+            rows={rows}
+            tile={tile}
+            assembledInches={assembledInches}
+            margins={margins}
+            overlap={overlap}
+            pageW={pageW}
+            pageH={pageH}
+            trimW={trimW}
+            trimH={trimH}
+            contentW={contentW}
+            contentH={contentH}
+            composition={normalized}
+            measured={measured}
+            selection={selection}
+            onSelect={setSelection}
+            onChange={setComposition}
+            onLivePatch={patchCompositionLive}
+            onLiveCommit={commitComposition}
+            onSheetGrid={applyGrid}
+            renderer={renderer}
+            arrangement={arrangement}
+            unit={unit}
+            join={join}
+            showTrim={showTrim}
+            showSafe={showSafe}
+            showTape={showTape}
+            showNumbers={showNumbers}
+            showCutMarks={showCutMarks}
+          />
         </div>
-        <footer className="pro-rail-t h-[10px] shrink-0 bg-[#0c0c0e]" />
+        <footer className="pro-rail-t h-11 shrink-0 bg-[#0c0c0e] flex items-center justify-end gap-1.5 px-3">
+          <span className="hidden md:block font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase mr-1">
+            Zoom
+          </span>
+          {[0.25, 0.5, 0.75, 1].map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => patch({ scaleToFit: false, zoom: level })}
+              className={`hidden lg:inline-flex pro-bevel h-7 px-2.5 rounded-[3px] border font-mono text-[11px] tracking-[0.08em] transition-colors ${
+                !scaleToFit && Math.abs(zoom - level) < 0.001
+                  ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
+                  : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-[#F0F0F2] hover:border-[#5E5E69]'
+              }`}
+            >
+              {level * 100}%
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => patch({ scaleToFit: true })}
+            className={`pro-bevel h-7 px-2.5 rounded-[3px] border font-mono text-[11px] tracking-[0.08em] uppercase transition-colors ${
+              scaleToFit
+                ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
+                : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-[#F0F0F2] hover:border-[#5E5E69]'
+            }`}
+          >
+            Scale
+          </button>
+        </footer>
       </div>
       <PrintArea
         sheets={sheets}

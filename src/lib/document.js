@@ -11,7 +11,8 @@ import {
   normalizeJoin,
   normalizeTextLayers,
 } from './layout.js'
-import { PAPERS, sheetSize } from './paper.js'
+import { CUSTOM_PAPER_ID, PAPERS, normalizeCustomPaper, sheetSize } from './paper.js'
+import { normalizeUnit } from './units.js'
 
 export const SCHEMA = 'tile-banner-studio'
 export const DOCUMENT_VERSION = 3
@@ -45,7 +46,7 @@ const VIEW_KEYS = [
   'scaleToFit',
 ]
 
-const LAYOUT_KEYS = ['paperId', 'orientation', 'cols', 'rows', 'bannerMode']
+const LAYOUT_KEYS = ['paperId', 'orientation', 'unit', 'customPaper', 'cols', 'rows', 'bannerMode']
 
 export function normalizeBannerMode(value) {
   return value === 'tile' ? 'tile' : 'horiz'
@@ -87,7 +88,9 @@ export function exportDocument(settings) {
     exportedAt: new Date().toISOString(),
     layout: {
       paperId: settings.paperId,
+      customPaper: settings.paperId === CUSTOM_PAPER_ID ? settings.customPaper : undefined,
       orientation: settings.orientation,
+      unit: normalizeUnit(settings.unit),
       cols: settings.cols,
       rows: settings.rows,
       bannerMode: normalizeBannerMode(settings.bannerMode),
@@ -152,14 +155,20 @@ export function importDocument(raw, defaults) {
   const colsIn = layoutSplit.known.cols
   const cols = Number.isInteger(colsIn) && colsIn >= 1 ? colsIn : undefined
 
-  const paperId = asEnum(
+  let paperId = asEnum(
     layoutSplit.known.paperId,
     PAPERS.map((paper) => paper.id),
     null,
   )
+  let customPaper = null
+  if (layoutSplit.known.paperId === CUSTOM_PAPER_ID) {
+    customPaper = normalizeCustomPaper(layoutSplit.known.customPaper)
+    paperId = customPaper ? CUSTOM_PAPER_ID : null
+  }
   if (!paperId) throw new Error('That file uses an unknown paper size.')
   const orientation = asEnum(layoutSplit.known.orientation, ['landscape', 'portrait'], null)
   if (!orientation) throw new Error('That file has no page orientation.')
+  const unit = normalizeUnit(layoutSplit.known.unit ?? defaults.unit)
 
   const marginsIn = isPlainObject(viewSplit.known.margins) ? viewSplit.known.margins : {}
   const margins = {
@@ -192,7 +201,7 @@ export function importDocument(raw, defaults) {
       null,
     )
     if (!fontId) throw new Error('That file uses an unknown font.')
-    const trimH = sheetSize(paperId, orientation).pageH - margins.top - margins.bottom
+    const trimH = sheetSize(paperId, orientation, customPaper).pageH - margins.top - margins.bottom
     const glyphHeight = clamp(
       textSplit.known.glyphHeight,
       0.8,
@@ -213,7 +222,9 @@ export function importDocument(raw, defaults) {
   return {
     ...defaults,
     paperId,
+    customPaper,
     orientation,
+    unit,
     cols,
     rows,
     bannerMode: normalizeBannerMode(layoutSplit.known.bannerMode),

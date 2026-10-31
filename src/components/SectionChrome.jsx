@@ -3,23 +3,16 @@ import { useSectionOpen } from '../hooks/usePersistedSections.js'
 export function SectionSpine({ label, sub, expanded = true, onToggle, className = '' }) {
   const face = (
     <>
-      <span className="w-1.5 h-1.5 rounded-full bg-[#E3FF33]" />
-      <span
-        className="font-stencil text-[10px] tracking-[0.28em] text-[#9A9AA2] uppercase whitespace-nowrap"
-        style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-      >
+      <span className="w-1.5 h-1.5 rounded-full bg-[#E3FF33] shrink-0" />
+      <span className="font-stencil text-[10px] tracking-[0.28em] text-[#9A9AA2] uppercase whitespace-nowrap [writing-mode:vertical-rl] rotate-180">
         {label}
       </span>
-      <span
-        className="font-mono text-[8px] tracking-[0.2em] text-[#5A5A60] uppercase whitespace-nowrap"
-        style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-      >
+      <span className="font-mono text-[8px] tracking-[0.2em] text-[#5A5A60] uppercase whitespace-nowrap [writing-mode:vertical-rl] rotate-180">
         {sub}
       </span>
     </>
   )
-  const shell =
-    `flex-none w-[22px] self-stretch flex flex-col items-center justify-between py-3 border-r border-black bg-black/40 shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] ${className}`
+  const shell = `flex-none w-[22px] self-stretch flex flex-col items-center justify-between py-3 border-r border-black bg-black/40 shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] ${className}`
 
   if (!onToggle) {
     return (
@@ -64,10 +57,10 @@ export function RailSection({
     <section
       className={`${zoneClass} flex flex-row overflow-hidden min-h-0 ${
         expanded
-          ? 'flex-1 min-w-0'
+          ? 'flex-1 min-h-0 min-w-0 w-[min(320px,46vw)] self-stretch xl:w-auto'
           : collapsedFill
-            ? 'shrink-0 h-[4.5rem] xl:h-auto xl:flex-1 xl:min-h-0'
-            : 'shrink-0 h-[4.5rem] xl:h-auto xl:min-h-[6.5rem]'
+            ? 'flex-1 min-h-[7.5rem] w-[22px] self-end xl:h-auto xl:min-h-0 xl:w-auto xl:self-stretch'
+            : 'shrink-0 w-[22px] self-end xl:h-auto xl:min-h-[6.5rem] xl:w-auto xl:self-stretch'
       }`}
     >
       <SectionSpine

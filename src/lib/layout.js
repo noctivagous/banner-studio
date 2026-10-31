@@ -1,3 +1,5 @@
+import { formatMeasure, unitSpec } from './units.js'
+
 export const PX_PER_INCH = 90
 
 // Inset the top sheet's left cut this far into the duplicated tape.
@@ -216,7 +218,12 @@ export const MARGIN_PRESETS = {
   custom: { top: 0.2, bottom: 0.2, left: 0.3, right: 0.3 },
 }
 
-export function formatLength(inches) {
+export function formatLength(inches, unit = 'in') {
+  if (unit !== 'in') {
+    const label = unitSpec(unit).label
+    if (!(inches > 0)) return `0 ${label}`
+    return `${formatMeasure(inches, unit)} ${label}`
+  }
   if (inches <= 0) return '0"'
   const feet = Math.floor(inches / 12)
   const rem = inches % 12

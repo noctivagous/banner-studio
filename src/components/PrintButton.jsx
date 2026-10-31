@@ -13,6 +13,7 @@ export function PrintButton({
   onChange,
   join = 'trim-tape',
   fullWidth = false,
+  flushLeft = false,
 }) {
   const [open, setOpen] = useState(false)
   const [menuBox, setMenuBox] = useState(null)
@@ -61,7 +62,9 @@ export function PrintButton({
         type="button"
         onClick={onPrint}
         disabled={disabled}
-        className={`${height} ${fullWidth ? 'flex-1' : 'px-3'} rounded-l-[4px] bg-[#E3FF33] text-black font-mono text-[11px] font-bold tracking-[0.12em] uppercase disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110`}
+        className={`${height} ${fullWidth ? 'flex-1' : 'px-3'} ${
+          flushLeft ? 'rounded-l-[4px] md:rounded-l-none' : 'rounded-l-[4px]'
+        } bg-[#E3FF33] text-black font-mono text-[11px] font-bold leading-none tracking-[0.12em] uppercase disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110`}
       >
         Print{markCount > 0 ? ` + ${markCount}` : ''}
       </button>

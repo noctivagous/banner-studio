@@ -6,7 +6,7 @@ import {
   detectPreset,
 } from '../lib/layout.js'
 import { JoinSelect } from './JoinMarks.jsx'
-import { PAPERS } from '../lib/paper.js'
+import { CUSTOM_PAPER_ID, PAPERS } from '../lib/paper.js'
 import { FieldLabel } from './FieldLabel.jsx'
 import { ParamSection } from './ParamSection.jsx'
 import { ZoneHeader } from './SectionChrome.jsx'
@@ -25,7 +25,10 @@ const PRESET_BUTTONS = [
 export function PrinterSafe({ margins, overlap, join = 'overlap-tape', onJoin, joinBump = false, paperId, orientation, onChange }) {
   const active = detectPreset(margins)
   const alignRecut = join === JOIN_ALIGN_RECUT
-  const paperLabel = PAPERS.find((paper) => paper.id === paperId)?.label ?? paperId
+  const paperLabel =
+    paperId === CUSTOM_PAPER_ID
+      ? 'Custom'
+      : (PAPERS.find((paper) => paper.id === paperId)?.label ?? paperId)
   const presetLabel = PRESET_BUTTONS.find((preset) => preset.id === active)?.label ?? active
   const uniformMargin =
     margins.top === margins.bottom &&
@@ -92,6 +95,7 @@ export function PrinterSafe({ margins, overlap, join = 'overlap-tape', onJoin, j
             onChange={(e) => onChange({ paperId: e.target.value })}
             className="w-full bg-[#08080A] border border-[#43434E] rounded-[3px] h-9 px-2.5 font-tech text-[13px] text-[#F0F0F2] focus:outline-none focus:border-[#E3FF33]/60 appearance-none shadow-[inset_0_2px_5px_rgba(0,0,0,0.6)]"
           >
+            {paperId === CUSTOM_PAPER_ID ? <option value={CUSTOM_PAPER_ID}>Custom</option> : null}
             {PAPERS.map((paper) => (
               <option key={paper.id} value={paper.id}>
                 {paper.label}

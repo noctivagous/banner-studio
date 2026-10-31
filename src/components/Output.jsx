@@ -1,4 +1,5 @@
 import { JOIN_ALIGN_RECUT, formatLength } from '../lib/layout.js'
+import { formatSize } from '../lib/units.js'
 import { PrintButton } from './PrintButton.jsx'
 import { ParamSection } from './ParamSection.jsx'
 import { ZoneHeader } from './SectionChrome.jsx'
@@ -26,6 +27,7 @@ export function Output({
   join = 'trim-tape',
   printMarks,
   pageLabel,
+  unit = 'in',
 }) {
   const alignRecut = join === JOIN_ALIGN_RECUT
   const toggles = [
@@ -58,8 +60,8 @@ export function Output({
           <div className="font-tech text-[13px] leading-[1.3] text-[#F0F0F2] break-all">
             {assembledInches > 0
               ? tile
-                ? `${formatLength(assembledInches)} × ${formatLength(assembledHeight)}`
-                : formatLength(assembledInches)
+                ? `${formatLength(assembledInches, unit)} × ${formatLength(assembledHeight, unit)}`
+                : formatLength(assembledInches, unit)
               : '—'}
           </div>
         </div>
@@ -69,7 +71,7 @@ export function Output({
             {tile ? 'Assembled Height' : 'Final Height'}
           </span>
           <span className="font-tech text-[12px] text-[#F0F0F2]">
-            {(tile ? assembledHeight : trimH).toFixed(2)}&quot;
+            {formatLength(tile ? assembledHeight : trimH, unit)}
           </span>
         </div>
         <div className="flex justify-between">
@@ -77,7 +79,7 @@ export function Output({
             Trim / Sheet
           </span>
           <span className="font-tech text-[12px] text-[#F0F0F2]">
-            {trimW.toFixed(2)}&quot; × {trimH.toFixed(2)}&quot;
+            {formatSize(trimW, trimH, unit)}
           </span>
         </div>
         <div className="flex justify-between">
@@ -86,8 +88,8 @@ export function Output({
           </span>
           <span className="font-mono text-[11px] text-[#A8A8B0]">
             {tile
-              ? `${contentW.toFixed(2)}" × ${contentH.toFixed(2)}"`
-              : `${contentW.toFixed(2)}" wide`}
+              ? formatSize(contentW, contentH, unit)
+              : `${formatLength(contentW, unit)} wide`}
           </span>
         </div>
       </div>

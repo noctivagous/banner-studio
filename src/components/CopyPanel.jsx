@@ -15,7 +15,6 @@ import {
   withAlignMode,
   withLine,
 } from '../lib/composition.js'
-import { useSectionOpen } from '../hooks/usePersistedSections.js'
 import { ParamSection } from './ParamSection.jsx'
 import { SectionSpine, ZoneHeader } from './SectionChrome.jsx'
 import { SegmentControl } from './SegmentControl.jsx'
@@ -163,6 +162,9 @@ export function CopyPanel({
   printableHeight,
   tile = false,
   onChange,
+  open,
+  onOpenChange,
+  fill = false,
 }) {
   const container = composition.container
   const stack = getStack(composition)
@@ -187,8 +189,7 @@ export function CopyPanel({
   const patchThisLine = (lineId, linePatch) => {
     onChange(withLine(composition, lineId, linePatch), lineId)
   }
-
-  const [open, setOpen] = useSectionOpen('sidebar.copy', false)
+  const setOpen = onOpenChange
 
   const afterId = line?.id || lines[lines.length - 1]?.id
   const addLine = () => {
@@ -209,10 +210,12 @@ export function CopyPanel({
 
   return (
     <div
-      className={`zone-copy min-h-0 bg-[#14141c] border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] flex flex-row overflow-hidden shrink-0 ${
+      className={`zone-copy min-h-0 bg-[#14141c] border-black shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] flex flex-row overflow-hidden xl:order-1 ${
         open
-          ? 'w-full xl:w-[340px] max-h-[46vh] xl:max-h-none border-b xl:border-b-0 xl:border-r'
-          : 'w-full h-[4.5rem] xl:w-[22px] xl:h-auto border-r'
+          ? 'w-[min(340px,46vw)] flex-1 min-h-0 self-stretch border-b xl:w-[340px] xl:flex-none xl:max-h-none xl:border-b-0 xl:border-r'
+          : fill
+            ? 'w-[22px] flex-1 min-h-[7.5rem] self-end border-b xl:h-auto xl:min-h-0 xl:w-[22px] xl:flex-none xl:self-stretch xl:border-b-0 xl:border-r'
+            : 'w-[22px] shrink-0 self-end border-b xl:h-auto xl:w-[22px] xl:self-stretch xl:border-b-0 xl:border-r'
       }`}
     >
       <SectionSpine

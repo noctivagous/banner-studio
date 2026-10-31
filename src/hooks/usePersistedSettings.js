@@ -6,6 +6,8 @@ import {
   normalizeComposition,
 } from '../lib/composition.js'
 import { normalizeBannerMode } from '../lib/document.js'
+import { CUSTOM_PAPER_ID, PAPERS, normalizeCustomPaper } from '../lib/paper.js'
+import { normalizeUnit } from '../lib/units.js'
 import { JOIN_OVERLAP_TAPE, normalizeJoin } from '../lib/layout.js'
 
 export const STORAGE_KEY = 'tile-banner-studio'
@@ -13,7 +15,9 @@ export const STORAGE_KEY = 'tile-banner-studio'
 export const DEFAULT_SETTINGS = {
   composition: defaultComposition(),
   paperId: 'letter',
+  customPaper: null,
   orientation: 'landscape',
+  unit: 'in',
   cols: 2,
   rows: 1,
   bannerMode: 'horiz',
@@ -65,9 +69,22 @@ function load() {
       printOverlap: _printOverlap,
       ...rest
     } = parsed
+    const customPaper = normalizeCustomPaper(parsed.customPaper)
+    const paperKnown = PAPERS.some((paper) => paper.id === parsed.paperId)
+    const paperId =
+      parsed.paperId === CUSTOM_PAPER_ID
+        ? customPaper
+          ? CUSTOM_PAPER_ID
+          : DEFAULT_SETTINGS.paperId
+        : paperKnown
+          ? parsed.paperId
+          : DEFAULT_SETTINGS.paperId
     return {
       ...DEFAULT_SETTINGS,
       ...rest,
+      paperId,
+      customPaper,
+      unit: normalizeUnit(parsed.unit),
       composition,
       cols: Number.isInteger(parsed.cols) && parsed.cols >= 1 ? parsed.cols : undefined,
       rows: Number.isInteger(parsed.rows) && parsed.rows >= 1 ? parsed.rows : undefined,

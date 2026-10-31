@@ -1,15 +1,21 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { PaperPreview } from './PaperPreview.jsx'
-import { SegmentControl } from './SegmentControl.jsx'
-import { SheetGridBar } from './SheetGridBar.jsx'
+import { SheetColsControl, SheetRowsControl } from './SheetGridBar.jsx'
+import { InsertPalette } from './InsertPalette.jsx'
+import { FontSelect } from './FontSelect.jsx'
+import { FontSizeControl } from './FontSizeControl.jsx'
 import {
   MAX_GLYPH_HEIGHT,
   MIN_GLYPH_HEIGHT,
   cornerLengthIn,
   cutPolygonCss,
   cutPolygonPoints,
+  addCopyLine,
+  canAddCopyLine,
   findLine,
   fontOf,
+  getLines,
+  isArtLine,
   isIdSelected,
   lineText,
   nextSelection,
@@ -1177,6 +1183,9 @@ export function Preview({
   onLivePatch,
   onLiveCommit,
   onSheetGrid,
+  renderer = 'paper',
+  arrangement = 'overlap',
+  unit = 'in',
   join = 'overlap-tape',
   showTrim,
   showSafe,
@@ -1226,9 +1235,6 @@ export function Preview({
     hTop: 0,
   })
   const rulerH = 28
-  const zoomPresets = [0.25, 0.5, 0.75, 1]
-  const [arrangement, setArrangement] = useState('overlap')
-  const [renderer, setRenderer] = useState('paper')
   const [editing, setEditing] = useState(null)
   const [objectMenu, setObjectMenu] = useState(null)
 
@@ -1288,6 +1294,8 @@ export function Preview({
   const sheetsW = cols > 0 ? (cols - 1) * pitchX + sheetW : 0
   const boardW = sheetsW
   const boardH = rows > 0 ? pageTop(rows - 1) + rowBody : 0
+  const canvasHeightIn =
+    rows > 0 ? (stacked ? pageH + Math.max(0, rows - 1) * contentH : rows * pageH) : pageH
 
   const measureScroll = useCallback(() => {
     const el = canvasRef.current
@@ -1371,93 +1379,82 @@ export function Preview({
     return () => ro.disconnect()
   }, [measureScroll, sheetCount, cols, rows, zoom, pageW, pageH, showNumbers, arrangement, join])
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-[#08080A] relative order-first xl:order-none overflow-hidden">
-      <div className="pro-bar h-[46px] bg-[#141417] flex items-center justify-between px-3 shrink-0">
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#E3FF33] animate-pulse" />
-            <span className="font-mono text-[11px] tracking-[0.12em] text-[#F0F0F2] uppercase">
-              Preview Canvas
-            </span>
-            <SegmentControl
-              ariaLabel="Sheet arrangement"
-              value={arrangement}
-              onChange={setArrangement}
-              options={[
-                { value: 'separate', label: 'Separate' },
-                { value: 'overlap', label: 'Overlap' },
-              ]}
-            />
-            <SegmentControl
-              ariaLabel="Preview renderer"
-              value={renderer}
-              onChange={setRenderer}
-              options={[
-                { value: 'paper', label: 'Paper.js' },
-                { value: 'dom', label: 'DOM' },
-              ]}
-            />
-          </div>
-          <div className="hidden md:flex items-center gap-2 ml-3 pl-3 border-l border-black shadow-[inset_1px_0_0_rgba(255,255,255,0.05)]">
-            <span className="font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase">
-              Scale 1&quot; = {PX_PER_INCH * zoom}px
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="hidden md:block font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase mr-2">
-            Zoom
-          </span>
-          {zoomPresets.map((level) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => {
-                onScaleToFit(false)
-                onZoom(level)
-              }}
-              className={`hidden lg:inline-flex pro-bevel h-7 px-2.5 rounded-[3px] border font-mono text-[11px] tracking-[0.08em] transition-colors ${
-                !scaleToFit && Math.abs(zoom - level) < 0.001
-                  ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                  : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-[#F0F0F2] hover:border-[#5E5E69]'
-              }`}
-            >
-              {level * 100}%
-            </button>
-          ))}
-          <div className="hidden lg:block w-px h-4 bg-black shadow-[1px_0_0_rgba(255,255,255,0.06)] mx-1" />
-          <button
-            type="button"
-            onClick={() => onScaleToFit(true)}
-            className={`pro-bevel h-7 px-2.5 rounded-[3px] border font-mono text-[11px] tracking-[0.08em] uppercase transition-colors ${
-              scaleToFit
-                ? 'bg-[#E3FF33] text-black border-[#E3FF33] font-bold'
-                : 'bg-[#26262E] text-[#7A7A80] border-[#43434E] hover:text-[#F0F0F2] hover:border-[#5E5E69]'
-            }`}
-          >
-            Scale
-          </button>
-        </div>
-      </div>
-      {onSheetGrid ? (
-        <SheetGridBar
-          cols={cols}
-          rows={rows}
-          onNudge={(axis, edge, delta) => {
-            onSheetGrid(
-              axis === 'x' ? cols + delta : cols,
-              axis === 'y' ? rows + delta : rows,
-              {
-                x: axis === 'x' ? edge : 'right',
-                y: axis === 'y' ? edge : 'bottom',
-              },
-            )
-          }}
-          onSetGrid={(nextCols, nextRows) => onSheetGrid(nextCols, nextRows, { x: 'right', y: 'bottom' })}
-        />
-      ) : null}
+  const nudgeGrid = (axis, edge, delta) => {
+    if (!onSheetGrid) return
+    onSheetGrid(
+      axis === 'x' ? cols + delta : cols,
+      axis === 'y' ? rows + delta : rows,
+      {
+        x: axis === 'x' ? edge : 'right',
+        y: axis === 'y' ? edge : 'bottom',
+      },
+    )
+  }
+  const setGrid = (nextCols, nextRows) => {
+    if (!onSheetGrid) return
+    onSheetGrid(nextCols, nextRows, { x: 'right', y: 'bottom' })
+  }
+  const lines = getLines(composition)
+  const selectedLine = findLine(composition, selection?.id)
+  const fontLine =
+    selectedLine && !isArtLine(selectedLine) ? selectedLine : lines.find((line) => !isArtLine(line)) || null
+  const scaleLabel = (
+    <span className="absolute left-0 bottom-full mb-1.5 pointer-events-none font-mono text-[10px] tracking-[0.1em] text-[#7A7A80] uppercase whitespace-nowrap">
+      Scale 1&quot; = {(PX_PER_INCH * zoom).toFixed(2)}px
+    </span>
+  )
+  const insertText = () => {
+    if (!onChange || lines.length === 0) return
+    const afterId = fontLine?.id || lines[lines.length - 1]?.id
+    const next = addCopyLine(composition, afterId)
+    onChange(next.composition)
+    onSelect?.({ kind: 'line', id: next.lineId })
+  }
 
+  return (
+    <div className="order-1 xl:order-2 flex-1 flex flex-col min-h-0 min-w-0 bg-[#08080A] relative overflow-hidden">
+      <div className="pro-bar shrink-0 flex items-center gap-3 px-2 py-1.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              {onSheetGrid ? (
+                <SheetRowsControl cols={cols} rows={rows} onNudge={nudgeGrid} onSetGrid={setGrid} />
+              ) : null}
+              <div className="w-2 h-2 rounded-full bg-[#E3FF33] animate-pulse shrink-0" />
+            </div>
+            <InsertPalette
+              textDisabled={!canAddCopyLine(composition, trimH, { tile })}
+              onInsertText={insertText}
+            />
+          </div>
+      <div className="flex-1 flex min-h-0 min-w-0">
+        {onSheetGrid ? (
+          <div className="pro-bar shrink-0 flex items-start justify-center px-1.5 pt-1.5 border-r border-black">
+            <SheetColsControl cols={cols} rows={rows} onNudge={nudgeGrid} onSetGrid={setGrid} />
+          </div>
+        ) : null}
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
+        <div className="pro-bar shrink-0 flex items-center gap-2 px-2 py-1.5 border-b border-black">
+          <span className="font-mono text-[9px] tracking-[0.14em] text-[#5E5E69] uppercase shrink-0">
+            Font
+          </span>
+          <FontSelect
+            compact
+            fontId={fontLine?.fontId}
+            onChange={(patch) => {
+              if (!fontLine) return
+              onChange?.(withLine(composition, fontLine.id, patch))
+            }}
+          />
+          <FontSizeControl
+            glyphHeight={fontLine?.glyphHeight ?? 0}
+            canvasHeightIn={canvasHeightIn}
+            pageUnit={unit}
+            disabled={!fontLine}
+            onChange={(glyphHeight) => {
+              if (!fontLine) return
+              onChange?.(withLine(composition, fontLine.id, { glyphHeight }))
+            }}
+          />
+        </div>
       <div className="flex-1 relative min-h-0 min-w-0">
       <div
         aria-hidden="true"
@@ -1484,7 +1481,10 @@ export function Preview({
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-[#08080A] via-transparent to-[#08080A]/60 pointer-events-none" />
-        <div ref={padRef} className="relative p-6 md:p-10">
+        <div
+          ref={padRef}
+          className="relative box-border flex min-h-full min-w-full p-6 md:p-10 [align-items:safe_center] [justify-content:safe_center]"
+        >
           {sheetCount === 0 ? (
             <div className="min-h-[420px] flex items-center justify-center">
               <div className="w-full max-w-[520px] border border-dashed border-[#43434E] rounded-[4px] bg-[#121214]/60 backdrop-blur p-8 text-center">
@@ -1518,6 +1518,7 @@ export function Preview({
               className="relative"
               style={{ width: boardW, height: boardH }}
             >
+              {scaleLabel}
               <PaperPreview
                 sheets={sheets}
                 cols={cols}
@@ -1594,6 +1595,7 @@ export function Preview({
               className="relative"
               style={{ width: boardW, height: boardH }}
             >
+              {scaleLabel}
               {sheets.map((sheet) => (
                 <div
                   key={sheet.index}
@@ -2039,6 +2041,8 @@ export function Preview({
           />
         </div>
       )}
+      </div>
+      </div>
       </div>
       {objectMenu && (
         <ObjectContextMenu

@@ -149,17 +149,17 @@ export function OverlapIcon() {
   )
 }
 
-export function LandscapeIcon() {
+export function LandscapeIcon({ size = 12 }) {
   return (
-    <Base>
+    <Base size={size}>
       <rect x="1.5" y="3" width="9" height="6" rx="1" />
     </Base>
   )
 }
 
-export function PortraitIcon() {
+export function PortraitIcon({ size = 12 }) {
   return (
-    <Base>
+    <Base size={size}>
       <rect x="3" y="1.5" width="6" height="9" rx="1" />
     </Base>
   )
